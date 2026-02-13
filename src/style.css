@@ -1,0 +1,232 @@
+:root {
+  --color-bg: #f8f9fa;
+  --color-surface: #ffffff;
+  --color-text: #1a1a2e;
+  --color-text-muted: #6c757d;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-border: #dee2e6;
+  --color-drop-bg: #f0f4ff;
+  --color-drop-border: #93b4ff;
+  --color-success: #16a34a;
+  --color-error: #dc2626;
+  --color-bar-bg: #e9ecef;
+  --color-bar-fill: #2563eb;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+  min-height: 100vh;
+  padding: 2rem 1rem;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  margin-top: 0.25rem;
+}
+
+#app {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* --- Drop zone --- */
+.drop-area {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.drop-area:hover,
+.drop-area:focus-visible {
+  border-color: var(--color-drop-border);
+  background: var(--color-drop-bg);
+  outline: none;
+}
+
+.drop-area--active {
+  border-color: var(--color-primary);
+  background: var(--color-drop-bg);
+  border-style: solid;
+}
+
+.drop-area__content {
+  text-align: center;
+  pointer-events: none;
+}
+
+.drop-area__icon {
+  color: var(--color-text-muted);
+  margin-bottom: 1rem;
+}
+
+.drop-area__text {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.drop-area__subtext {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* --- Processing --- */
+.file-list {
+  list-style: none;
+}
+
+.file-item {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  box-shadow: var(--shadow);
+}
+
+.file-item__name {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.file-item__pass {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.file-item__bar {
+  height: 6px;
+  background: var(--color-bar-bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.file-item__fill {
+  height: 100%;
+  background: var(--color-bar-fill);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.file-item__fill--error {
+  background: var(--color-error);
+}
+
+/* --- Results --- */
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  margin-bottom: 1rem;
+}
+
+.results-table th,
+.results-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.results-table th {
+  background: var(--color-bg);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.saved--positive {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.saved--zero {
+  color: var(--color-text-muted);
+}
+
+.results-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+/* --- Buttons --- */
+.btn {
+  display: inline-block;
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+
+.btn--primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btn--primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.btn--secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn--secondary:hover {
+  background: var(--color-bg);
+}
+
+.btn--small {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+/* --- State visibility --- */
+.state[hidden] {
+  display: none;
+}
