@@ -233,6 +233,10 @@ Works on mobile for quick single-file optimization. Batch features are desktop-f
 - [ ] Watch mode (Node)
 - [ ] WASM Ghostscript fallback
 
+## Learnings & Documentation
+
+Technical learnings, design decisions, and pitfalls encountered during development are captured in [`docs/learnings.md`](docs/learnings.md). This is a living document — update it whenever we discover something non-obvious about PDF internals, tooling trade-offs, or browser constraints.
+
 ## Open Questions
 
 1. ~~**pdf-lib vs custom parser?**~~ **Resolved:** pdf-lib works well. Direct access to its internal `context` and indirect object enumeration provides sufficient low-level control for all current optimization passes without needing a fork.
