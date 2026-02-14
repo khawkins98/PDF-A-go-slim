@@ -2,6 +2,7 @@ import './style.css';
 
 // --- State ---
 let blobUrls = [];
+let lastFiles = null;
 
 // --- DOM refs ---
 const dropZone = document.getElementById('drop-zone');
@@ -12,7 +13,9 @@ const fileList = document.getElementById('file-list');
 const resultsSection = document.getElementById('results');
 const resultsBody = document.getElementById('results-body');
 const btnDownloadAll = document.getElementById('btn-download-all');
+const btnReoptimize = document.getElementById('btn-reoptimize');
 const btnStartOver = document.getElementById('btn-start-over');
+const optionsPanel = document.getElementById('options-panel');
 
 // Options panel refs
 const presetBtns = document.querySelectorAll('.preset-btn');
@@ -109,6 +112,7 @@ function showState(state) {
   dropZone.hidden = state !== 'idle';
   processingSection.hidden = state !== 'processing';
   resultsSection.hidden = state !== 'results';
+  optionsPanel.hidden = state === 'processing';
 }
 
 function revokeBlobUrls() {
@@ -194,6 +198,8 @@ async function handleFiles(files) {
     (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'),
   );
   if (pdfFiles.length === 0) return;
+
+  lastFiles = pdfFiles;
 
   const options = collectOptions();
 
@@ -321,8 +327,13 @@ dropArea.addEventListener('drop', (e) => {
   if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
 });
 
+btnReoptimize.addEventListener('click', () => {
+  if (lastFiles) handleFiles(lastFiles);
+});
+
 btnStartOver.addEventListener('click', () => {
   revokeBlobUrls();
+  lastFiles = null;
   fileInput.value = '';
   showState('idle');
 });
