@@ -231,6 +231,7 @@ Works on mobile for quick single-file optimization. Batch features are desktop-f
 - [x] Re-optimize button (re-run with different settings from results screen)
 - [x] Credits & attribution (footer with package links)
 - [x] Font subsetting (harfbuzzjs WASM, Type1/TrueType + Type0/Identity-H, retain-gids)
+- [x] Benchmark test suite (reference PDFs, compression quality baselines, accessibility preservation verification)
 - [ ] Linearization
 - [ ] Side-by-side preview (via PDF-A-go-go)
 

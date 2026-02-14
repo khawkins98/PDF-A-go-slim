@@ -14,6 +14,7 @@ A browser-based PDF optimization tool that reduces file size entirely client-sid
 - **Privacy-first** — files never leave your browser; all processing runs in a Web Worker
 - **Batch capable** — optimize multiple PDFs at once with individual or bulk download
 - **Debug mode** — add `?debug` to the URL to see per-pass timing, image skip reason breakdowns, and per-image conversion details
+- **Benchmark tested** — 46 benchmark tests verify compression quality, asset stripping, and accessibility preservation against 6 reference PDFs simulating real-world bloat patterns ([results](docs/benchmark-results.md))
 
 ## Quick Start
 
@@ -30,8 +31,9 @@ Open `http://localhost:5173`, drop a PDF, and download the optimized version.
 |---------|-------------|
 | `npm run dev` | Start Vite dev server |
 | `npm run build` | Production build |
-| `npm test` | Run all tests (`vitest run`) |
+| `npm test` | Run all tests and regenerate [benchmark report](docs/benchmark-results.md) |
 | `npm run test:watch` | Run tests in watch mode |
+| `npm run benchmark` | Regenerate benchmark report only |
 
 ## Architecture
 

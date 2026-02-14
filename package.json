@@ -7,8 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run && node scripts/benchmark-report.js",
+    "test:watch": "vitest",
+    "benchmark": "node scripts/benchmark-report.js"
   },
   "dependencies": {
     "fflate": "^0.8.2",

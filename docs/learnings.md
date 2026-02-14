@@ -223,6 +223,16 @@ The "Other" (now "Other Data") bucket in the object inspector is a massive dumpi
 
 Objects that don't match any of these heuristics fall into "Miscellaneous" (generic streams/dicts). Showing individual items for Miscellaneous adds visual noise without insight — a summary count + total size is sufficient.
 
+### Benchmark Fixture Design
+
+Reference PDFs for benchmark testing need to be more complex than unit-test fixtures. Key patterns:
+
+- **Multiple bloat vectors per fixture.** A realistic Illustrator-export PDF has embedded standard fonts AND XMP AND PieceInfo AND duplicate objects AND poor compression — all at once. Each fixture should exercise multiple optimization passes simultaneously.
+- **Return bytes, not PDFDocument.** Benchmark generators return `Uint8Array` (saved bytes) to match the pipeline's `optimize(inputBytes)` contract, unlike unit-test fixtures which return `PDFDocument`.
+- **Wide compression ranges.** Compression ratios for synthetic data are intentionally wide (e.g., `>= 30%` rather than `30-50%`) to avoid flakiness. Synthetic PDFs don't have the same bloat profile as real-world documents — the overhead of PDF structure objects relative to content is different. Tighten thresholds after measuring against actual real-world files.
+- **`beforeAll` for pipeline tests.** Run `optimize()` once in `beforeAll`, then assert many properties from the returned `stats` and reloaded `PDFDocument`. This avoids re-running the full pipeline (8 passes) for each assertion.
+- **Verification utility layer.** Functions like `getEmbeddedFonts()`, `getMetadataStatus()`, and `getStructureTreeInfo()` inspect a loaded `PDFDocument` and return structured results, keeping test assertions clean and reusable across suites.
+
 ### Font Subset Prefix Stripping
 
 PDF font names often carry a 6-letter subset prefix (e.g., `ABCDEF+Helvetica`). This prefix is an artifact of subsetting and meaningless to end users. The prefix always follows the pattern `[A-Z]{6}+` and can be safely stripped for display purposes using `/^[A-Z]{6}\+/`.
