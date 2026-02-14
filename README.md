@@ -9,7 +9,7 @@ A browser-based PDF optimization tool that reduces file size entirely client-sid
 - **Optimization presets** — Lossless (default), Web (lossy, 75% quality), Print (lossy, 92% quality)
 - **Advanced controls** — lossy/lossless toggle, image quality slider, font unembedding and subsetting checkboxes
 - **Per-file stats** — expandable detail rows showing what each pass accomplished
-- **Object inspector** — before/after breakdown of every PDF object by category (fonts, images, content streams, metadata, page tree) with per-category savings
+- **Object inspector** — before/after breakdown of PDF objects by category (fonts, images, page content, metadata, document structure, other data) with proportional size bars, per-item diffs, sub-grouped "Other Data", and collapsible lists
 - **Privacy-first** — files never leave your browser; all processing runs in a Web Worker
 - **Batch capable** — optimize multiple PDFs at once with individual or bulk download
 

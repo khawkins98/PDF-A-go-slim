@@ -144,6 +144,24 @@ Classifying PDF objects by semantic type requires multiple pre-passes because ma
 
 **Size measurement:** Stream `contents.length` (compressed bytes) is the meaningful size metric for understanding where bytes go. Non-stream objects (dicts, arrays, numbers) contribute negligible overhead compared to streams and can be summarized rather than listed individually.
 
+### Sub-categorizing "Other" Objects
+
+The "Other" (now "Other Data") bucket in the object inspector is a massive dumping ground without further classification. Most objects in it can be identified by checking for characteristic dictionary keys:
+
+- **ICC color profiles:** have both `/N` (number of components) and `/Alternate` (fallback colorspace) keys.
+- **CMaps:** have a `/CMapName` key — these are Unicode mapping tables for composite fonts.
+- **Font encodings:** have a `/Differences` array that overrides a base encoding.
+- **Glyph widths:** have a `/Widths` array of per-character advance widths.
+- **CID system info:** have a `/Registry` key (typically `"Adobe"`).
+- **Form XObjects:** streams with `/Subtype /Form` — reusable graphics snippets.
+- **Annotations:** `/Type /Annot` or subtypes like `/Link`, `/Widget`.
+
+Objects that don't match any of these heuristics fall into "Miscellaneous" (generic streams/dicts). Showing individual items for Miscellaneous adds visual noise without insight — a summary count + total size is sufficient.
+
+### Font Subset Prefix Stripping
+
+PDF font names often carry a 6-letter subset prefix (e.g., `ABCDEF+Helvetica`). This prefix is an artifact of subsetting and meaningless to end users. The prefix always follows the pattern `[A-Z]{6}+` and can be safely stripped for display purposes using `/^[A-Z]{6}\+/`.
+
 ---
 
 ## Code Architecture

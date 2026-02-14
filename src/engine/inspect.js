@@ -2,7 +2,7 @@
  * Object Inspector — classifies PDF objects by semantic type and size.
  *
  * Enumerates all indirect objects, groups them into 6 categories
- * (Fonts, Images, Content Streams, Metadata, Page Tree, Other),
+ * (Fonts, Images, Page Content, Metadata, Document Structure, Other Data),
  * and returns a plain serializable summary suitable for UI display.
  */
 import { PDFName, PDFDict, PDFArray, PDFRef, PDFRawStream } from 'pdf-lib';
@@ -12,11 +12,35 @@ import { FONT_FILE_KEYS } from './utils/hash.js';
 const CATEGORY_LABELS = [
   'Fonts',
   'Images',
-  'Content Streams',
+  'Page Content',
   'Metadata',
-  'Page Tree',
-  'Other',
+  'Document Structure',
+  'Other Data',
 ];
+
+/** Strip ABCDEF+ subset prefix from font names. */
+function stripSubsetPrefix(name) {
+  if (!name) return name;
+  return name.replace(/^[A-Z]{6}\+/, '');
+}
+
+/** Map PDF colorspace names to short labels. */
+const COLORSPACE_SHORT = {
+  DeviceRGB: 'RGB',
+  DeviceGray: 'Gray',
+  DeviceCMYK: 'CMYK',
+};
+
+/** Map font subtype names to readable labels. */
+const FONT_SUBTYPE_LABELS = {
+  Type1: 'Type 1',
+  TrueType: 'TrueType',
+  Type0: 'Composite',
+  CIDFontType0: 'CID Type 0',
+  CIDFontType2: 'CID TrueType',
+  Type3: 'Type 3',
+  MMType1: 'Multiple Master',
+};
 
 /**
  * Inspect a PDFDocument and return a categorized object summary.
@@ -122,6 +146,8 @@ export function inspectDocument(pdfDoc) {
     let category;
     let name = null;
     let detail = null;
+    let displayName = null;
+    let subCategory = null;
 
     if (isStream && subtype === 'Image') {
       category = 'Images';
@@ -130,39 +156,83 @@ export function inspectDocument(pdfDoc) {
       const h = numVal('Height');
       const cs = nameVal('ColorSpace');
       if (w != null && h != null) {
+        const csShort = COLORSPACE_SHORT[cs] || cs || '';
         detail = `${w}x${h}${cs ? ' ' + cs : ''}`;
+        displayName = `${w} \u00d7 ${h}${csShort ? ' ' + csShort : ''}`;
       }
     } else if (isStream && (type === 'Metadata' || subtype === 'XML')) {
       category = 'Metadata';
+      displayName = 'XMP Metadata';
     } else if (fontFileRefs.has(tag)) {
       category = 'Fonts';
-      // Determine which font file key this is
       detail = 'font file';
+      displayName = 'Font program data';
     } else if (type === 'Font') {
       category = 'Fonts';
       name = nameVal('BaseFont');
       detail = subtype || null;
+      const cleanName = stripSubsetPrefix(name);
+      const subtypeLabel = FONT_SUBTYPE_LABELS[subtype] || subtype || '';
+      displayName = cleanName ? `${cleanName}${subtypeLabel ? ' (' + subtypeLabel + ')' : ''}` : subtypeLabel;
     } else if (type === 'FontDescriptor') {
       category = 'Fonts';
       name = nameVal('FontName');
       detail = 'FontDescriptor';
+      displayName = `${stripSubsetPrefix(name) || 'Font'} descriptor`;
     } else if (contentStreamRefs.has(tag)) {
-      category = 'Content Streams';
+      category = 'Page Content';
       name = `Page ${contentStreamRefs.get(tag)}`;
+      displayName = name;
     } else if (type === 'Page' || type === 'Pages' || type === 'Catalog') {
-      category = 'Page Tree';
+      category = 'Document Structure';
       detail = type;
+      displayName = type === 'Pages' ? 'Page tree node' : type;
     } else {
-      category = 'Other';
-      if (isStream) {
+      category = 'Other Data';
+
+      // Sub-categorize "Other" items
+      if (isStream && subtype === 'Form') {
+        subCategory = 'Graphics';
+        displayName = 'Form XObject';
+        detail = 'Form XObject';
+      } else if (dict && dict.get(PDFName.of('N')) && dict.get(PDFName.of('Alternate'))) {
+        subCategory = 'Color Profiles';
+        displayName = 'ICC Color Profile';
+        detail = 'ICC profile';
+      } else if (dict && dict.get(PDFName.of('CMapName'))) {
+        subCategory = 'Font Support';
+        displayName = 'Unicode Mapping';
+        detail = 'CMap';
+      } else if (dict && dict.get(PDFName.of('Differences'))) {
+        subCategory = 'Font Support';
+        displayName = 'Font Encoding';
+        detail = 'encoding';
+      } else if (dict && dict.get(PDFName.of('Widths'))) {
+        subCategory = 'Font Support';
+        displayName = 'Glyph Widths';
+        detail = 'glyph widths';
+      } else if (type === 'Annot' || subtype === 'Link' || subtype === 'Widget') {
+        subCategory = 'Annotations';
+        const annLabel = subtype || 'Annotation';
+        displayName = `${annLabel} Annotation`;
+        detail = annLabel;
+      } else if (dict && dict.get(PDFName.of('Registry'))) {
+        subCategory = 'Font Support';
+        displayName = 'CID Info';
+        detail = 'CID info';
+      } else if (isStream) {
+        subCategory = 'Miscellaneous';
+        displayName = 'Data stream';
         detail = 'stream';
       } else if (dict) {
-        // Try to identify common untyped dict objects
-        if (dict.get(PDFName.of('Widths'))) detail = 'glyph widths';
-        else if (dict.get(PDFName.of('Differences'))) detail = 'encoding';
-        else if (dict.get(PDFName.of('Registry'))) detail = 'CID info';
-        else if (type) detail = type;
-        else detail = 'dict';
+        subCategory = 'Miscellaneous';
+        if (type) {
+          displayName = type;
+          detail = type;
+        } else {
+          displayName = 'Structure data';
+          detail = 'dict';
+        }
       }
     }
 
@@ -175,6 +245,8 @@ export function inspectDocument(pdfDoc) {
       size,
       filter: filterStr,
       detail,
+      displayName,
+      subCategory,
     });
   }
 

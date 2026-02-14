@@ -1,13 +1,24 @@
 import { describe, it, expect } from 'vitest';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFDict, PDFRawStream } from 'pdf-lib';
+import { deflateSync } from 'fflate';
 import { inspectDocument } from '../../src/engine/inspect.js';
 import { optimize } from '../../src/engine/pipeline.js';
 import {
   createPdfWithEmbeddedStandardFont,
+  createPdfWithSubsetPrefixedFont,
   createPdfWithFlatDecodeRgbImage,
   createMetadataBloatPdf,
   createPdfWithContentStreamText,
 } from '../fixtures/create-test-pdfs.js';
+
+const EXPECTED_LABELS = [
+  'Fonts',
+  'Images',
+  'Page Content',
+  'Metadata',
+  'Document Structure',
+  'Other Data',
+];
 
 describe('inspectDocument', () => {
   it('returns all 6 categories in fixed order', async () => {
@@ -16,32 +27,42 @@ describe('inspectDocument', () => {
     const result = inspectDocument(doc);
 
     expect(result.categories).toHaveLength(6);
-    expect(result.categories.map((c) => c.label)).toEqual([
-      'Fonts',
-      'Images',
-      'Content Streams',
-      'Metadata',
-      'Page Tree',
-      'Other',
-    ]);
+    expect(result.categories.map((c) => c.label)).toEqual(EXPECTED_LABELS);
   });
 
-  it('classifies fonts', async () => {
+  it('classifies fonts with displayName', async () => {
     const doc = await createPdfWithEmbeddedStandardFont();
     const result = inspectDocument(doc);
     const fonts = result.categories.find((c) => c.label === 'Fonts');
 
     expect(fonts.count).toBeGreaterThan(0);
-    // Should have at least a Font dict and a font file stream
+    // Should have a Font dict with displayName
     const fontDict = fonts.items.find((i) => i.name === 'Helvetica' && i.detail === 'Type1');
     expect(fontDict).toBeDefined();
+    expect(fontDict.displayName).toBe('Helvetica (Type 1)');
     // Should also have a font file stream
     const fontFile = fonts.items.find((i) => i.detail === 'font file');
     expect(fontFile).toBeDefined();
     expect(fontFile.size).toBeGreaterThan(0);
+    expect(fontFile.displayName).toBe('Font program data');
   });
 
-  it('classifies images with dimensions', async () => {
+  it('strips subset prefix from font displayName', async () => {
+    const doc = await createPdfWithSubsetPrefixedFont();
+    const result = inspectDocument(doc);
+    const fonts = result.categories.find((c) => c.label === 'Fonts');
+
+    const fontDict = fonts.items.find((i) => i.name === 'ABCDEF+Helvetica' && i.detail === 'TrueType');
+    expect(fontDict).toBeDefined();
+    // displayName should not have the ABCDEF+ prefix
+    expect(fontDict.displayName).toBe('Helvetica (TrueType)');
+
+    const descriptor = fonts.items.find((i) => i.detail === 'FontDescriptor');
+    expect(descriptor).toBeDefined();
+    expect(descriptor.displayName).toBe('Helvetica descriptor');
+  });
+
+  it('classifies images with dimensions and abbreviated colorspace', async () => {
     const doc = await createPdfWithFlatDecodeRgbImage();
     const result = inspectDocument(doc);
     const images = result.categories.find((c) => c.label === 'Images');
@@ -52,25 +73,43 @@ describe('inspectDocument', () => {
     expect(img.size).toBeGreaterThan(0);
     expect(img.detail).toContain('100x100');
     expect(img.detail).toContain('DeviceRGB');
+    // displayName uses abbreviated format
+    expect(img.displayName).toContain('100 \u00d7 100');
+    expect(img.displayName).toContain('RGB');
   });
 
-  it('classifies metadata', async () => {
+  it('classifies metadata with displayName', async () => {
     const doc = await createMetadataBloatPdf();
     const result = inspectDocument(doc);
     const metadata = result.categories.find((c) => c.label === 'Metadata');
 
     expect(metadata.count).toBeGreaterThan(0);
     expect(metadata.items.length).toBeGreaterThan(0);
+    const xmp = metadata.items.find((i) => i.displayName === 'XMP Metadata');
+    expect(xmp).toBeDefined();
   });
 
   it('classifies content streams with page numbers', async () => {
     const doc = await createPdfWithContentStreamText();
     const result = inspectDocument(doc);
-    const content = result.categories.find((c) => c.label === 'Content Streams');
+    const content = result.categories.find((c) => c.label === 'Page Content');
 
     expect(content.count).toBeGreaterThan(0);
     const pageItem = content.items.find((i) => i.name === 'Page 1');
     expect(pageItem).toBeDefined();
+    expect(pageItem.displayName).toBe('Page 1');
+  });
+
+  it('classifies page tree into Document Structure', async () => {
+    const doc = await PDFDocument.create();
+    doc.addPage();
+    const result = inspectDocument(doc);
+    const structure = result.categories.find((c) => c.label === 'Document Structure');
+
+    expect(structure.count).toBeGreaterThan(0);
+    const catalog = structure.items.find((i) => i.detail === 'Catalog');
+    expect(catalog).toBeDefined();
+    expect(catalog.displayName).toBe('Catalog');
   });
 
   it('totalSize equals sum of category sizes', async () => {
@@ -107,5 +146,100 @@ describe('inspectDocument', () => {
     expect(stats.inspect.after).toBeDefined();
     expect(stats.inspect.before.categories).toHaveLength(6);
     expect(stats.inspect.after.categories).toHaveLength(6);
+  });
+
+  describe('Other Data sub-categories', () => {
+    it('classifies dicts with Widths as Font Support / Glyph Widths', async () => {
+      const doc = await PDFDocument.create();
+      doc.addPage();
+      const widthsDict = doc.context.obj({});
+      widthsDict.set(PDFName.of('Widths'), doc.context.obj([250, 300]));
+      doc.context.register(widthsDict);
+
+      const result = inspectDocument(doc);
+      const other = result.categories.find((c) => c.label === 'Other Data');
+      const widthItem = other.items.find((i) => i.displayName === 'Glyph Widths');
+      expect(widthItem).toBeDefined();
+      expect(widthItem.subCategory).toBe('Font Support');
+    });
+
+    it('classifies dicts with Differences as Font Support / Font Encoding', async () => {
+      const doc = await PDFDocument.create();
+      doc.addPage();
+      const encDict = doc.context.obj({});
+      encDict.set(PDFName.of('Differences'), doc.context.obj([24]));
+      doc.context.register(encDict);
+
+      const result = inspectDocument(doc);
+      const other = result.categories.find((c) => c.label === 'Other Data');
+      const encItem = other.items.find((i) => i.displayName === 'Font Encoding');
+      expect(encItem).toBeDefined();
+      expect(encItem.subCategory).toBe('Font Support');
+    });
+
+    it('classifies dicts with Registry as Font Support / CID Info', async () => {
+      const doc = await PDFDocument.create();
+      doc.addPage();
+      const cidDict = doc.context.obj({});
+      cidDict.set(PDFName.of('Registry'), doc.context.obj('Adobe'));
+      doc.context.register(cidDict);
+
+      const result = inspectDocument(doc);
+      const other = result.categories.find((c) => c.label === 'Other Data');
+      const cidItem = other.items.find((i) => i.displayName === 'CID Info');
+      expect(cidItem).toBeDefined();
+      expect(cidItem.subCategory).toBe('Font Support');
+    });
+
+    it('classifies plain streams as Miscellaneous / Data stream', async () => {
+      const doc = await PDFDocument.create();
+      doc.addPage();
+      const data = new Uint8Array(100);
+      data.fill(42);
+      const compressed = deflateSync(data, { level: 6 });
+      const dict = doc.context.obj({});
+      dict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+      dict.set(PDFName.of('Length'), doc.context.obj(compressed.length));
+      const stream = PDFRawStream.of(dict, compressed);
+      doc.context.register(stream);
+
+      const result = inspectDocument(doc);
+      const other = result.categories.find((c) => c.label === 'Other Data');
+      const miscItem = other.items.find((i) => i.displayName === 'Data stream');
+      expect(miscItem).toBeDefined();
+      expect(miscItem.subCategory).toBe('Miscellaneous');
+    });
+
+    it('classifies plain dicts as Miscellaneous / Structure data', async () => {
+      const doc = await PDFDocument.create();
+      doc.addPage();
+      const plainDict = doc.context.obj({});
+      plainDict.set(PDFName.of('SomeKey'), doc.context.obj('SomeValue'));
+      doc.context.register(plainDict);
+
+      const result = inspectDocument(doc);
+      const other = result.categories.find((c) => c.label === 'Other Data');
+      const structItem = other.items.find((i) => i.displayName === 'Structure data');
+      expect(structItem).toBeDefined();
+      expect(structItem.subCategory).toBe('Miscellaneous');
+    });
+
+    it('classifies Form XObject streams as Graphics', async () => {
+      const doc = await PDFDocument.create();
+      doc.addPage();
+      const formData = new Uint8Array(50);
+      formData.fill(0);
+      const dict = doc.context.obj({});
+      dict.set(PDFName.of('Subtype'), PDFName.of('Form'));
+      dict.set(PDFName.of('Length'), doc.context.obj(formData.length));
+      const stream = PDFRawStream.of(dict, formData);
+      doc.context.register(stream);
+
+      const result = inspectDocument(doc);
+      const other = result.categories.find((c) => c.label === 'Other Data');
+      const formItem = other.items.find((i) => i.displayName === 'Form XObject');
+      expect(formItem).toBeDefined();
+      expect(formItem.subCategory).toBe('Graphics');
+    });
   });
 });
