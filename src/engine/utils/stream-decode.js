@@ -90,6 +90,79 @@ export function decodeStream(rawBytes, filters) {
   return result;
 }
 
+/**
+ * Undo PNG row prediction (Predictor 10-15).
+ * PNG prediction prepends a filter type byte to each row.
+ * @param {Uint8Array} data - Decoded (inflated) data with prediction bytes
+ * @param {number} columns - Pixels per row (from DecodeParms.Columns)
+ * @param {number} components - Bytes per pixel (Colors * BitsPerComponent / 8)
+ * @returns {Uint8Array} Raw pixel data without prediction
+ */
+export function undoPngPrediction(data, columns, components) {
+  const bytesPerPixel = components;
+  const bytesPerRow = columns * bytesPerPixel;
+  const stride = bytesPerRow + 1; // +1 for filter type byte
+
+  if (data.length % stride !== 0 && data.length >= stride) {
+    // Try to determine actual row count from data length
+  }
+
+  const rows = Math.floor(data.length / stride);
+  const output = new Uint8Array(rows * bytesPerRow);
+  const prevRow = new Uint8Array(bytesPerRow); // starts as zeros
+
+  for (let r = 0; r < rows; r++) {
+    const srcOff = r * stride;
+    const dstOff = r * bytesPerRow;
+    const filterType = data[srcOff];
+
+    for (let i = 0; i < bytesPerRow; i++) {
+      const raw = data[srcOff + 1 + i];
+      const a = i >= bytesPerPixel ? output[dstOff + i - bytesPerPixel] : 0; // left
+      const b = prevRow[i]; // up
+      const c = i >= bytesPerPixel ? prevRow[i - bytesPerPixel] : 0; // upper-left
+
+      let val;
+      switch (filterType) {
+        case 0: // None
+          val = raw;
+          break;
+        case 1: // Sub
+          val = (raw + a) & 0xff;
+          break;
+        case 2: // Up
+          val = (raw + b) & 0xff;
+          break;
+        case 3: // Average
+          val = (raw + ((a + b) >>> 1)) & 0xff;
+          break;
+        case 4: // Paeth
+          val = (raw + paethPredictor(a, b, c)) & 0xff;
+          break;
+        default:
+          val = raw;
+          break;
+      }
+      output[dstOff + i] = val;
+    }
+
+    // Copy current row to prevRow for next iteration
+    prevRow.set(output.subarray(dstOff, dstOff + bytesPerRow));
+  }
+
+  return output;
+}
+
+function paethPredictor(a, b, c) {
+  const p = a + b - c;
+  const pa = Math.abs(p - a);
+  const pb = Math.abs(p - b);
+  const pc = Math.abs(p - c);
+  if (pa <= pb && pa <= pc) return a;
+  if (pb <= pc) return b;
+  return c;
+}
+
 // --- Individual decoders ---
 
 function decodeFlateDecode(data) {

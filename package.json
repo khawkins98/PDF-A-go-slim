@@ -11,8 +11,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "pdf-lib": "^1.17.1",
-    "fflate": "^0.8.2"
+    "fflate": "^0.8.2",
+    "jpeg-js": "^0.4.4",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "vite": "^6.0.0",

@@ -15,6 +15,7 @@ import {
   rgb,
 } from 'pdf-lib';
 import { deflateSync } from 'fflate';
+import { encode as jpegEncode } from 'jpeg-js';
 
 /**
  * Create a simple valid PDF with one page and some text.
@@ -162,6 +163,344 @@ export async function createUnreferencedObjectPdf() {
   // Another orphan
   const orphanDict2 = doc.context.obj({ Type: 'Orphan', Value: 'Unused' });
   doc.context.register(orphanDict2);
+
+  return doc;
+}
+
+// --- Image test fixtures ---
+
+/**
+ * Create a PDF with a FlateDecode RGB image (100x100 gradient).
+ * Large enough to exceed the 10KB minimum for image recompression.
+ */
+export async function createPdfWithFlatDecodeRgbImage() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  const width = 100;
+  const height = 100;
+  const components = 3;
+  const pixels = new Uint8Array(width * height * components);
+
+  // Create photo-like data: smooth gradients with mild variation.
+  // Deflate can't compress this well (no exact byte repeats),
+  // but JPEG handles smooth color transitions efficiently.
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * components;
+      const xf = x / width;
+      const yf = y / height;
+      // Overlapping sine waves create non-repeating but smooth data
+      pixels[idx]     = Math.round(127 + 127 * Math.sin(xf * 7.3 + yf * 2.1));
+      pixels[idx + 1] = Math.round(127 + 127 * Math.sin(yf * 5.7 + xf * 3.9));
+      pixels[idx + 2] = Math.round(127 + 127 * Math.sin((xf + yf) * 4.1));
+    }
+  }
+
+  const compressed = deflateSync(pixels, { level: 6 });
+
+  const imgDict = doc.context.obj({});
+  imgDict.set(PDFName.of('Type'), PDFName.of('XObject'));
+  imgDict.set(PDFName.of('Subtype'), PDFName.of('Image'));
+  imgDict.set(PDFName.of('Width'), doc.context.obj(width));
+  imgDict.set(PDFName.of('Height'), doc.context.obj(height));
+  imgDict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
+  imgDict.set(PDFName.of('BitsPerComponent'), doc.context.obj(8));
+  imgDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  imgDict.set(PDFName.of('Length'), doc.context.obj(compressed.length));
+
+  const imgStream = PDFRawStream.of(imgDict, compressed);
+  const imgRef = doc.context.register(imgStream);
+
+  // Reference the image from the page so it's not orphaned
+  const xobjectDict = doc.context.obj({});
+  xobjectDict.set(PDFName.of('Img0'), imgRef);
+  page.node.set(PDFName.of('Resources'), doc.context.obj({}));
+  page.node.get(PDFName.of('Resources')).set(PDFName.of('XObject'), xobjectDict);
+
+  return doc;
+}
+
+/**
+ * Create a PDF with a FlateDecode grayscale image.
+ */
+export async function createPdfWithFlatDecodeGrayImage() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  const width = 120;
+  const height = 120;
+  const pixels = new Uint8Array(width * height);
+
+  // Smooth sine-wave pattern: deflate-inefficient but JPEG-friendly
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const xf = x / width;
+      const yf = y / height;
+      pixels[y * width + x] = Math.round(127 + 127 * Math.sin(xf * 7.3 + yf * 5.1));
+    }
+  }
+
+  const compressed = deflateSync(pixels, { level: 6 });
+
+  const imgDict = doc.context.obj({});
+  imgDict.set(PDFName.of('Type'), PDFName.of('XObject'));
+  imgDict.set(PDFName.of('Subtype'), PDFName.of('Image'));
+  imgDict.set(PDFName.of('Width'), doc.context.obj(width));
+  imgDict.set(PDFName.of('Height'), doc.context.obj(height));
+  imgDict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceGray'));
+  imgDict.set(PDFName.of('BitsPerComponent'), doc.context.obj(8));
+  imgDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  imgDict.set(PDFName.of('Length'), doc.context.obj(compressed.length));
+
+  const imgStream = PDFRawStream.of(imgDict, compressed);
+  const imgRef = doc.context.register(imgStream);
+
+  const xobjectDict = doc.context.obj({});
+  xobjectDict.set(PDFName.of('Img0'), imgRef);
+  page.node.set(PDFName.of('Resources'), doc.context.obj({}));
+  page.node.get(PDFName.of('Resources')).set(PDFName.of('XObject'), xobjectDict);
+
+  return doc;
+}
+
+/**
+ * Create a PDF with a DCTDecode (JPEG) image — should be skipped.
+ */
+export async function createPdfWithJpegImage() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  const width = 10;
+  const height = 10;
+  const rgbaData = new Uint8Array(width * height * 4);
+  for (let i = 0; i < rgbaData.length; i += 4) {
+    rgbaData[i] = 128;
+    rgbaData[i + 1] = 128;
+    rgbaData[i + 2] = 128;
+    rgbaData[i + 3] = 255;
+  }
+  const jpegData = new Uint8Array(
+    jpegEncode({ data: rgbaData, width, height }, 80).data,
+  );
+
+  const imgDict = doc.context.obj({});
+  imgDict.set(PDFName.of('Type'), PDFName.of('XObject'));
+  imgDict.set(PDFName.of('Subtype'), PDFName.of('Image'));
+  imgDict.set(PDFName.of('Width'), doc.context.obj(width));
+  imgDict.set(PDFName.of('Height'), doc.context.obj(height));
+  imgDict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
+  imgDict.set(PDFName.of('BitsPerComponent'), doc.context.obj(8));
+  imgDict.set(PDFName.of('Filter'), PDFName.of('DCTDecode'));
+  imgDict.set(PDFName.of('Length'), doc.context.obj(jpegData.length));
+
+  const imgStream = PDFRawStream.of(imgDict, jpegData);
+  const imgRef = doc.context.register(imgStream);
+
+  const xobjectDict = doc.context.obj({});
+  xobjectDict.set(PDFName.of('Img0'), imgRef);
+  page.node.set(PDFName.of('Resources'), doc.context.obj({}));
+  page.node.get(PDFName.of('Resources')).set(PDFName.of('XObject'), xobjectDict);
+
+  return doc;
+}
+
+/**
+ * Create a PDF with a FlateDecode image that has an SMask (alpha) — should be skipped.
+ */
+export async function createPdfWithAlphaImage() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  const width = 50;
+  const height = 50;
+  const pixels = new Uint8Array(width * height * 3);
+  pixels.fill(128);
+  const compressed = deflateSync(pixels, { level: 6 });
+
+  // Create the SMask stream
+  const maskPixels = new Uint8Array(width * height);
+  maskPixels.fill(200);
+  const maskCompressed = deflateSync(maskPixels, { level: 6 });
+
+  const maskDict = doc.context.obj({});
+  maskDict.set(PDFName.of('Type'), PDFName.of('XObject'));
+  maskDict.set(PDFName.of('Subtype'), PDFName.of('Image'));
+  maskDict.set(PDFName.of('Width'), doc.context.obj(width));
+  maskDict.set(PDFName.of('Height'), doc.context.obj(height));
+  maskDict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceGray'));
+  maskDict.set(PDFName.of('BitsPerComponent'), doc.context.obj(8));
+  maskDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  maskDict.set(PDFName.of('Length'), doc.context.obj(maskCompressed.length));
+  const maskStream = PDFRawStream.of(maskDict, maskCompressed);
+  const maskRef = doc.context.register(maskStream);
+
+  // Main image with SMask
+  const imgDict = doc.context.obj({});
+  imgDict.set(PDFName.of('Type'), PDFName.of('XObject'));
+  imgDict.set(PDFName.of('Subtype'), PDFName.of('Image'));
+  imgDict.set(PDFName.of('Width'), doc.context.obj(width));
+  imgDict.set(PDFName.of('Height'), doc.context.obj(height));
+  imgDict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
+  imgDict.set(PDFName.of('BitsPerComponent'), doc.context.obj(8));
+  imgDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  imgDict.set(PDFName.of('Length'), doc.context.obj(compressed.length));
+  imgDict.set(PDFName.of('SMask'), maskRef);
+
+  const imgStream = PDFRawStream.of(imgDict, compressed);
+  const imgRef = doc.context.register(imgStream);
+
+  const xobjectDict = doc.context.obj({});
+  xobjectDict.set(PDFName.of('Img0'), imgRef);
+  page.node.set(PDFName.of('Resources'), doc.context.obj({}));
+  page.node.get(PDFName.of('Resources')).set(PDFName.of('XObject'), xobjectDict);
+
+  return doc;
+}
+
+// --- Font unembedding test fixtures ---
+
+/**
+ * Create a PDF with an embedded standard font (Type1 Helvetica with FontDescriptor + FontFile2).
+ * Manually constructs the font structures to simulate what Illustrator/InDesign does.
+ */
+export async function createPdfWithEmbeddedStandardFont() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  // Create a fake FontFile2 (TrueType font program) — just needs to be some bytes
+  const fontFileData = new Uint8Array(5000);
+  for (let i = 0; i < fontFileData.length; i++) fontFileData[i] = i % 256;
+  const fontFileCompressed = deflateSync(fontFileData, { level: 6 });
+
+  const fontFileDict = doc.context.obj({});
+  fontFileDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  fontFileDict.set(PDFName.of('Length'), doc.context.obj(fontFileCompressed.length));
+  fontFileDict.set(PDFName.of('Length1'), doc.context.obj(fontFileData.length));
+  const fontFileStream = PDFRawStream.of(fontFileDict, fontFileCompressed);
+  const fontFileRef = doc.context.register(fontFileStream);
+
+  // Create FontDescriptor
+  const fontDescriptor = doc.context.obj({});
+  fontDescriptor.set(PDFName.of('Type'), PDFName.of('FontDescriptor'));
+  fontDescriptor.set(PDFName.of('FontName'), PDFName.of('Helvetica'));
+  fontDescriptor.set(PDFName.of('Flags'), doc.context.obj(32));
+  fontDescriptor.set(PDFName.of('FontBBox'), doc.context.obj([-166, -225, 1000, 931]));
+  fontDescriptor.set(PDFName.of('ItalicAngle'), doc.context.obj(0));
+  fontDescriptor.set(PDFName.of('Ascent'), doc.context.obj(718));
+  fontDescriptor.set(PDFName.of('Descent'), doc.context.obj(-207));
+  fontDescriptor.set(PDFName.of('CapHeight'), doc.context.obj(718));
+  fontDescriptor.set(PDFName.of('StemV'), doc.context.obj(88));
+  fontDescriptor.set(PDFName.of('FontFile2'), fontFileRef);
+  const fontDescRef = doc.context.register(fontDescriptor);
+
+  // Create Font dict
+  const fontDict = doc.context.obj({});
+  fontDict.set(PDFName.of('Type'), PDFName.of('Font'));
+  fontDict.set(PDFName.of('Subtype'), PDFName.of('Type1'));
+  fontDict.set(PDFName.of('BaseFont'), PDFName.of('Helvetica'));
+  fontDict.set(PDFName.of('Encoding'), PDFName.of('WinAnsiEncoding'));
+  fontDict.set(PDFName.of('FontDescriptor'), fontDescRef);
+  const fontRef = doc.context.register(fontDict);
+
+  // Wire font into the page's Resources
+  const resources = doc.context.obj({});
+  const fontsDict = doc.context.obj({});
+  fontsDict.set(PDFName.of('F1'), fontRef);
+  resources.set(PDFName.of('Font'), fontsDict);
+  page.node.set(PDFName.of('Resources'), resources);
+
+  return doc;
+}
+
+/**
+ * Create a PDF with a subset-prefixed embedded standard font (ABCDEF+Helvetica).
+ */
+export async function createPdfWithSubsetPrefixedFont() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  const fontFileData = new Uint8Array(3000);
+  fontFileData.fill(0xaa);
+  const fontFileCompressed = deflateSync(fontFileData, { level: 6 });
+
+  const fontFileDict = doc.context.obj({});
+  fontFileDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  fontFileDict.set(PDFName.of('Length'), doc.context.obj(fontFileCompressed.length));
+  const fontFileStream = PDFRawStream.of(fontFileDict, fontFileCompressed);
+  const fontFileRef = doc.context.register(fontFileStream);
+
+  const fontDescriptor = doc.context.obj({});
+  fontDescriptor.set(PDFName.of('Type'), PDFName.of('FontDescriptor'));
+  fontDescriptor.set(PDFName.of('FontName'), PDFName.of('ABCDEF+Helvetica'));
+  fontDescriptor.set(PDFName.of('FontFile2'), fontFileRef);
+  const fontDescRef = doc.context.register(fontDescriptor);
+
+  const fontDict = doc.context.obj({});
+  fontDict.set(PDFName.of('Type'), PDFName.of('Font'));
+  fontDict.set(PDFName.of('Subtype'), PDFName.of('TrueType'));
+  fontDict.set(PDFName.of('BaseFont'), PDFName.of('ABCDEF+Helvetica'));
+  fontDict.set(PDFName.of('FontDescriptor'), fontDescRef);
+  const fontRef = doc.context.register(fontDict);
+
+  const resources = doc.context.obj({});
+  const fontsDict = doc.context.obj({});
+  fontsDict.set(PDFName.of('F1'), fontRef);
+  resources.set(PDFName.of('Font'), fontsDict);
+  page.node.set(PDFName.of('Resources'), resources);
+
+  return doc;
+}
+
+/**
+ * Create a PDF with a Type0 composite standard font — should be skipped.
+ */
+export async function createPdfWithType0StandardFont() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  // Use pdf-lib's embedFont which creates a Type0 composite
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText('Type0 test', { x: 10, y: 100, size: 12, font });
+
+  return doc;
+}
+
+/**
+ * Create a PDF with a non-standard font name — should be skipped.
+ */
+export async function createPdfWithNonStandardFont() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  const fontFileData = new Uint8Array(2000);
+  fontFileData.fill(0xbb);
+  const fontFileCompressed = deflateSync(fontFileData, { level: 6 });
+
+  const fontFileDict = doc.context.obj({});
+  fontFileDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  fontFileDict.set(PDFName.of('Length'), doc.context.obj(fontFileCompressed.length));
+  const fontFileStream = PDFRawStream.of(fontFileDict, fontFileCompressed);
+  const fontFileRef = doc.context.register(fontFileStream);
+
+  const fontDescriptor = doc.context.obj({});
+  fontDescriptor.set(PDFName.of('Type'), PDFName.of('FontDescriptor'));
+  fontDescriptor.set(PDFName.of('FontName'), PDFName.of('MyCustomFont-Regular'));
+  fontDescriptor.set(PDFName.of('FontFile2'), fontFileRef);
+  const fontDescRef = doc.context.register(fontDescriptor);
+
+  const fontDict = doc.context.obj({});
+  fontDict.set(PDFName.of('Type'), PDFName.of('Font'));
+  fontDict.set(PDFName.of('Subtype'), PDFName.of('TrueType'));
+  fontDict.set(PDFName.of('BaseFont'), PDFName.of('MyCustomFont-Regular'));
+  fontDict.set(PDFName.of('FontDescriptor'), fontDescRef);
+  const fontRef = doc.context.register(fontDict);
+
+  const resources = doc.context.obj({});
+  const fontsDict = doc.context.obj({});
+  fontsDict.set(PDFName.of('F1'), fontRef);
+  resources.set(PDFName.of('Font'), fontsDict);
+  page.node.set(PDFName.of('Resources'), resources);
 
   return doc;
 }

@@ -116,6 +116,59 @@ describe('optimize pipeline', () => {
     expect(optPage.getHeight()).toBe(origPage.getHeight());
   });
 
+  it('applies lossy image recompression when lossy option is set', async () => {
+    // Create a PDF with a FlateDecode image and bloat
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([400, 400]);
+
+    // Add a FlateDecode RGB image with smooth data (JPEG-friendly)
+    const width = 100;
+    const height = 100;
+    const pixels = new Uint8Array(width * height * 3);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 3;
+        const xf = x / width;
+        const yf = y / height;
+        pixels[idx] = Math.round(127 + 127 * Math.sin(xf * 7.3 + yf * 2.1));
+        pixels[idx + 1] = Math.round(127 + 127 * Math.sin(yf * 5.7 + xf * 3.9));
+        pixels[idx + 2] = Math.round(127 + 127 * Math.sin((xf + yf) * 4.1));
+      }
+    }
+    const compressed = deflateSync(pixels, { level: 6 });
+    const imgDict = doc.context.obj({});
+    imgDict.set(PDFName.of('Type'), PDFName.of('XObject'));
+    imgDict.set(PDFName.of('Subtype'), PDFName.of('Image'));
+    imgDict.set(PDFName.of('Width'), doc.context.obj(width));
+    imgDict.set(PDFName.of('Height'), doc.context.obj(height));
+    imgDict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
+    imgDict.set(PDFName.of('BitsPerComponent'), doc.context.obj(8));
+    imgDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+    imgDict.set(PDFName.of('Length'), doc.context.obj(compressed.length));
+    const imgRef = doc.context.register(PDFRawStream.of(imgDict, compressed));
+
+    // Reference image from page
+    const xobjectDict = doc.context.obj({});
+    xobjectDict.set(PDFName.of('Img0'), imgRef);
+    const resources = doc.context.obj({});
+    resources.set(PDFName.of('XObject'), xobjectDict);
+    page.node.set(PDFName.of('Resources'), resources);
+
+    const inputBytes = new Uint8Array(await doc.save());
+
+    const { output, stats } = await optimize(inputBytes, { lossy: true });
+
+    // With lossy enabled, the image pass should run and produce a valid PDF
+    expect(output).toBeDefined();
+    const reloaded = await PDFDocument.load(output);
+    expect(reloaded.getPageCount()).toBe(1);
+
+    // Verify image recompression pass ran
+    const imagePass = stats.passes.find((p) => p.name === 'Recompressing images');
+    expect(imagePass).toBeDefined();
+    expect(imagePass.converted).toBe(1);
+  });
+
   it('calls progress callback during optimization', async () => {
     const inputBytes = new Uint8Array(await createBloatedPdf());
     const progressCalls = [];

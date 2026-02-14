@@ -82,34 +82,54 @@ There's no open-source, privacy-first, in-browser option that handles the full r
 
 ## Technical Architecture
 
-### Core Engine
+### Core Engine (as built)
 
 ```
-pdf-a-go-slim/
-  src/
-    parser/          # PDF object/stream parser (cross-ref tables, object streams)
-    optimizer/
-      streams.js     # Stream recompression (Flate, LZW → Flate)
-      dedup.js       # Object deduplication (content-hash based)
-      metadata.js    # Metadata stripping (AI, XMP thumbnails, etc.)
-      fonts.js       # Font dedup, subsetting, standard font unembedding
-      images.js      # Image recompression and downsampling
-      unreferenced.js # Unreferenced object removal
-    writer/          # PDF serializer (cross-ref rebuild, linearization)
-    index.js         # Pipeline: parse → optimize → write
+src/
+  main.js                     # UI, drag-and-drop, worker orchestration
+  worker.js                   # Web Worker — off-main-thread processing
+  engine/
+    pipeline.js               # Sequential optimization passes with progress + options
+    optimize/
+      streams.js              # Recompress streams with fflate level 9
+      images.js               # FlateDecode → JPEG recompression (lossy, opt-in)
+      font-unembed.js         # Remove embedded base-14 standard fonts
+      dedup.js                # Hash-based object deduplication (djb2)
+      fonts.js                # Consolidate duplicate embedded fonts
+      metadata.js             # Strip XMP, Illustrator, Photoshop bloat keys
+      unreferenced.js         # Remove unreachable objects via BFS traversal
+    utils/
+      stream-decode.js        # Decoders: Flate, LZW, ASCII85, ASCIIHex, RunLength, PNG prediction
+      pdf-traversal.js        # BFS graph walker from PDF trailer
+```
+
+### Options Schema
+
+All passes receive an `options` object. Each pass checks its own flags and ignores unknown options, making the schema forward-compatible with presets and per-pass configurability.
+
+```js
+{
+  lossy: false,                  // Master switch for lossy optimizations (default off)
+  imageQuality: 0.85,            // JPEG quality 0-1 (only when lossy=true)
+  unembedStandardFonts: true,    // Remove embedded base-14 fonts (default on, lossless)
+}
 ```
 
 ### Key Technical Decisions
 
-**PDF Parsing**: Build on [pdf-lib](https://github.com/Hopding/pdf-lib) for low-level PDF object manipulation, or write a minimal parser. pdf-lib handles cross-reference tables, object streams, and incremental updates but doesn't do optimization. An alternative is [pdfjs-dist](https://github.com/nicbou/pdf.js) for rendering-side validation but it's read-only.
+**PDF Parsing**: [pdf-lib](https://github.com/Hopding/pdf-lib) for low-level PDF object access (PDFDocument, PDFDict, PDFArray, PDFRawStream, etc.). Provides cross-reference tables, object streams, and incremental updates. We operate directly on its internal context objects for optimization.
 
-**Stream Compression**: Use [pako](https://github.com/nicbou/pako) (zlib in JS) for Flate recompression. Most PDFs use Flate already but often with suboptimal compression levels.
+**Stream Compression**: [fflate](https://github.com/101arrowz/fflate) — pure-JS zlib for deflateSync/inflateSync. Faster and smaller than pako. Used for both stream recompression and PNG prediction reversal.
 
-**Font Subsetting**: Use [fontkit](https://github.com/nicbou/fontkit) or [subset-font](https://github.com/nicbou/subset-font) for TrueType/OpenType subsetting in the browser.
+**Image Recompression**: [jpeg-js](https://github.com/jpeg-js/jpeg-js) — pure JS JPEG encoder/decoder (~15KB). Works in both Web Worker and Node (for tests). Chosen over OffscreenCanvas because OffscreenCanvas isn't available in Node test environments.
 
-**Image Processing**: Use OffscreenCanvas + Canvas API for image re-encoding (JPEG, PNG). For WebP, use the browser's native encoder via `canvas.toBlob('image/webp', quality)`.
+**Font Unembedding**: Type1 and TrueType only. Type0/CIDFont composites use 2-byte Identity-H encoding — unembedding would require rewriting content stream text operators, which is too risky. Fonts with custom `/Encoding << /Differences [...] >>` are also skipped.
 
-**WASM Option**: For maximum compression, compile [MuPDF](https://mupdf.com/) or Ghostscript to WASM. This handles edge cases (Type1 font conversion, JBIG2 recompression) that pure JS can't. Ship as an optional heavy module (~5MB).
+**Future considerations for image processing**: OffscreenCanvas + Canvas API could enable WebP encoding (`canvas.toBlob('image/webp', quality)`) in browsers that support it. Worth exploring for P1 image downsampling.
+
+**Future considerations for font subsetting**: [fontkit](https://github.com/foliojs/fontkit) or [subset-font](https://github.com/nicbou/subset-font) for TrueType/OpenType subsetting in the browser.
+
+**WASM Option**: For maximum compression, compile [QPDF](https://github.com/qpdf/qpdf) (Apache 2.0) to WASM. MuPDF and Ghostscript are AGPL — licensing concerns for bundling. Ship as an optional heavy module (~5MB).
 
 ### Browser Constraints
 
@@ -148,6 +168,7 @@ Single-page app. Three states:
 - **Optimization level**: Simple toggle — "Lossless" (default) vs "Lossy"
 - **Lossy settings** (expandable): Image quality slider (1-100), target DPI dropdown
 - **Advanced** (expandable): Individual toggle switches for each optimization type
+- **Presets** (future): Named profiles ("Web", "Print", "Archive") that set all options at once, with the ability to customize individual settings within a preset
 - **Batch actions**: "Download All" (zip), "Download All" (individual)
 
 ### Responsive
@@ -175,8 +196,39 @@ Works on mobile for quick single-file optimization. Batch features are desktop-f
 | qpdf | Yes (CLI) | Yes | Yes | Yes | No |
 | pdf-lib | Yes (JS) | Yes | Yes | N/A | No (library only) |
 
+## Progress
+
+### P0 — MVP
+- [x] Drag-and-drop input
+- [x] Stream recompression (Flate level 9)
+- [x] Remove duplicate objects (hash-based dedup)
+- [x] Strip metadata bloat (XMP, Illustrator, Photoshop)
+- [x] Font deduplication
+- [x] Unreferenced object removal (BFS traversal)
+- [x] Size comparison (before/after display)
+- [x] Download output
+- [x] Lossless by default
+- [x] Web Worker for off-main-thread processing
+
+### P1 — Enhanced (in progress)
+- [x] Image recompression (FlateDecode → JPEG via jpeg-js, lossy opt-in)
+- [x] Standard font unembedding (14 base fonts, Type1/TrueType only)
+- [ ] Image downsampling (DPI reduction)
+- [ ] Font subsetting
+- [ ] Linearization
+- [ ] Optimization presets (Web / Print / Archive)
+- [ ] Side-by-side preview
+
+### P2 — Power User
+- [ ] Object inspector
+- [ ] Per-object control
+- [ ] CLI / Node.js mode
+- [ ] Watch mode (Node)
+- [ ] WASM Ghostscript fallback
+
 ## Open Questions
 
-1. **pdf-lib vs custom parser?** pdf-lib is well-maintained but may not expose enough internals for font deduplication and stream-level manipulation. May need to fork or write a lower-level parser.
-2. **WASM Ghostscript licensing**: Ghostscript is AGPL. Using it as an optional WASM module loaded at runtime (not bundled) may be acceptable, but needs legal review. MuPDF is also AGPL. Alternative: compile [QPDF](https://github.com/qpdf/qpdf) (Apache 2.0) to WASM.
-3. **Standard font unembedding safety**: Some PDF readers on mobile/embedded systems may not have the base-14 fonts. Should this be behind a warning?
+1. ~~**pdf-lib vs custom parser?**~~ **Resolved:** pdf-lib works well. Direct access to its internal `context` and indirect object enumeration provides sufficient low-level control for all current optimization passes without needing a fork.
+2. **WASM Ghostscript licensing**: Ghostscript is AGPL. MuPDF is also AGPL. Best alternative: compile [QPDF](https://github.com/qpdf/qpdf) (Apache 2.0) to WASM for structural optimizations that pure JS can't handle.
+3. ~~**Standard font unembedding safety**~~ **Resolved:** Implemented for Type1/TrueType only, skipping Type0 composites and fonts with custom Differences encodings. Enabled by default (`unembedStandardFonts: true`) since all conforming PDF readers are required to provide the base-14 fonts.
+4. **Configurability UX**: The engine options schema is extensible — each pass reads its own flags from the options object. Future work: expose these as UI controls (toggle switches per pass, quality sliders, DPI dropdowns) and bundle them into named presets (Web/Print/Archive). The architecture supports this without changing pass function signatures.

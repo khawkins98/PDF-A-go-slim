@@ -6,6 +6,8 @@
  */
 import { PDFDocument } from 'pdf-lib';
 import { recompressStreams } from './optimize/streams.js';
+import { recompressImages } from './optimize/images.js';
+import { unembedStandardFonts } from './optimize/font-unembed.js';
 import { deduplicateObjects } from './optimize/dedup.js';
 import { deduplicateFonts } from './optimize/fonts.js';
 import { stripMetadata } from './optimize/metadata.js';
@@ -13,6 +15,8 @@ import { removeUnreferencedObjects } from './optimize/unreferenced.js';
 
 const PASSES = [
   { name: 'Recompressing streams', fn: recompressStreams },
+  { name: 'Recompressing images', fn: recompressImages },
+  { name: 'Unembedding standard fonts', fn: unembedStandardFonts },
   { name: 'Deduplicating objects', fn: deduplicateObjects },
   { name: 'Deduplicating fonts', fn: deduplicateFonts },
   { name: 'Stripping metadata', fn: stripMetadata },
@@ -41,7 +45,7 @@ export async function optimize(inputBytes, options = {}, onProgress) {
     if (onProgress) onProgress((i + 0.5) / PASSES.length, name);
 
     try {
-      const passStats = fn(pdfDoc);
+      const passStats = fn(pdfDoc, options);
       stats.passes.push({ name, ...passStats });
     } catch (err) {
       stats.passes.push({ name, error: err.message });

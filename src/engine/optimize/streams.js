@@ -17,7 +17,7 @@ import {
  * Extract filter names from a stream's dictionary.
  * Returns an array of filter name strings, or null if no filters.
  */
-function getFilterNames(dict) {
+export function getFilterNames(dict) {
   const filterEntry = dict.get(PDFName.of('Filter'));
   if (!filterEntry) return null;
 
