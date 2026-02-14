@@ -9,7 +9,7 @@
 <body>
   <header>
     <h1>PDF-A-go-slim</h1>
-    <p class="tagline">Optimize PDFs in your browser. Files never leave your device.</p>
+    <p class="tagline">Reduce PDF file size in your browser. Files never leave your device.</p>
   </header>
 
   <!-- Full-page drop overlay -->
@@ -46,6 +46,7 @@
     </section>
 
     <!-- Optimization options (shared between idle and results states) -->
+    <div id="options-idle-slot">
     <div id="options-panel" class="options-panel">
       <div class="presets">
         <span class="presets__label">Preset:</span>
@@ -96,6 +97,7 @@
         </div>
       </details>
     </div>
+    </div>
 
     <!-- Processing state -->
     <section id="processing" class="state state--processing" hidden>
@@ -108,21 +110,16 @@
 
     <!-- Results state -->
     <section id="results" class="state state--results" hidden>
-      <h2>Results</h2>
-      <table id="results-table" class="results-table">
-        <thead>
-          <tr>
-            <th>File</th>
-            <th>Original</th>
-            <th>Optimized</th>
-            <th>Saved</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="results-body"></tbody>
-      </table>
+      <div id="results-summary"></div>
+      <div id="results-files"></div>
+      <div id="results-settings" class="results-settings">
+        <div class="results-settings__summary">
+          <span class="results-settings__label">Settings: <strong id="settings-preset-label">Lossless</strong></span>
+          <button class="results-settings__toggle" id="btn-toggle-settings">Change settings</button>
+        </div>
+        <div id="results-settings-body" class="results-settings__body" hidden></div>
+      </div>
       <div class="results-actions">
-        <button id="btn-download-all" class="btn btn--primary" hidden>Download All</button>
         <button id="btn-reoptimize" class="btn btn--secondary">Re-optimize</button>
         <button id="btn-start-over" class="btn btn--secondary">Start Over</button>
       </div>
