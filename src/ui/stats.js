@@ -114,8 +114,5 @@ export function buildDebugPanel(stats) {
     }
   }
 
-  return `<details class="debug-panel">
-    <summary class="debug-panel__toggle">Debug info</summary>
-    <div class="debug-panel__body">${html}</div>
-  </details>`;
+  return html;
 }

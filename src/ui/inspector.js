@@ -133,8 +133,7 @@ function buildCategoryRow(catBefore, catAfter, totalBeforeSize, passes) {
 
   return `<details class="inspect-category" style="--cat-accent: ${info.color}; --pct: ${pct}%">
     <summary class="inspect-category__header">
-      <span class="inspect-category__label">${info.label}</span>
-      <span class="inspect-category__desc-text">${info.description}</span>
+      <span class="inspect-category__label">${info.label}<span class="inspect-category__desc-text">${info.description}</span></span>
       <span class="inspect-category__before">${formatSize(bSize)} <small>(${catBefore.count})</small></span>
       <span class="inspect-category__after">${formatSize(aSize)} <small>(${catAfter.count})</small></span>
       <span class="inspect-category__saved">${formatDiff(diff)}</span>
@@ -160,7 +159,6 @@ export function buildInspectPanel(stats) {
   return `<div class="inspect-panel">
     <div class="inspect-panel__header">
       <span></span>
-      <span></span>
       <span class="inspect-panel__col-label">Before</span>
       <span class="inspect-panel__col-label">After</span>
       <span class="inspect-panel__col-label">Saved</span>
@@ -168,7 +166,6 @@ export function buildInspectPanel(stats) {
     ${rows}
     <div class="inspect-panel__total">
       <span class="inspect-category__label">Total</span>
-      <span></span>
       <span>${formatSize(before.totalSize)} <small>(${before.objectCount} obj)</small></span>
       <span>${formatSize(after.totalSize)} <small>(${after.objectCount} obj)</small></span>
       <span>${formatDiff(totalDiff)}</span>
