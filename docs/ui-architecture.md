@@ -195,14 +195,14 @@ The app has three mutually exclusive states managed by `showState()` in `main.js
 1. "Did it work?" -- savings percentage + sizes (always visible, prominent)
 2. "Get my file" -- download button (one clear location)
 3. "What happened?" -- hint banner + pass summary + object breakdown (visible but secondary)
-4. "Deep dive" -- preview, debug (collapsed by default)
+4. "Deep dive" -- preview (auto-open for single file, collapsed for batch), debug (collapsed by default)
 5. "What next?" -- settings bar + action buttons
 
 **Interactions:**
 - Download link -> browser downloads optimized PDF
 - Hint banner "Web preset" -> applies Web preset, triggers stale detection
 - Each `<details>` section -> native open/close toggle
-- Preview -> lazy-loads PDF-A-go-go viewer on first expand, destroys on collapse
+- Preview -> auto-opens for single-file results; lazy-loads PDF-A-go-go viewer on first expand, destroys on collapse
 - "Change settings" -> expands relocated `#options-panel` inline
 - Changing any option -> settings bar highlights with `.results-settings--stale`
 - Re-optimize -> re-runs `handleFiles(lastFiles)` with current options

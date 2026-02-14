@@ -81,7 +81,7 @@ function buildHintBanner(result, saved, options, onStaleCheck) {
 /**
  * Build disclosure sections (details/summary) for stats, inspector, preview, debug.
  */
-function buildDisclosureSections(result, blob, options) {
+function buildDisclosureSections(result, blob, options, { autoOpenPreview = false } = {}) {
   const sections = [];
 
   // Combined stats + inspector disclosure
@@ -115,7 +115,7 @@ function buildDisclosureSections(result, blob, options) {
   }
 
   // Preview disclosure
-  const compareSection = buildCompareSection(result.originalFile, blob);
+  const compareSection = buildCompareSection(result.originalFile, blob, { autoOpen: autoOpenPreview });
   sections.push(compareSection);
 
   // Debug disclosure (only when ?debug URL param is present)
@@ -177,8 +177,8 @@ export function buildSingleFileCard(result, blob, blobUrl, options, animateCount
   const hintBanner = buildHintBanner(result, saved, options, onStaleCheck);
   if (hintBanner) card.appendChild(hintBanner);
 
-  // Disclosure sections
-  const sections = buildDisclosureSections(result, blob, options);
+  // Disclosure sections (auto-open preview for single-file results)
+  const sections = buildDisclosureSections(result, blob, options, { autoOpenPreview: true });
   for (const section of sections) card.appendChild(section);
 
   // Trigger animation after card is in DOM

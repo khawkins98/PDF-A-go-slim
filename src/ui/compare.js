@@ -49,56 +49,45 @@ const VIEWER_CONFIG = {
 };
 
 /**
- * Build a preview <tr> for a result row showing the optimized PDF.
+ * Build a preview <details> section for a result card.
  * @param {File} originalFile - The original PDF File object (kept for API compat)
  * @param {Blob} optimizedBlob - The optimized PDF as a Blob
- * @returns {HTMLTableRowElement}
+ * @returns {HTMLDetailsElement}
  */
-export function buildCompareRow(originalFile, optimizedBlob) {
-  const tr = document.createElement('tr');
-  tr.className = 'compare-row';
-  const td = document.createElement('td');
-  td.colSpan = 5;
+export function buildCompareSection(originalFile, optimizedBlob, { autoOpen = false } = {}) {
+  const details = document.createElement('details');
+  details.className = 'result-card__disclosure';
 
-  const toggleBtn = document.createElement('button');
-  toggleBtn.className = 'compare-toggle';
-  toggleBtn.textContent = 'Preview';
-  td.appendChild(toggleBtn);
+  const summary = document.createElement('summary');
+  summary.textContent = 'Preview';
+  details.appendChild(summary);
 
   const viewerContainer = document.createElement('div');
   viewerContainer.className = 'compare-viewer-wrap';
-  viewerContainer.hidden = true;
-  td.appendChild(viewerContainer);
+  details.appendChild(viewerContainer);
 
-  tr.appendChild(td);
-
-  let expanded = false;
+  let loaded = false;
   let blobUrl = null;
 
-  toggleBtn.addEventListener('click', async () => {
-    if (expanded) {
+  details.addEventListener('toggle', async () => {
+    if (!details.open) {
       // Collapse — destroy viewer and revoke URL
       destroyCompareViewers(viewerContainer);
-      viewerContainer.hidden = true;
       viewerContainer.innerHTML = '';
-      toggleBtn.textContent = 'Preview';
-      toggleBtn.classList.remove('toggle--open');
       if (blobUrl) { URL.revokeObjectURL(blobUrl); activeBlobUrls.delete(blobUrl); blobUrl = null; }
-      expanded = false;
+      loaded = false;
       return;
     }
 
-    // Expand
-    toggleBtn.textContent = 'Loading viewer\u2026';
-    toggleBtn.disabled = true;
+    if (loaded) return;
+
+    summary.textContent = 'Loading viewer\u2026';
 
     try {
       await loadPdfAGoGo();
     } catch (err) {
-      viewerContainer.hidden = false;
       viewerContainer.innerHTML = `<div class="compare-error">Could not load preview: ${err.message}</div>`;
-      toggleBtn.textContent = 'Preview';
-      toggleBtn.disabled = false;
+      summary.textContent = 'Preview';
       return;
     }
 
@@ -106,7 +95,6 @@ export function buildCompareRow(originalFile, optimizedBlob) {
     activeBlobUrls.add(blobUrl);
 
     viewerContainer.innerHTML = '';
-    viewerContainer.hidden = false;
 
     const header = document.createElement('div');
     header.className = 'compare-side__label';
@@ -127,13 +115,13 @@ export function buildCompareRow(originalFile, optimizedBlob) {
       viewerContainer.innerHTML = `<div class="compare-error">Error initializing viewer: ${err.message}</div>`;
     }
 
-    toggleBtn.textContent = 'Hide preview';
-    toggleBtn.classList.add('toggle--open');
-    toggleBtn.disabled = false;
-    expanded = true;
+    summary.textContent = 'Preview';
+    loaded = true;
   });
 
-  return tr;
+  if (autoOpen) details.open = true;
+
+  return details;
 }
 
 function destroyCompareViewers(container) {
@@ -165,11 +153,9 @@ export function destroyAllComparisons() {
 
   // Also collapse any open viewers in the DOM
   document.querySelectorAll('.compare-viewer-wrap').forEach((el) => {
-    el.hidden = true;
     el.innerHTML = '';
   });
-  document.querySelectorAll('.compare-toggle.toggle--open').forEach((btn) => {
-    btn.textContent = 'Preview';
-    btn.classList.remove('toggle--open');
+  document.querySelectorAll('details.result-card__disclosure').forEach((d) => {
+    d.open = false;
   });
 }
