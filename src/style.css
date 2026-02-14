@@ -1125,3 +1125,116 @@ header h1 {
     height: 450px;
   }
 }
+
+/* --- Full-page drop overlay --- */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(37, 99, 235, 0.08);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px dashed var(--color-primary);
+  pointer-events: none;
+}
+
+.drop-overlay[hidden] {
+  display: none;
+}
+
+.drop-overlay__content {
+  text-align: center;
+}
+
+.drop-overlay__icon {
+  color: var(--color-primary);
+  margin-bottom: 0.75rem;
+}
+
+.drop-overlay__text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* --- Toast notification --- */
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-text);
+  color: #fff;
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.toast--fading {
+  opacity: 0;
+}
+
+/* --- Shimmer animation on progress bar --- */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.file-item__fill--active {
+  background: linear-gradient(90deg, var(--color-bar-fill) 25%, #5b8dee 50%, var(--color-bar-fill) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
+}
+
+/* --- Cancel button --- */
+.processing-actions {
+  text-align: center;
+  margin-top: 0.75rem;
+}
+
+.btn-cancel {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.4rem 0.75rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.btn-cancel:hover {
+  color: var(--color-text);
+}
+
+/* --- Error retry button --- */
+.file-item__retry {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0.6rem;
+  margin-left: 0.5rem;
+}
+
+.file-item__retry:hover {
+  background: var(--color-drop-bg);
+  border-color: var(--color-primary);
+}
+
+.file-item__error {
+  color: var(--color-error);
+  font-size: 0.8rem;
+  display: inline;
+}

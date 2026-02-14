@@ -5,10 +5,58 @@ import { buildInspectPanel } from './ui/inspector.js';
 import { buildStatsDetail, buildDebugPanel } from './ui/stats.js';
 import { buildCompareRow, destroyAllComparisons } from './ui/compare.js';
 
+// --- Friendly pass name labels (pipeline names stay unchanged for test compat) ---
+const PASS_LABELS = {
+  'Recompressing streams': 'Compressing data\u2026',
+  'Recompressing images': 'Optimizing images\u2026',
+  'Unembedding standard fonts': 'Cleaning up fonts\u2026',
+  'Subsetting fonts': 'Optimizing fonts\u2026',
+  'Deduplicating objects': 'Removing duplicates\u2026',
+  'Deduplicating fonts': 'Consolidating fonts\u2026',
+  'Stripping metadata': 'Cleaning metadata\u2026',
+  'Removing unreferenced objects': 'Final cleanup\u2026',
+};
+
+// --- Friendly error messages ---
+function friendlyError(msg) {
+  const lower = (msg || '').toLowerCase();
+  if (lower.includes('encrypt') || lower.includes('password'))
+    return 'This PDF is password-protected';
+  if (lower.includes('invalid pdf') || lower.includes('not a valid'))
+    return "This file doesn't appear to be a valid PDF";
+  return 'Something went wrong processing this file';
+}
+
+// --- Toast notification ---
+function showToast(message, duration = 4000) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('toast--fading');
+    toast.addEventListener('transitionend', () => toast.remove());
+  }, duration);
+}
+
+// --- Count-up animation ---
+function animateCountUp(el, target, duration = 600) {
+  const start = performance.now();
+  const update = (now) => {
+    const t = Math.min((now - start) / duration, 1);
+    const eased = 1 - (1 - t) ** 3; // ease-out cubic
+    el.textContent = `-${(eased * target).toFixed(1)}%`;
+    if (t < 1) requestAnimationFrame(update);
+  };
+  requestAnimationFrame(update);
+}
+
 // --- State ---
 let blobUrls = [];
 let lastFiles = null;
 let lastRunOptions = null;
+let activeWorker = null;
+let cancelled = false;
 
 // --- DOM refs ---
 const dropZone = document.getElementById('drop-zone');
@@ -20,6 +68,8 @@ const resultsSection = document.getElementById('results');
 const resultsBody = document.getElementById('results-body');
 const btnReoptimize = document.getElementById('btn-reoptimize');
 const btnStartOver = document.getElementById('btn-start-over');
+const dropOverlay = document.getElementById('drop-overlay');
+const btnCancel = document.getElementById('btn-cancel');
 
 // --- Stale results detection ---
 function checkStaleResults() {
@@ -73,6 +123,7 @@ function revokeBlobUrls() {
 function processFileWithProgress(file, options, progressCb) {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+    activeWorker = worker;
     const reader = new FileReader();
 
     reader.onload = () => {
@@ -85,15 +136,18 @@ function processFileWithProgress(file, options, progressCb) {
       if (type === 'progress') {
         progressCb(progress, pass);
       } else if (type === 'result') {
+        activeWorker = null;
         worker.terminate();
         resolve({ result, stats });
       } else if (type === 'error') {
+        activeWorker = null;
         worker.terminate();
         reject(new Error(error));
       }
     };
 
     worker.onerror = (err) => {
+      activeWorker = null;
       worker.terminate();
       reject(err);
     };
@@ -104,12 +158,18 @@ function processFileWithProgress(file, options, progressCb) {
 
 // --- Main flow ---
 async function handleFiles(files) {
-  const pdfFiles = Array.from(files).filter(
+  const allFiles = Array.from(files);
+  const pdfFiles = allFiles.filter(
     (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'),
   );
+  const skipped = allFiles.length - pdfFiles.length;
+  if (skipped > 0) {
+    showToast(`Only PDF files are supported. ${skipped} file${skipped > 1 ? 's' : ''} skipped.`);
+  }
   if (pdfFiles.length === 0) return;
 
   lastFiles = pdfFiles;
+  cancelled = false;
 
   const options = collectOptions();
   lastRunOptions = JSON.stringify(options);
@@ -121,12 +181,14 @@ async function handleFiles(files) {
   const results = [];
 
   for (const file of pdfFiles) {
+    if (cancelled) break;
+
     const li = document.createElement('li');
     li.className = 'file-item';
     li.innerHTML = `
       <span class="file-item__name">${file.name}</span>
       <span class="file-item__pass">Starting&hellip;</span>
-      <div class="file-item__bar"><div class="file-item__fill" style="width:0%"></div></div>
+      <div class="file-item__bar"><div class="file-item__fill file-item__fill--active" style="width:0%"></div></div>
     `;
     fileList.appendChild(li);
 
@@ -136,18 +198,40 @@ async function handleFiles(files) {
     try {
       const { result, stats } = await processFileWithProgress(file, options, (progress, pass) => {
         fillEl.style.width = `${Math.round(progress * 100)}%`;
-        passEl.textContent = pass || 'Processing\u2026';
+        passEl.textContent = PASS_LABELS[pass] || pass || 'Processing\u2026';
       });
 
       fillEl.style.width = '100%';
+      fillEl.classList.remove('file-item__fill--active');
       passEl.textContent = 'Done';
 
       results.push({ name: file.name, originalFile: file, original: file.size, result, stats });
     } catch (err) {
-      passEl.textContent = `Error: ${err.message}`;
+      if (cancelled) break;
+      fillEl.classList.remove('file-item__fill--active');
       fillEl.style.width = '100%';
       fillEl.classList.add('file-item__fill--error');
+
+      passEl.innerHTML = '';
+      const errorSpan = document.createElement('span');
+      errorSpan.className = 'file-item__error';
+      errorSpan.textContent = friendlyError(err.message);
+      passEl.appendChild(errorSpan);
+
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'file-item__retry';
+      retryBtn.textContent = 'Retry';
+      retryBtn.addEventListener('click', () => {
+        li.remove();
+        handleFiles([file]);
+      });
+      passEl.appendChild(retryBtn);
     }
+  }
+
+  if (cancelled) {
+    showState('idle');
+    return;
   }
 
   // Ensure processing state is visible for at least 800ms
@@ -314,11 +398,11 @@ async function handleFiles(files) {
   }
 
   const barHtml = hasSavings
-    ? `<div class="results-hero__bar"><div class="results-hero__bar-fill" style="width: ${100 - parseFloat(totalPct)}%"></div></div>`
+    ? `<div class="results-hero__bar"><div class="results-hero__bar-fill" style="width: 0%"></div></div>`
     : '';
 
   heroDiv.innerHTML = `
-    <div class="results-hero__pct ${hasSavings ? '' : 'results-hero__pct--zero'}">${hasSavings ? `-${totalPct}%` : '0%'}</div>
+    <div class="results-hero__pct ${hasSavings ? '' : 'results-hero__pct--zero'}">${hasSavings ? '-0.0%' : '0%'}</div>
     <div class="results-hero__sizes">${formatSize(totalOriginal)} \u2192 ${formatSize(totalOptimized)}</div>
     ${barHtml}
     ${heroDownloadHtml}
@@ -326,6 +410,19 @@ async function handleFiles(files) {
 
   const resultsTable = resultsSection.querySelector('.results-table');
   resultsSection.insertBefore(heroDiv, resultsTable);
+
+  // Animate hero card: count-up + bar fill
+  if (hasSavings) {
+    const pctEl = heroDiv.querySelector('.results-hero__pct');
+    animateCountUp(pctEl, parseFloat(totalPct));
+
+    const barFill = heroDiv.querySelector('.results-hero__bar-fill');
+    if (barFill) {
+      requestAnimationFrame(() => {
+        barFill.style.width = `${100 - parseFloat(totalPct)}%`;
+      });
+    }
+  }
 
   // Wire up hero "Download All" button
   const heroDownloadAllBtn = heroDiv.querySelector('#hero-download-all');
@@ -395,6 +492,49 @@ dropArea.addEventListener('drop', (e) => {
   e.preventDefault();
   dropArea.classList.remove('drop-area--active');
   if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+});
+
+// --- Full-page drop overlay ---
+let dragCounter = 0;
+
+document.addEventListener('dragenter', (e) => {
+  if (!e.dataTransfer.types.includes('Files')) return;
+  // Only show overlay when not processing
+  if (!processingSection.hidden) return;
+  dragCounter++;
+  if (dragCounter === 1) {
+    dropOverlay.hidden = false;
+  }
+});
+
+document.addEventListener('dragleave', () => {
+  dragCounter--;
+  if (dragCounter <= 0) {
+    dragCounter = 0;
+    dropOverlay.hidden = true;
+  }
+});
+
+document.addEventListener('dragover', (e) => {
+  e.preventDefault();
+});
+
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dragCounter = 0;
+  dropOverlay.hidden = true;
+  if (!processingSection.hidden) return;
+  if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+});
+
+// --- Cancel button ---
+btnCancel.addEventListener('click', () => {
+  cancelled = true;
+  if (activeWorker) {
+    activeWorker.terminate();
+    activeWorker = null;
+  }
+  showState('idle');
 });
 
 btnReoptimize.addEventListener('click', () => {
