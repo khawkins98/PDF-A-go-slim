@@ -1083,6 +1083,9 @@ header h1 {
 }
 
 .compare-side__label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   background: var(--color-bg);
   padding: 0.4rem 0.75rem;
   font-size: 0.78rem;
@@ -1090,6 +1093,19 @@ header h1 {
   color: var(--color-text-muted);
   border-bottom: 1px solid var(--color-border);
   margin: -0.5rem -0.75rem 0;
+}
+
+.compare-powered-by {
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  opacity: 0.7;
+}
+
+.compare-powered-by:hover {
+  opacity: 1;
+  color: var(--color-primary);
 }
 
 .compare-side__viewer {

@@ -110,7 +110,7 @@ export function buildCompareRow(originalFile, optimizedBlob) {
 
     const header = document.createElement('div');
     header.className = 'compare-side__label';
-    header.textContent = `Optimized \u2014 ${formatSize(optimizedBlob.size)}`;
+    header.innerHTML = `Optimized \u2014 ${formatSize(optimizedBlob.size)}<a href="https://github.com/khawkins98/PDF-A-go-go" target="_blank" rel="noopener" class="compare-powered-by">Powered by PDF-A-go-go</a>`;
     viewerContainer.appendChild(header);
 
     const viewer = document.createElement('div');
