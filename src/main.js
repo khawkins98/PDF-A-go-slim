@@ -345,8 +345,32 @@ async function handleFiles(files) {
 
 }
 
+// --- Example PDF ---
+const EXAMPLE_PDF_URL = 'https://raw.githubusercontent.com/mozilla/pdf.js/master/test/pdfs/tracemonkey.pdf';
+const btnTryExample = document.getElementById('btn-try-example');
+
+btnTryExample.addEventListener('click', async (e) => {
+  e.stopPropagation(); // Don't trigger the file picker
+  btnTryExample.disabled = true;
+  btnTryExample.textContent = 'loading\u2026';
+  try {
+    const res = await fetch(EXAMPLE_PDF_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const file = new File([blob], 'tracemonkey.pdf', { type: 'application/pdf' });
+    handleFiles([file]);
+  } catch (err) {
+    btnTryExample.textContent = 'failed to load';
+    console.error('Example PDF fetch failed:', err);
+  }
+});
+
 // --- Event listeners ---
-dropArea.addEventListener('click', () => fileInput.click());
+dropArea.addEventListener('click', (e) => {
+  // Don't open file picker if the example button was clicked
+  if (e.target.closest('#btn-try-example')) return;
+  fileInput.click();
+});
 dropArea.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
