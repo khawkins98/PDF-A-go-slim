@@ -13,6 +13,7 @@ import { deduplicateObjects } from './optimize/dedup.js';
 import { deduplicateFonts } from './optimize/fonts.js';
 import { stripMetadata } from './optimize/metadata.js';
 import { removeUnreferencedObjects } from './optimize/unreferenced.js';
+import { inspectDocument } from './inspect.js';
 
 const PASSES = [
   { name: 'Recompressing streams', fn: recompressStreams },
@@ -41,6 +42,7 @@ export async function optimize(inputBytes, options = {}, onProgress) {
   });
 
   const stats = { inputSize, passes: [] };
+  const inspectBefore = inspectDocument(pdfDoc);
 
   for (let i = 0; i < PASSES.length; i++) {
     const { name, fn } = PASSES[i];
@@ -55,6 +57,9 @@ export async function optimize(inputBytes, options = {}, onProgress) {
 
     if (onProgress) onProgress((i + 1) / PASSES.length, name);
   }
+
+  const inspectAfter = inspectDocument(pdfDoc);
+  stats.inspect = { before: inspectBefore, after: inspectAfter };
 
   const outputBytes = await pdfDoc.save({
     useObjectStreams: true,

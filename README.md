@@ -9,6 +9,7 @@ A browser-based PDF optimization tool that reduces file size entirely client-sid
 - **Optimization presets** — Lossless (default), Web (lossy, 75% quality), Print (lossy, 92% quality)
 - **Advanced controls** — lossy/lossless toggle, image quality slider, font unembedding and subsetting checkboxes
 - **Per-file stats** — expandable detail rows showing what each pass accomplished
+- **Object inspector** — before/after breakdown of every PDF object by category (fonts, images, content streams, metadata, page tree) with per-category savings
 - **Privacy-first** — files never leave your browser; all processing runs in a Web Worker
 - **Batch capable** — optimize multiple PDFs at once with individual or bulk download
 
@@ -38,6 +39,8 @@ index.html → src/main.js (UI, drag-and-drop, options panel, worker orchestrati
              src/worker.js (Web Worker — off-main-thread processing)
                  ↓
              src/engine/pipeline.js (sequential optimization passes with progress)
+                 ↓
+             src/engine/inspect.js (object classification — before/after snapshots)
                  ↓
              src/engine/optimize/  (8 passes, run in order):
                streams.js      — recompress streams with fflate level 9

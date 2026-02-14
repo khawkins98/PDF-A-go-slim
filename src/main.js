@@ -217,6 +217,86 @@ function buildStatsDetail(stats) {
   return `<ul class="pass-stats__list">${items.join('')}</ul>`;
 }
 
+// --- Object inspector ---
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function formatDiff(diff) {
+  if (diff === 0) return '';
+  const sign = diff < 0 ? '\u2212' : '+'; // minus sign or plus
+  const cls = diff < 0 ? 'inspect-diff--smaller' : 'inspect-diff--larger';
+  return `<span class="${cls}">${sign}${formatSize(Math.abs(diff))}</span>`;
+}
+
+function buildCategoryRow(catBefore, catAfter) {
+  const bSize = catBefore.totalSize;
+  const aSize = catAfter.totalSize;
+  const diff = aSize - bSize;
+
+  const visibleItems = catBefore.items.filter((i) => i.size > 0);
+  const hiddenCount = catBefore.count - visibleItems.length;
+
+  let itemsHtml = visibleItems.map((item) => {
+    const ref = escapeHtml(item.ref);
+    const name = item.name ? escapeHtml(item.name) : '';
+    const size = formatSize(item.size);
+    const filter = item.filter ? escapeHtml(item.filter) : '';
+    const detail = item.detail ? escapeHtml(item.detail) : '';
+    return `<div class="inspect-item">
+      <span class="inspect-item__ref">${ref}</span>
+      <span class="inspect-item__name">${name}</span>
+      <span class="inspect-item__size">${size}</span>
+      <span class="inspect-item__filter">${filter}</span>
+      <span class="inspect-item__detail">${detail}</span>
+    </div>`;
+  }).join('');
+
+  if (hiddenCount > 0) {
+    itemsHtml += `<div class="inspect-item inspect-item--summary">${hiddenCount} non-stream object${hiddenCount !== 1 ? 's' : ''} (dicts, arrays, refs)</div>`;
+  }
+  if (!itemsHtml) {
+    itemsHtml = '<div class="inspect-item inspect-item--summary">No objects</div>';
+  }
+
+  return `<details class="inspect-category">
+    <summary class="inspect-category__header">
+      <span class="inspect-category__label">${catBefore.label}</span>
+      <span class="inspect-category__before">${formatSize(bSize)} <small>(${catBefore.count})</small></span>
+      <span class="inspect-category__after">${formatSize(aSize)} <small>(${catAfter.count})</small></span>
+      <span class="inspect-category__saved">${formatDiff(diff)}</span>
+    </summary>
+    <div class="inspect-category__items">${itemsHtml}</div>
+  </details>`;
+}
+
+function buildInspectPanel(stats) {
+  if (!stats?.inspect?.before || !stats?.inspect?.after) return null;
+  const { before, after } = stats.inspect;
+
+  const rows = before.categories.map((catB, i) =>
+    buildCategoryRow(catB, after.categories[i])
+  ).join('');
+
+  const totalDiff = after.totalSize - before.totalSize;
+
+  return `<div class="inspect-panel">
+    <div class="inspect-panel__header">
+      <span></span>
+      <span class="inspect-panel__col-label">Before</span>
+      <span class="inspect-panel__col-label">After</span>
+      <span class="inspect-panel__col-label">Saved</span>
+    </div>
+    ${rows}
+    <div class="inspect-panel__total">
+      <span class="inspect-category__label">Total</span>
+      <span>${formatSize(before.totalSize)} <small>(${before.objectCount} obj)</small></span>
+      <span>${formatSize(after.totalSize)} <small>(${after.objectCount} obj)</small></span>
+      <span>${formatDiff(totalDiff)}</span>
+    </div>
+  </div>`;
+}
+
 // --- Main flow ---
 async function handleFiles(files) {
   const pdfFiles = Array.from(files).filter(
@@ -306,6 +386,29 @@ async function handleFiles(files) {
         const visible = !statsDiv.hidden;
         statsDiv.hidden = visible;
         toggleBtn.textContent = visible ? 'Show details' : 'Hide details';
+      });
+    }
+
+    // Object inspector row
+    const inspectHtml = buildInspectPanel(r.stats);
+    if (inspectHtml) {
+      const inspectTr = document.createElement('tr');
+      inspectTr.className = 'inspect-row';
+      const inspectTd = document.createElement('td');
+      inspectTd.colSpan = 5;
+      inspectTd.innerHTML = `
+        <button class="inspect-toggle">Object breakdown</button>
+        <div class="inspect-detail" hidden>${inspectHtml}</div>
+      `;
+      inspectTr.appendChild(inspectTd);
+      resultsBody.appendChild(inspectTr);
+
+      const inspectBtn = inspectTd.querySelector('.inspect-toggle');
+      const inspectDiv = inspectTd.querySelector('.inspect-detail');
+      inspectBtn.addEventListener('click', () => {
+        const visible = !inspectDiv.hidden;
+        inspectDiv.hidden = visible;
+        inspectBtn.textContent = visible ? 'Object breakdown' : 'Hide breakdown';
       });
     }
   }

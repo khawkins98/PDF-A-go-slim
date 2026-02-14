@@ -130,6 +130,20 @@ Smooth sine-wave patterns (`Math.sin(x * freq)`) are photo-like: they compress p
 
 When reading numeric values from pdf-lib dicts in tests, `Number(val.toString())` works reliably across all PDFNumber creation methods. The `.numberValue()` / `.value()` accessors return `NaN` or `undefined` in some cases depending on whether the number came from parsing or `context.obj()`.
 
+### Object Classification for Inspection
+
+Classifying PDF objects by semantic type requires multiple pre-passes because many objects lack self-identifying `/Type` entries:
+
+- **Font file streams** (FontFile/FontFile2/FontFile3) have no `/Type` — they must be identified by walking FontDescriptor dicts and collecting refs to their font file entries.
+- **Content streams** are plain streams referenced from page `/Contents` — must walk pages to build a ref→page mapping.
+- **Image resource names** (e.g., `Im0`) are stored in the page's `/Resources/XObject` dict, not on the image stream itself.
+
+**Indirect ref resolution is critical.** Page `/Resources` and `/XObject` entries are frequently indirect references (`PDFRef`), not inline dicts. Forgetting to `context.lookup()` silently skips entire pages.
+
+**PDFRawStream extends PDFDict** in pdf-lib. An `instanceof PDFDict` check matches streams too. When searching for non-stream dicts (e.g., FontDescriptors), always add `|| obj instanceof PDFRawStream` to the exclusion guard.
+
+**Size measurement:** Stream `contents.length` (compressed bytes) is the meaningful size metric for understanding where bytes go. Non-stream objects (dicts, arrays, numbers) contribute negligible overhead compared to streams and can be summarized rather than listed individually.
+
 ---
 
 ## Code Architecture

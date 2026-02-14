@@ -23,6 +23,8 @@ index.html → src/main.js (UI, drag-and-drop, worker orchestration)
                  ↓
              src/engine/pipeline.js (sequential optimization passes with progress reporting)
                  ↓
+             src/engine/inspect.js (object classification — before/after snapshots)
+                 ↓
              src/engine/optimize/  (passes, run in order):
                streams.js      — recompress streams with fflate level 9
                images.js       — JPEG recompression + DPI downsampling
