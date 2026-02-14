@@ -28,6 +28,44 @@
         </div>
         <input type="file" id="file-input" accept=".pdf,application/pdf" multiple hidden />
       </div>
+
+      <!-- Optimization options -->
+      <div class="options-panel">
+        <div class="presets">
+          <span class="presets__label">Preset:</span>
+          <button class="preset-btn preset-btn--active" data-preset="lossless">Lossless</button>
+          <button class="preset-btn" data-preset="web">Web</button>
+          <button class="preset-btn" data-preset="print">Print</button>
+        </div>
+
+        <details class="advanced">
+          <summary class="advanced__toggle">Advanced Settings</summary>
+          <div class="advanced__body">
+            <div class="control-row">
+              <label class="control-label">Mode</label>
+              <div class="mode-toggle">
+                <button type="button" class="mode-btn mode-btn--active" data-mode="lossless">Lossless</button>
+                <button type="button" class="mode-btn" data-mode="lossy">Lossy</button>
+              </div>
+            </div>
+
+            <div class="control-row control-row--quality" hidden>
+              <label class="control-label" for="quality-slider">Image quality</label>
+              <div class="quality-control">
+                <input type="range" id="quality-slider" class="quality-slider" min="1" max="100" value="85" />
+                <span id="quality-value" class="quality-value">85</span>
+              </div>
+            </div>
+
+            <div class="control-row">
+              <label class="control-label">
+                <input type="checkbox" id="unembed-fonts" checked />
+                Unembed standard fonts
+              </label>
+            </div>
+          </div>
+        </details>
+      </div>
     </section>
 
     <!-- Processing state -->

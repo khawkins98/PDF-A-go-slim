@@ -68,7 +68,10 @@ There's no open-source, privacy-first, in-browser option that handles the full r
 | **Standard font unembedding** | Remove embedded copies of the 14 standard PDF fonts (Helvetica, Courier, Times, etc.) since all PDF readers include them |
 | **Linearization** | Rewrite for fast web viewing (byte-serving, page-at-a-time loading) |
 | **Optimization presets** | Named profiles: "Web" (aggressive), "Print" (conservative), "Archive" (lossless maximum) |
-| **Side-by-side preview** | Render before/after pages to verify no visual regression |
+| **Side-by-side preview** | Render before/after pages using [PDF-A-go-go](https://github.com/khawkins98/PDF-A-go-go) to verify no visual regression |
+| **Re-optimize** | After results, offer a button to re-run with different settings (e.g., try Lossy after seeing Lossless results) without starting over |
+| **Optimization summary** | Show a human-readable summary of what was done (e.g., "3 images recompressed, 1 font unembedded, 12 metadata entries stripped") |
+| **Credits & attribution** | Footer or about section crediting open-source packages used (pdf-lib, fflate, jpeg-js, PDF-A-go-go) and linking to source |
 
 ### P2 — Power User
 
@@ -213,11 +216,14 @@ Works on mobile for quick single-file optimization. Batch features are desktop-f
 ### P1 — Enhanced (in progress)
 - [x] Image recompression (FlateDecode → JPEG via jpeg-js, lossy opt-in)
 - [x] Standard font unembedding (14 base fonts, Type1/TrueType only)
+- [x] Optimization presets (Lossless / Web / Print) with UI controls
+- [x] Optimization summary (per-pass stats in expandable detail rows)
 - [ ] Image downsampling (DPI reduction)
 - [ ] Font subsetting
 - [ ] Linearization
-- [ ] Optimization presets (Web / Print / Archive)
-- [ ] Side-by-side preview
+- [ ] Side-by-side preview (via PDF-A-go-go)
+- [ ] Re-optimize button (re-run with different settings from results screen)
+- [ ] Credits & attribution (footer/about with package links)
 
 ### P2 — Power User
 - [ ] Object inspector
@@ -231,4 +237,4 @@ Works on mobile for quick single-file optimization. Batch features are desktop-f
 1. ~~**pdf-lib vs custom parser?**~~ **Resolved:** pdf-lib works well. Direct access to its internal `context` and indirect object enumeration provides sufficient low-level control for all current optimization passes without needing a fork.
 2. **WASM Ghostscript licensing**: Ghostscript is AGPL. MuPDF is also AGPL. Best alternative: compile [QPDF](https://github.com/qpdf/qpdf) (Apache 2.0) to WASM for structural optimizations that pure JS can't handle.
 3. ~~**Standard font unembedding safety**~~ **Resolved:** Implemented for Type1/TrueType only, skipping Type0 composites and fonts with custom Differences encodings. Enabled by default (`unembedStandardFonts: true`) since all conforming PDF readers are required to provide the base-14 fonts.
-4. **Configurability UX**: The engine options schema is extensible — each pass reads its own flags from the options object. Future work: expose these as UI controls (toggle switches per pass, quality sliders, DPI dropdowns) and bundle them into named presets (Web/Print/Archive). The architecture supports this without changing pass function signatures.
+4. ~~**Configurability UX**~~ **Resolved:** Implemented preset buttons (Lossless/Web/Print), collapsible Advanced Settings panel with lossy/lossless toggle, image quality slider, and font unembedding checkbox. Presets set all controls; manual tweaks auto-detect matching preset or show "Custom". Options flow through to the worker and engine unchanged.
