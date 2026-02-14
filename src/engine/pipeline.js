@@ -14,6 +14,7 @@ import { deduplicateFonts } from './optimize/fonts.js';
 import { stripMetadata } from './optimize/metadata.js';
 import { removeUnreferencedObjects } from './optimize/unreferenced.js';
 import { inspectDocument } from './inspect.js';
+import { detectAccessibilityTraits } from './utils/accessibility-detect.js';
 
 const PASSES = [
   { name: 'Recompressing streams', fn: recompressStreams },
@@ -41,7 +42,10 @@ export async function optimize(inputBytes, options = {}, onProgress) {
     updateMetadata: false,
   });
 
-  const stats = { inputSize, passes: [] };
+  const pdfTraits = detectAccessibilityTraits(pdfDoc);
+  const passOptions = { ...options, _pdfTraits: pdfTraits };
+
+  const stats = { inputSize, pdfTraits, passes: [] };
   const inspectBefore = inspectDocument(pdfDoc);
 
   for (let i = 0; i < PASSES.length; i++) {
@@ -50,7 +54,7 @@ export async function optimize(inputBytes, options = {}, onProgress) {
 
     try {
       const t0 = Date.now();
-      const passStats = await fn(pdfDoc, options);
+      const passStats = await fn(pdfDoc, passOptions);
       stats.passes.push({ name, _ms: Date.now() - t0, ...passStats });
     } catch (err) {
       stats.passes.push({ name, error: err.message });

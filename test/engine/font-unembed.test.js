@@ -7,6 +7,7 @@ import {
   createPdfWithSubsetPrefixedFont,
   createPdfWithType0StandardFont,
   createPdfWithNonStandardFont,
+  createPdfAWithEmbeddedFont,
 } from '../fixtures/create-test-pdfs.js';
 
 describe('unembedStandardFonts', () => {
@@ -120,6 +121,29 @@ describe('unembedStandardFonts', () => {
       }
     }
     expect(foundToUnicode).toBe(true);
+  });
+
+  it('skips unembedding when PDF/A detected', async () => {
+    const doc = await createPdfAWithEmbeddedFont();
+    const result = unembedStandardFonts(doc, {
+      _pdfTraits: { isPdfA: true, pdfALevel: '1B' },
+    });
+
+    expect(result.unembedded).toBe(0);
+    expect(result.pdfaSkipped).toBe(true);
+
+    // Font should still have its FontDescriptor (not unembedded)
+    let foundDescriptor = false;
+    for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+      if (!(obj instanceof PDFDict)) continue;
+      const type = obj.get(PDFName.of('Type'));
+      if (type instanceof PDFName && type.decodeText() === 'Font') {
+        if (obj.get(PDFName.of('FontDescriptor'))) {
+          foundDescriptor = true;
+        }
+      }
+    }
+    expect(foundDescriptor).toBe(true);
   });
 
   it('disabled when options.unembedStandardFonts === false', async () => {

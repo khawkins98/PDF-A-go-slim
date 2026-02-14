@@ -28,18 +28,20 @@ const BLOAT_KEYS = [
 /**
  * Strip metadata bloat from the document.
  * @param {PDFDocument} pdfDoc
- * @returns {{ stripped: number }}
+ * @param {object} [options]
+ * @returns {{ stripped: number, xmpPreserved?: boolean }}
  */
-export function stripMetadata(pdfDoc) {
+export function stripMetadata(pdfDoc, options = {}) {
+  const { _pdfTraits } = options;
   const context = pdfDoc.context;
   let stripped = 0;
+  let xmpPreserved = false;
 
-  // 1. Remove XMP metadata stream from the catalog
+  // 1. Handle XMP metadata stream on the catalog
   const catalog = pdfDoc.catalog;
   const metadataRef = catalog.get(PDFName.of('Metadata'));
   if (metadataRef) {
-    // Before stripping, migrate document language to /Lang on catalog
-    // (screen readers and assistive tech depend on /Lang)
+    // Migrate document language to /Lang before potentially stripping XMP
     if (!catalog.get(PDFName.of('Lang')) && metadataRef instanceof PDFRef) {
       const metadataObj = context.lookup(metadataRef);
       if (metadataObj instanceof PDFRawStream) {
@@ -50,12 +52,16 @@ export function stripMetadata(pdfDoc) {
       }
     }
 
-    catalog.delete(PDFName.of('Metadata'));
-    // Delete the metadata stream object itself if it's an indirect ref
-    if (metadataRef instanceof PDFRef) {
-      context.delete(metadataRef);
+    // PDF/A requires XMP metadata — preserve it
+    if (_pdfTraits?.isPdfA) {
+      xmpPreserved = true;
+    } else {
+      catalog.delete(PDFName.of('Metadata'));
+      if (metadataRef instanceof PDFRef) {
+        context.delete(metadataRef);
+      }
+      stripped++;
     }
-    stripped++;
   }
 
   // 2. Walk all indirect objects and strip bloat keys
@@ -67,7 +73,7 @@ export function stripMetadata(pdfDoc) {
     }
   }
 
-  return { stripped };
+  return { stripped, ...(xmpPreserved && { xmpPreserved: true }) };
 }
 
 /**

@@ -42,6 +42,7 @@ index.html → src/main.js (UI state machine, drag-and-drop, worker orchestratio
                unicode-mapper.js         — map char codes → Unicode codepoints
                glyph-list.js             — Adobe Glyph List + encoding tables
                harfbuzz-subsetter.js     — harfbuzzjs WASM wrapper for font subsetting
+               accessibility-detect.js   — PDF/A, PDF/UA, tagged PDF detection
                hash.js                   — shared djb2 hash + FONT_FILE_KEYS constant
 ```
 

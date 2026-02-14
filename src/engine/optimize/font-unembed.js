@@ -94,13 +94,18 @@ function hasCustomDifferences(dict) {
  * @returns {{ unembedded: number, skipped: number }}
  */
 export function unembedStandardFonts(pdfDoc, options = {}) {
-  const { unembedStandardFonts: enabled = true } = options;
+  const { unembedStandardFonts: enabled = true, _pdfTraits } = options;
   const context = pdfDoc.context;
   let unembedded = 0;
   let skipped = 0;
 
   if (!enabled) {
     return { unembedded: 0, skipped: 0 };
+  }
+
+  // PDF/A requires all fonts to be embedded — skip this pass entirely
+  if (_pdfTraits?.isPdfA) {
+    return { unembedded: 0, skipped: 0, pdfaSkipped: true };
   }
 
   // Collect refs to delete after processing (FontDescriptor, FontFile streams)

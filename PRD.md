@@ -103,6 +103,7 @@ src/
       metadata.js             # Strip XMP, Illustrator, Photoshop bloat keys
       unreferenced.js         # Remove unreachable objects via BFS traversal
     utils/
+      accessibility-detect.js # PDF/A, PDF/UA, tagged PDF detection
       hash.js                 # Shared hashing (hashBytes) + font constants (FONT_FILE_KEYS)
       stream-decode.js        # Decoders: Flate, LZW, ASCII85, ASCIIHex, RunLength, PNG prediction
       pdf-traversal.js        # BFS graph walker from PDF trailer
@@ -249,16 +250,19 @@ PDF optimization can degrade accessibility. The following mitigations are in pla
 - **ToUnicode CMap preservation** — `font-unembed.js` preserves `/ToUnicode` entries when replacing standard font dicts, so screen readers retain glyph-to-character mapping.
 - **Document language migration** — `metadata.js` extracts `dc:language` from XMP and sets `/Lang` on the catalog before stripping XMP, preserving the language tag for assistive technology.
 - **Dedup safety** — `dedup.js` only deduplicates `PDFRawStream` objects. Structure tree elements (`/StructElem`) are plain `PDFDict` objects and are never merged.
+- **Tagged PDF detection** — `accessibility-detect.js` detects `/MarkInfo` and `/StructTreeRoot` on the catalog. Traits are reported in `stats.pdfTraits` for UI visibility.
+- **PDF/A awareness** — Pipeline auto-detects PDF/A conformance level (via XMP `pdfaid:part`) and disables font unembedding and XMP stripping for PDF/A files. Bloat keys are still stripped.
+- **Structure tree protection** — Confirmed via tests that `unreferenced.js` BFS traversal reaches `/StructTreeRoot` and its descendants through the catalog. Tagged structure is never removed as orphaned.
+- **XMP accessibility metadata** — `parseConformanceFromXmp()` detects `pdfuaid:part` (PDF/UA) and `pdfaid:part`/`pdfaid:conformance` (PDF/A). XMP is preserved for PDF/A files.
+- **Accessible PDF test suite** — Test fixtures for tagged PDFs, PDF/A-1b, PDF/UA, and tagged PDFs with orphans. End-to-end pipeline tests verify accessibility data survives optimization.
 
 ### Future work
 
 | Item | Priority | Description |
 |------|----------|-------------|
-| **Tagged PDF detection** | P2 | Detect `/MarkInfo` and `/StructTreeRoot` on the catalog. When present, warn the user or skip aggressive passes (font unembedding, unreferenced removal) that could damage the accessibility tree. |
-| **PDF/A awareness** | P2 | PDF/A requires embedded fonts — font unembedding directly violates PDF/A. Detect PDF/A conformance level (via XMP `pdfaid:part`) and disable font-unembed for those files. |
-| **Structure tree protection** | P2 | Ensure `unreferenced.js` BFS traversal always reaches `/StructTreeRoot` and its descendants so tagged structure is never removed as orphaned. |
-| **XMP accessibility metadata** | P3 | Before stripping XMP, check for additional accessibility properties beyond language (e.g., `pdfuaid:part` for PDF/UA conformance) and preserve or migrate them. |
-| **Accessible PDF test suite** | P3 | Add test fixtures with tagged content, structure trees, and `/Lang` to verify accessibility data survives the full pipeline. |
+| **PDF/A-1 object stream restriction** | P2 | PDF/A-1 (based on PDF 1.4) prohibits object streams, but the pipeline saves with `useObjectStreams: true`. This could break strict PDF/A-1 conformance. Should conditionally disable object streams when `pdfALevel` starts with `1`. PDF/A-2+ allows object streams and is unaffected. |
+| **PDF/UA font protection** | P2 | PDF/UA (ISO 14289) also requires all fonts to be embedded. Currently only PDF/A triggers the font-unembed skip — PDF/UA should too. |
+| **UI accessibility warnings** | P3 | Surface `pdfTraits` in the results UI to warn users when they're optimizing tagged/PDF-A/PDF-UA documents. Show the detected conformance level (e.g., "PDF/A-1b detected — font unembedding and XMP removal disabled"). |
 
 ## Learnings & Documentation
 

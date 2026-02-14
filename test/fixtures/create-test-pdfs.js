@@ -788,6 +788,202 @@ export async function createMetadataBloatPdfWithLang() {
   return doc;
 }
 
+// --- Accessibility / conformance test fixtures ---
+
+/**
+ * Create a tagged PDF with MarkInfo, StructTreeRoot, StructElem children, and /Lang.
+ */
+export async function createTaggedPdf() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  // Set /Lang on catalog
+  doc.catalog.set(PDFName.of('Lang'), PDFString.of('en-US'));
+
+  // Set /MarkInfo << /Marked true >>
+  const markInfo = doc.context.obj({});
+  markInfo.set(PDFName.of('Marked'), doc.context.obj(true));
+  doc.catalog.set(PDFName.of('MarkInfo'), markInfo);
+
+  // Create a minimal structure tree
+  const structElem1 = doc.context.obj({});
+  structElem1.set(PDFName.of('Type'), PDFName.of('StructElem'));
+  structElem1.set(PDFName.of('S'), PDFName.of('P'));
+  const structElem1Ref = doc.context.register(structElem1);
+
+  const structElem2 = doc.context.obj({});
+  structElem2.set(PDFName.of('Type'), PDFName.of('StructElem'));
+  structElem2.set(PDFName.of('S'), PDFName.of('H1'));
+  const structElem2Ref = doc.context.register(structElem2);
+
+  const structTreeRoot = doc.context.obj({});
+  structTreeRoot.set(PDFName.of('Type'), PDFName.of('StructTreeRoot'));
+  structTreeRoot.set(PDFName.of('K'), doc.context.obj([structElem1Ref, structElem2Ref]));
+  const structTreeRootRef = doc.context.register(structTreeRoot);
+
+  // Set parent pointers
+  structElem1.set(PDFName.of('P'), structTreeRootRef);
+  structElem2.set(PDFName.of('P'), structTreeRootRef);
+
+  doc.catalog.set(PDFName.of('StructTreeRoot'), structTreeRootRef);
+
+  return doc;
+}
+
+/**
+ * Create a PDF/A-1b document with conformance declared in XMP metadata.
+ */
+export async function createPdfAPdf() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  doc.setTitle('PDF/A Test');
+
+  // XMP with pdfaid:part=1, pdfaid:conformance=B
+  const xmpData = new TextEncoder().encode(
+    '<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>' +
+      '<x:xmpmeta xmlns:x="adobe:ns:meta/">' +
+      '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"' +
+      ' xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/">' +
+      '<rdf:Description rdf:about="">' +
+      '<pdfaid:part>1</pdfaid:part>' +
+      '<pdfaid:conformance>B</pdfaid:conformance>' +
+      '</rdf:Description>' +
+      '</rdf:RDF></x:xmpmeta><?xpacket end="w"?>',
+  );
+  const xmpDict = doc.context.obj({});
+  xmpDict.set(PDFName.of('Type'), PDFName.of('Metadata'));
+  xmpDict.set(PDFName.of('Subtype'), PDFName.of('XML'));
+  xmpDict.set(PDFName.of('Length'), doc.context.obj(xmpData.length));
+  const xmpStream = PDFRawStream.of(xmpDict, xmpData);
+  const xmpRef = doc.context.register(xmpStream);
+  doc.catalog.set(PDFName.of('Metadata'), xmpRef);
+
+  return doc;
+}
+
+/**
+ * Create a tagged PDF with orphan objects — tests that StructTreeRoot
+ * descendants are reachable by BFS and not removed as unreferenced.
+ */
+export async function createTaggedPdfWithOrphans() {
+  const doc = await createTaggedPdf();
+
+  // Add orphan objects that should be removed
+  const orphanData = new Uint8Array(1000);
+  orphanData.fill(0xcc);
+  const orphanDict = doc.context.obj({});
+  orphanDict.set(PDFName.of('Length'), doc.context.obj(orphanData.length));
+  orphanDict.set(PDFName.of('OrphanMarker'), PDFName.of('True'));
+  const orphanStream = PDFRawStream.of(orphanDict, orphanData);
+  doc.context.register(orphanStream);
+
+  return doc;
+}
+
+/**
+ * Create a PDF/UA document with XMP pdfuaid:part=1, MarkInfo, and StructTreeRoot.
+ */
+export async function createPdfUAPdf() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  // Set /Lang (required by PDF/UA)
+  doc.catalog.set(PDFName.of('Lang'), PDFString.of('en'));
+
+  // Set /MarkInfo << /Marked true >>
+  const markInfo = doc.context.obj({});
+  markInfo.set(PDFName.of('Marked'), doc.context.obj(true));
+  doc.catalog.set(PDFName.of('MarkInfo'), markInfo);
+
+  // Minimal StructTreeRoot
+  const structTreeRoot = doc.context.obj({});
+  structTreeRoot.set(PDFName.of('Type'), PDFName.of('StructTreeRoot'));
+  const structTreeRootRef = doc.context.register(structTreeRoot);
+  doc.catalog.set(PDFName.of('StructTreeRoot'), structTreeRootRef);
+
+  // XMP with pdfuaid:part=1
+  const xmpData = new TextEncoder().encode(
+    '<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>' +
+      '<x:xmpmeta xmlns:x="adobe:ns:meta/">' +
+      '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"' +
+      ' xmlns:pdfuaid="http://www.aiim.org/pdfua/ns/id/">' +
+      '<rdf:Description rdf:about="">' +
+      '<pdfuaid:part>1</pdfuaid:part>' +
+      '</rdf:Description>' +
+      '</rdf:RDF></x:xmpmeta><?xpacket end="w"?>',
+  );
+  const xmpDict = doc.context.obj({});
+  xmpDict.set(PDFName.of('Type'), PDFName.of('Metadata'));
+  xmpDict.set(PDFName.of('Subtype'), PDFName.of('XML'));
+  xmpDict.set(PDFName.of('Length'), doc.context.obj(xmpData.length));
+  const xmpStream = PDFRawStream.of(xmpDict, xmpData);
+  const xmpRef = doc.context.register(xmpStream);
+  doc.catalog.set(PDFName.of('Metadata'), xmpRef);
+
+  return doc;
+}
+
+/**
+ * Create a PDF/A document with an embedded standard font.
+ * Used to verify that font-unembed skips PDF/A files.
+ */
+export async function createPdfAWithEmbeddedFont() {
+  const doc = await createPdfAPdf();
+
+  // Add an embedded Helvetica font (same pattern as createPdfWithEmbeddedStandardFont)
+  const page = doc.getPage(0);
+  const fontFileData = new Uint8Array(5000);
+  for (let i = 0; i < fontFileData.length; i++) fontFileData[i] = i % 256;
+  const fontFileCompressed = deflateSync(fontFileData, { level: 6 });
+
+  const fontFileDict = doc.context.obj({});
+  fontFileDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  fontFileDict.set(PDFName.of('Length'), doc.context.obj(fontFileCompressed.length));
+  fontFileDict.set(PDFName.of('Length1'), doc.context.obj(fontFileData.length));
+  const fontFileStream = PDFRawStream.of(fontFileDict, fontFileCompressed);
+  const fontFileRef = doc.context.register(fontFileStream);
+
+  const fontDescriptor = doc.context.obj({});
+  fontDescriptor.set(PDFName.of('Type'), PDFName.of('FontDescriptor'));
+  fontDescriptor.set(PDFName.of('FontName'), PDFName.of('Helvetica'));
+  fontDescriptor.set(PDFName.of('Flags'), doc.context.obj(32));
+  fontDescriptor.set(PDFName.of('FontFile2'), fontFileRef);
+  const fontDescRef = doc.context.register(fontDescriptor);
+
+  const fontDict = doc.context.obj({});
+  fontDict.set(PDFName.of('Type'), PDFName.of('Font'));
+  fontDict.set(PDFName.of('Subtype'), PDFName.of('Type1'));
+  fontDict.set(PDFName.of('BaseFont'), PDFName.of('Helvetica'));
+  fontDict.set(PDFName.of('Encoding'), PDFName.of('WinAnsiEncoding'));
+  fontDict.set(PDFName.of('FontDescriptor'), fontDescRef);
+  const fontRef = doc.context.register(fontDict);
+
+  const resources = doc.context.obj({});
+  const fontsDict = doc.context.obj({});
+  fontsDict.set(PDFName.of('F1'), fontRef);
+  resources.set(PDFName.of('Font'), fontsDict);
+  page.node.set(PDFName.of('Resources'), resources);
+
+  return doc;
+}
+
+/**
+ * Create a PDF/A document with bloat keys (PieceInfo, etc.).
+ * Used to verify that metadata stripping preserves XMP but still strips bloat.
+ */
+export async function createPdfAWithBloat() {
+  const doc = await createPdfAPdf();
+  const page = doc.getPage(0);
+
+  // Add PieceInfo bloat to the page
+  const pieceInfo = doc.context.obj({});
+  pieceInfo.set(PDFName.of('Illustrator'), doc.context.obj({}));
+  page.node.set(PDFName.of('PieceInfo'), pieceInfo);
+
+  return doc;
+}
+
 export async function createPdfWithNonStandardFont() {
   const doc = await PDFDocument.create();
   const page = doc.addPage([200, 200]);

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { PDFDocument, PDFName, PDFString } from 'pdf-lib';
 import { stripMetadata } from '../../src/engine/optimize/metadata.js';
-import { createMetadataBloatPdf, createMetadataBloatPdfWithLang } from '../fixtures/create-test-pdfs.js';
+import { createMetadataBloatPdf, createMetadataBloatPdfWithLang, createPdfAWithBloat } from '../fixtures/create-test-pdfs.js';
 
 describe('stripMetadata', () => {
   it('removes XMP metadata from catalog', async () => {
@@ -66,6 +66,39 @@ describe('stripMetadata', () => {
     // Original /Lang should be preserved, not overwritten
     const lang = doc.catalog.get(PDFName.of('Lang'));
     expect(lang.decodeText()).toBe('de');
+  });
+
+  it('preserves XMP for PDF/A', async () => {
+    const doc = await createPdfAWithBloat();
+
+    // XMP should be present before
+    expect(doc.catalog.get(PDFName.of('Metadata'))).toBeDefined();
+
+    const result = stripMetadata(doc, {
+      _pdfTraits: { isPdfA: true, pdfALevel: '1B' },
+    });
+
+    // XMP should be preserved
+    expect(doc.catalog.get(PDFName.of('Metadata'))).toBeDefined();
+    expect(result.xmpPreserved).toBe(true);
+  });
+
+  it('still strips bloat keys for PDF/A', async () => {
+    const doc = await createPdfAWithBloat();
+    const page = doc.getPage(0);
+
+    // Verify PieceInfo is present
+    expect(page.node.get(PDFName.of('PieceInfo'))).toBeDefined();
+
+    const result = stripMetadata(doc, {
+      _pdfTraits: { isPdfA: true, pdfALevel: '1B' },
+    });
+
+    // PieceInfo should be gone even for PDF/A
+    expect(page.node.get(PDFName.of('PieceInfo'))).toBeUndefined();
+    expect(result.stripped).toBeGreaterThan(0);
+    // But XMP should be kept
+    expect(doc.catalog.get(PDFName.of('Metadata'))).toBeDefined();
   });
 
   it('produces a valid PDF after stripping', async () => {

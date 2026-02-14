@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { PDFDocument, PDFName, PDFRawStream, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFRawStream, PDFString, StandardFonts } from 'pdf-lib';
 import { deflateSync } from 'fflate';
 import { optimize } from '../../src/engine/pipeline.js';
+import {
+  createTaggedPdf,
+  createPdfAPdf,
+  createPdfAWithEmbeddedFont,
+} from '../fixtures/create-test-pdfs.js';
 
 /**
  * Create a bloated PDF with multiple optimization opportunities:
@@ -181,5 +186,57 @@ describe('optimize pipeline', () => {
     // Progress should go from 0 to 1
     expect(progressCalls[0].progress).toBeGreaterThan(0);
     expect(progressCalls[progressCalls.length - 1].progress).toBe(1);
+  });
+
+  it('reports pdfTraits in stats', async () => {
+    const inputBytes = new Uint8Array(await createBloatedPdf());
+    const { stats } = await optimize(inputBytes);
+
+    expect(stats.pdfTraits).toBeDefined();
+    expect(stats.pdfTraits.isTagged).toBe(false);
+    expect(stats.pdfTraits.isPdfA).toBe(false);
+  });
+
+  it('preserves structure tree through full pipeline', async () => {
+    const doc = await createTaggedPdf();
+    const inputBytes = new Uint8Array(await doc.save());
+
+    const { output, stats } = await optimize(inputBytes);
+
+    expect(stats.pdfTraits.isTagged).toBe(true);
+    expect(stats.pdfTraits.hasStructTree).toBe(true);
+
+    // Verify structure survives in the output
+    const reloaded = await PDFDocument.load(output);
+    expect(reloaded.catalog.get(PDFName.of('StructTreeRoot'))).toBeDefined();
+
+    const markInfo = reloaded.catalog.get(PDFName.of('MarkInfo'));
+    expect(markInfo).toBeDefined();
+  });
+
+  it('preserves XMP for PDF/A through full pipeline', async () => {
+    const doc = await createPdfAPdf();
+    const inputBytes = new Uint8Array(await doc.save());
+
+    const { output, stats } = await optimize(inputBytes);
+
+    expect(stats.pdfTraits.isPdfA).toBe(true);
+    expect(stats.pdfTraits.pdfALevel).toBe('1B');
+
+    // XMP metadata should survive
+    const reloaded = await PDFDocument.load(output);
+    expect(reloaded.catalog.get(PDFName.of('Metadata'))).toBeDefined();
+  });
+
+  it('skips font unembedding for PDF/A', async () => {
+    const doc = await createPdfAWithEmbeddedFont();
+    const inputBytes = new Uint8Array(await doc.save());
+
+    const { stats } = await optimize(inputBytes);
+
+    const unembedPass = stats.passes.find((p) => p.name === 'Unembedding standard fonts');
+    expect(unembedPass).toBeDefined();
+    expect(unembedPass.pdfaSkipped).toBe(true);
+    expect(unembedPass.unembedded).toBe(0);
   });
 });

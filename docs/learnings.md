@@ -124,15 +124,62 @@ Strips unused glyph outlines from embedded font programs. Typical savings: 50–
 
 Application-private data is surprisingly large. Illustrator's `AIPrivateData` can be hundreds of KB. XMP metadata, `PieceInfo`, Photoshop IRB — all safe to strip without affecting the visual output or user-facing metadata (title, author, subject are preserved separately in `/Info`).
 
+### PDF/A Conformance Levels and What's Safe to Optimize
+
+PDF/A is an ISO standard (19005) for long-term archival of PDF documents. Several conformance levels exist:
+
+- **PDF/A-1** (based on PDF 1.4): The strictest. Prohibits encryption, JavaScript, LZW compression, transparency, and **object streams**. All fonts must be embedded. XMP metadata with `pdfaid:part`/`pdfaid:conformance` is mandatory.
+- **PDF/A-2** (based on PDF 1.7): Relaxes PDF/A-1 restrictions. Allows JPEG2000 compression, transparency, and **object streams**.
+- **PDF/A-3**: Same as PDF/A-2, but allows embedding arbitrary file attachments.
+- **PDF/A-4** (based on PDF 2.0): Further modernization; recommends Associated Files for XMP Extension Schemas.
+
+Within each level, conformance 'a' requires tagged structure (StructTreeRoot, MarkInfo), while 'b' only requires faithful visual reproduction. Level 'u' (PDF/A-2u, 3u) adds a Unicode mapping requirement.
+
+**What's safe to optimize on PDF/A:**
+- Stream recompression (better Flate) — safe, lossless
+- Object deduplication — safe (doesn't break references)
+- Font subsetting — safe (fonts remain embedded, just smaller)
+- Removing PieceInfo, AIPrivateData, Photoshop, Illustrator bloat — safe (application-private data, not required by any PDF/A level)
+- Unreferenced object removal — safe (OutputIntent, StructTreeRoot, and other required catalog entries are all reachable from the trailer via BFS)
+
+**What breaks PDF/A conformance:**
+- Removing embedded fonts (font-unembed) — **blocked** for PDF/A
+- Removing XMP metadata — **blocked** for PDF/A (the `pdfaid:` declaration itself lives in XMP)
+- Using `useObjectStreams: true` for PDF/A-1 — **known limitation** (see below)
+
+**Known limitation — object streams and PDF/A-1:** Our pipeline saves with `useObjectStreams: true` for better compression. PDF/A-2+ allows object streams, but PDF/A-1 (based on PDF 1.4) does not. This means a PDF/A-1 file will lose strict conformance after optimization. Fixing this requires conditionally disabling object streams when `pdfALevel` starts with `1`. Tracked as future work.
+
+### PDF/UA Requirements
+
+PDF/UA (ISO 14289) governs universal accessibility. Key requirements:
+- All meaningful content must be tagged and in the structure tree
+- All fonts must be embedded (same constraint as PDF/A)
+- Document language must be declared via `/Lang` on the catalog
+- Logical reading order via depth-first traversal of the structure tree
+- Images and graphics require `/Alt` or `/ActualText` attributes
+
+Currently PDF/UA detection is informational only (`stats.pdfTraits.isPdfUA`). Font unembedding should also be blocked for PDF/UA — tracked as future work.
+
 ### Accessibility Impact of Optimization
 
-PDF optimization can silently break accessibility. Key risks discovered:
+PDF optimization can silently break accessibility. Key risks and mitigations:
 
+**Mitigated risks:**
 - **ToUnicode CMaps** are critical for screen readers. When unembedding standard fonts, the entire font dict gets rebuilt — must explicitly save and restore `/ToUnicode` before clearing entries.
 - **XMP metadata** can contain `dc:language`, the document language tag. Screen readers use `/Lang` (on the catalog) to determine pronunciation. Before stripping XMP, extract `dc:language` and migrate it to `/Lang` if not already set.
-- **Object deduplication** is safe for structure elements because `dedup.js` only processes `PDFRawStream` objects, and `/StructElem` entries are plain `PDFDict` objects. No fix needed, but worth noting.
-- **Tagged PDFs** (those with `/MarkInfo` and `/StructTreeRoot`) need special care. The BFS traversal in `unreferenced.js` should reach the structure tree through the catalog's `/Root`, but tagged PDFs haven't been tested. This is tracked as future work.
-- **PDF/A compliance** requires embedded fonts. Font unembedding directly violates PDF/A — a conformance check should disable it for PDF/A inputs.
+- **Tagged PDFs** (those with `/MarkInfo` and `/StructTreeRoot`) are safe through the full pipeline. The BFS traversal in `unreferenced.js` starts from the catalog, which references `/StructTreeRoot` and its descendants — confirmed by tests with tagged PDFs containing orphan objects (orphans removed, structure tree preserved).
+- **PDF/A compliance** — the pipeline auto-detects PDF/A via XMP `pdfaid:part` and disables font unembedding and XMP stripping. Bloat keys (PieceInfo, AIPrivateData, etc.) are still stripped — they're not part of the conformance requirement.
+- **OutputIntent** (required by PDF/A) is stored as `/OutputIntents` on the catalog dict, so BFS always reaches it. Never removed as unreferenced.
+
+**Safe by design (no fix needed):**
+- **Object deduplication** only processes `PDFRawStream` objects. Structure tree elements (`/StructElem`) are plain `PDFDict` objects and are never merged.
+- **Font subsetting** reduces font size but keeps the font embedded. Safe for both PDF/A and PDF/UA.
+
+### `_pdfTraits` Detection and Flow
+
+`pipeline.js` calls `detectAccessibilityTraits(pdfDoc)` after loading, injects the result as `options._pdfTraits` (spread into a new options object, not mutation), and includes `pdfTraits` in the returned stats. Individual passes read `options._pdfTraits?.isPdfA` etc. to decide whether to skip.
+
+**XMP conformance parsing** handles both element-style (`<pdfaid:part>1</pdfaid:part>`) and attribute-style (`pdfaid:part="1"`) XMP, since different PDF producers use different styles. The `parseConformanceFromXmp()` utility in `utils/accessibility-detect.js` is exported separately so other passes can reuse it.
 
 ---
 

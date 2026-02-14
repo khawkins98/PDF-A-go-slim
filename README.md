@@ -10,6 +10,7 @@ A browser-based PDF optimization tool that reduces file size entirely client-sid
 - **Advanced controls** — lossy/lossless toggle, image quality slider, font unembedding and subsetting checkboxes
 - **Per-file stats** — expandable detail rows showing what each pass accomplished
 - **Object inspector** — before/after breakdown of PDF objects by category (fonts, images, page content, metadata, document structure, other data) with proportional size bars, per-item diffs, sub-grouped "Other Data", and collapsible lists
+- **PDF/A and accessibility aware** — auto-detects PDF/A conformance and tagged PDFs; preserves embedded fonts, XMP metadata, and structure trees that conformance requires
 - **Privacy-first** — files never leave your browser; all processing runs in a Web Worker
 - **Batch capable** — optimize multiple PDFs at once with individual or bulk download
 - **Debug mode** — add `?debug` to the URL to see per-pass timing, image skip reason breakdowns, and per-image conversion details
@@ -45,13 +46,16 @@ index.html → src/main.js (UI, drag-and-drop, options panel, worker orchestrati
                  ↓
              src/engine/optimize/  (8 passes, run in order):
                streams.js      — recompress streams with fflate level 9
-               images.js       — FlateDecode → JPEG recompression (lossy, opt-in)
-               font-unembed.js — remove embedded base-14 standard fonts
+               images.js       — FlateDecode/JPEG recompression (lossy, opt-in)
+               font-unembed.js — remove embedded base-14 standard fonts (skipped for PDF/A)
                font-subset.js  — subset embedded fonts via harfbuzzjs WASM
                dedup.js        — hash-based object deduplication (djb2)
                fonts.js        — consolidate duplicate embedded fonts
-               metadata.js     — strip XMP, Illustrator, Photoshop bloat keys
+               metadata.js     — strip XMP, Illustrator, Photoshop bloat keys (XMP preserved for PDF/A)
                unreferenced.js — remove unreachable objects via BFS traversal
+                 ↓
+             src/engine/utils/
+               accessibility-detect.js — PDF/A, PDF/UA, tagged PDF detection
 ```
 
 ## Built With
