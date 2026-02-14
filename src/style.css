@@ -418,6 +418,11 @@ header h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: none;
+}
+
+.inspect-category[open] .inspect-category__desc-text {
+  display: inline;
 }
 
 .inspect-category__before,
@@ -441,6 +446,9 @@ header h1 {
 .inspect-diff--smaller {
   color: var(--color-success);
   font-weight: 600;
+  background: rgba(22, 163, 74, 0.08);
+  padding: 0 0.2rem;
+  border-radius: 2px;
 }
 
 .inspect-diff--larger {

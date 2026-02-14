@@ -241,5 +241,53 @@ describe('inspectDocument', () => {
       expect(formItem).toBeDefined();
       expect(formItem.subCategory).toBe('Graphics');
     });
+
+    it('classifies ICC profiles as Color Profiles', async () => {
+      const doc = await PDFDocument.create();
+      doc.addPage();
+      const iccData = new Uint8Array(200);
+      iccData.fill(0);
+      const dict = doc.context.obj({});
+      dict.set(PDFName.of('N'), doc.context.obj(3));
+      dict.set(PDFName.of('Alternate'), PDFName.of('DeviceRGB'));
+      dict.set(PDFName.of('Length'), doc.context.obj(iccData.length));
+      const stream = PDFRawStream.of(dict, iccData);
+      doc.context.register(stream);
+
+      const result = inspectDocument(doc);
+      const other = result.categories.find((c) => c.label === 'Other Data');
+      const iccItem = other.items.find((i) => i.displayName === 'ICC Color Profile');
+      expect(iccItem).toBeDefined();
+      expect(iccItem.subCategory).toBe('Color Profiles');
+    });
+
+    it('classifies CMapName dicts as Font Support / Unicode Mapping', async () => {
+      const doc = await PDFDocument.create();
+      doc.addPage();
+      const cmapDict = doc.context.obj({});
+      cmapDict.set(PDFName.of('CMapName'), PDFName.of('Adobe-Identity-UCS'));
+      doc.context.register(cmapDict);
+
+      const result = inspectDocument(doc);
+      const other = result.categories.find((c) => c.label === 'Other Data');
+      const cmapItem = other.items.find((i) => i.displayName === 'Unicode Mapping');
+      expect(cmapItem).toBeDefined();
+      expect(cmapItem.subCategory).toBe('Font Support');
+    });
+
+    it('classifies Annot type as Annotations', async () => {
+      const doc = await PDFDocument.create();
+      doc.addPage();
+      const annotDict = doc.context.obj({});
+      annotDict.set(PDFName.of('Type'), PDFName.of('Annot'));
+      annotDict.set(PDFName.of('Subtype'), PDFName.of('Link'));
+      doc.context.register(annotDict);
+
+      const result = inspectDocument(doc);
+      const other = result.categories.find((c) => c.label === 'Other Data');
+      const annotItem = other.items.find((i) => i.displayName === 'Link Annotation');
+      expect(annotItem).toBeDefined();
+      expect(annotItem.subCategory).toBe('Annotations');
+    });
   });
 });
