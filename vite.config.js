@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  base: process.env.GITHUB_ACTIONS ? '/PDF-A-go-slim/' : '/',
   server: {
     open: true,
   },
