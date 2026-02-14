@@ -3,6 +3,7 @@ import './style.css';
 // --- State ---
 let blobUrls = [];
 let lastFiles = null;
+let lastRunOptions = null;
 
 // --- DOM refs ---
 const dropZone = document.getElementById('drop-zone');
@@ -122,6 +123,34 @@ unembedCheckbox.addEventListener('change', syncPresetIndicator);
 
 subsetCheckbox.addEventListener('change', syncPresetIndicator);
 
+// --- Stale results detection ---
+function checkStaleResults() {
+  if (!lastRunOptions || resultsSection.hidden) return;
+  const current = JSON.stringify(collectOptions());
+  const isStale = current !== lastRunOptions;
+
+  btnReoptimize.classList.toggle('btn--stale', isStale);
+
+  const existing = resultsSection.querySelector('.stale-banner');
+  if (isStale && !existing) {
+    const banner = document.createElement('div');
+    banner.className = 'stale-banner';
+    banner.textContent = 'Settings changed \u2014 re-optimize to see updated results';
+    resultsSection.insertBefore(banner, resultsSection.querySelector('.results-hero') || resultsSection.querySelector('.results-table'));
+  } else if (!isStale && existing) {
+    existing.remove();
+  }
+}
+
+optionsPanel.addEventListener('input', checkStaleResults);
+optionsPanel.addEventListener('change', checkStaleResults);
+optionsPanel.addEventListener('click', (e) => {
+  if (e.target.closest('.preset-btn') || e.target.closest('.mode-btn')) {
+    // Defer to let the preset/mode handler run first
+    requestAnimationFrame(checkStaleResults);
+  }
+});
+
 // --- Helpers ---
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -134,6 +163,19 @@ function showState(state) {
   processingSection.hidden = state !== 'processing';
   resultsSection.hidden = state !== 'results';
   optionsPanel.hidden = state === 'processing';
+
+  // Auto-collapse Advanced Settings when showing results
+  if (state === 'results') {
+    const adv = optionsPanel.querySelector('.advanced');
+    if (adv) adv.open = false;
+  }
+
+  // Animate the entering section
+  const active = state === 'idle' ? dropZone : state === 'processing' ? processingSection : resultsSection;
+  active.classList.remove('state--entering');
+  // Force reflow to re-trigger animation
+  void active.offsetWidth;
+  active.classList.add('state--entering');
 }
 
 function revokeBlobUrls() {
@@ -232,7 +274,7 @@ function escapeHtml(str) {
 }
 
 function formatDiff(diff) {
-  if (diff === 0) return '';
+  if (diff === 0) return '<span class="inspect-diff--zero">\u2014</span>';
   const sign = diff < 0 ? '\u2212' : '+'; // minus sign or plus
   const cls = diff < 0 ? 'inspect-diff--smaller' : 'inspect-diff--larger';
   return `<span class="${cls}">${sign}${formatSize(Math.abs(diff))}</span>`;
@@ -411,8 +453,10 @@ async function handleFiles(files) {
   lastFiles = pdfFiles;
 
   const options = collectOptions();
+  lastRunOptions = JSON.stringify(options);
 
   showState('processing');
+  const processingStart = Date.now();
   fileList.innerHTML = '';
 
   const results = [];
@@ -447,10 +491,23 @@ async function handleFiles(files) {
     }
   }
 
+  // Ensure processing state is visible for at least 800ms
+  const elapsed = Date.now() - processingStart;
+  if (elapsed < 800) {
+    await new Promise((r) => setTimeout(r, 800 - elapsed));
+  }
+
   // Show results
   showState('results');
   resultsBody.innerHTML = '';
   revokeBlobUrls();
+
+  // Clear any stale banner / hero card from previous run
+  const staleBanner = resultsSection.querySelector('.stale-banner');
+  if (staleBanner) staleBanner.remove();
+  const oldHero = resultsSection.querySelector('.results-hero');
+  if (oldHero) oldHero.remove();
+  btnReoptimize.classList.remove('btn--stale');
 
   for (const r of results) {
     const blob = new Blob([r.result], { type: 'application/pdf' });
@@ -459,14 +516,15 @@ async function handleFiles(files) {
 
     const saved = r.original - r.result.byteLength;
     const pct = r.original > 0 ? ((saved / r.original) * 100).toFixed(1) : '0.0';
+    const savedText = saved > 0 ? `-${pct}% (${formatSize(saved)})` : `${pct}%`;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${r.name}</td>
       <td>${formatSize(r.original)}</td>
       <td>${formatSize(r.result.byteLength)}</td>
-      <td class="${saved > 0 ? 'saved--positive' : 'saved--zero'}">${saved > 0 ? '-' : ''}${pct}%</td>
-      <td><a href="${url}" download="${r.name}" class="btn btn--small">Download</a></td>
+      <td class="${saved > 0 ? 'saved--positive' : 'saved--zero'}">${savedText}</td>
+      <td><a href="${url}" download="${r.name}" class="btn btn--primary btn--small">Download</a></td>
     `;
     resultsBody.appendChild(tr);
 
@@ -490,6 +548,7 @@ async function handleFiles(files) {
         const visible = !statsDiv.hidden;
         statsDiv.hidden = visible;
         toggleBtn.textContent = visible ? 'Show details' : 'Hide details';
+        toggleBtn.classList.toggle('toggle--open', !visible);
       });
     }
 
@@ -513,6 +572,7 @@ async function handleFiles(files) {
         const visible = !inspectDiv.hidden;
         inspectDiv.hidden = visible;
         inspectBtn.textContent = visible ? 'Object breakdown' : 'Hide breakdown';
+        inspectBtn.classList.toggle('toggle--open', !visible);
       });
 
       // Delegated handler for "Show more..." toggles
@@ -528,9 +588,86 @@ async function handleFiles(files) {
         }
       });
     }
+
+    // Hint banner: suggest lossy preset when images dominate and savings are low
+    if (!options.lossy && r.stats?.inspect?.before) {
+      const cats = r.stats.inspect.before.categories;
+      const totalSize = r.stats.inspect.before.totalSize;
+      const imagesCat = cats.find((c) => c.label === 'Images');
+      const imagesPct = totalSize > 0 && imagesCat ? (imagesCat.totalSize / totalSize) * 100 : 0;
+      const savingsPct = r.original > 0 ? (saved / r.original) * 100 : 0;
+
+      if (imagesPct > 50 && savingsPct < 10) {
+        const hintTr = document.createElement('tr');
+        hintTr.className = 'hint-banner-row';
+        const hintTd = document.createElement('td');
+        hintTd.colSpan = 5;
+        hintTd.innerHTML = `<div class="hint-banner">Images make up ${Math.round(imagesPct)}% of this file. Try the <button class="hint-banner__link" data-action="apply-web">Web preset</button> for better compression.</div>`;
+        hintTr.appendChild(hintTd);
+        resultsBody.appendChild(hintTr);
+
+        hintTd.querySelector('[data-action="apply-web"]').addEventListener('click', () => {
+          applyPreset('web');
+          requestAnimationFrame(checkStaleResults);
+        });
+      }
+    }
   }
 
-  btnDownloadAll.hidden = results.length <= 1;
+  // --- Hero summary card ---
+  const totalOriginal = results.reduce((s, r) => s + r.original, 0);
+  const totalOptimized = results.reduce((s, r) => s + r.result.byteLength, 0);
+  const totalSaved = totalOriginal - totalOptimized;
+  const totalPct = totalOriginal > 0 ? ((totalSaved / totalOriginal) * 100).toFixed(1) : '0.0';
+  const hasSavings = totalSaved > 0;
+
+  const heroDiv = document.createElement('div');
+  heroDiv.className = 'results-hero';
+
+  // For single file, create a download link in the hero; for multi, "Download All"
+  let heroDownloadHtml = '';
+  if (results.length === 1) {
+    const r = results[0];
+    const blob = new Blob([r.result], { type: 'application/pdf' });
+    const heroUrl = URL.createObjectURL(blob);
+    blobUrls.push(heroUrl);
+    heroDownloadHtml = `<a href="${heroUrl}" download="${r.name}" class="btn btn--primary results-hero__download">Download</a>`;
+  } else if (results.length > 1) {
+    heroDownloadHtml = `<button class="btn btn--primary results-hero__download" id="hero-download-all">Download All</button>`;
+  }
+
+  const barHtml = hasSavings
+    ? `<div class="results-hero__bar"><div class="results-hero__bar-fill" style="width: ${100 - parseFloat(totalPct)}%"></div></div>`
+    : '';
+
+  heroDiv.innerHTML = `
+    <div class="results-hero__pct ${hasSavings ? '' : 'results-hero__pct--zero'}">${hasSavings ? `-${totalPct}%` : '0%'}</div>
+    <div class="results-hero__sizes">${formatSize(totalOriginal)} \u2192 ${formatSize(totalOptimized)}</div>
+    ${barHtml}
+    ${heroDownloadHtml}
+  `;
+
+  const resultsTable = resultsSection.querySelector('.results-table');
+  resultsSection.insertBefore(heroDiv, resultsTable);
+
+  // Wire up hero "Download All" button
+  const heroDownloadAllBtn = heroDiv.querySelector('#hero-download-all');
+  if (heroDownloadAllBtn) {
+    heroDownloadAllBtn.addEventListener('click', () => {
+      for (const r of results) {
+        const blob = new Blob([r.result], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = r.name;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    });
+  }
+
+  // Hide the old standalone Download All button (moved into hero)
+  btnDownloadAll.hidden = true;
   btnDownloadAll.onclick = () => {
     for (const r of results) {
       const blob = new Blob([r.result], { type: 'application/pdf' });
@@ -579,7 +716,13 @@ btnReoptimize.addEventListener('click', () => {
 btnStartOver.addEventListener('click', () => {
   revokeBlobUrls();
   lastFiles = null;
+  lastRunOptions = null;
   fileInput.value = '';
+  btnReoptimize.classList.remove('btn--stale');
+  const staleBanner = resultsSection.querySelector('.stale-banner');
+  if (staleBanner) staleBanner.remove();
+  const heroCard = resultsSection.querySelector('.results-hero');
+  if (heroCard) heroCard.remove();
   showState('idle');
 });
 

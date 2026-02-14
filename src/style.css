@@ -57,7 +57,7 @@ header h1 {
 
 /* --- Drop zone --- */
 .drop-area {
-  min-height: 60vh;
+  min-height: 280px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -105,6 +105,9 @@ header h1 {
 /* --- Options panel --- */
 .options-panel {
   margin-top: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .presets {
@@ -130,6 +133,16 @@ header h1 {
   color: var(--color-text);
   cursor: pointer;
   transition: all 0.15s;
+  text-align: center;
+}
+
+.preset-btn__desc {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  line-height: 1.2;
+  margin-top: 0.1rem;
 }
 
 .preset-btn:hover {
@@ -147,6 +160,10 @@ header h1 {
   background: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
   color: #fff;
+}
+
+.preset-btn--active .preset-btn__desc {
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .advanced {
@@ -279,18 +296,38 @@ header h1 {
 }
 
 .pass-stats-toggle {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   padding: 0.3rem 0.75rem;
   font-size: 0.75rem;
-  color: var(--color-primary);
+  color: var(--color-text-muted);
   cursor: pointer;
-  background: none;
-  border: none;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
   font-weight: 500;
+  margin: 0.3rem 0.75rem;
+}
+
+.pass-stats-toggle::before {
+  content: '';
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  transition: transform 0.15s;
+}
+
+.pass-stats-toggle.toggle--open::before {
+  transform: rotate(90deg);
 }
 
 .pass-stats-toggle:hover {
-  text-decoration: underline;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .pass-stats {
@@ -332,18 +369,38 @@ header h1 {
 }
 
 .inspect-toggle {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   padding: 0.3rem 0.75rem;
   font-size: 0.75rem;
-  color: var(--color-primary);
+  color: var(--color-text-muted);
   cursor: pointer;
-  background: none;
-  border: none;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
   font-weight: 500;
+  margin: 0.3rem 0.75rem;
+}
+
+.inspect-toggle::before {
+  content: '';
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  transition: transform 0.15s;
+}
+
+.inspect-toggle.toggle--open::before {
+  transform: rotate(90deg);
 }
 
 .inspect-toggle:hover {
-  text-decoration: underline;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .inspect-panel {
@@ -607,6 +664,54 @@ header h1 {
   background: var(--color-error);
 }
 
+/* --- Results hero card --- */
+.results-hero {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem 1rem;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.results-hero__pct {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-success);
+  line-height: 1.2;
+}
+
+.results-hero__pct--zero {
+  color: var(--color-text-muted);
+}
+
+.results-hero__sizes {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+}
+
+.results-hero__bar {
+  height: 6px;
+  background: var(--color-bar-bg);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 0.75rem auto 0;
+  max-width: 300px;
+}
+
+.results-hero__bar-fill {
+  height: 100%;
+  background: var(--color-success);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.results-hero__download {
+  margin-top: 1rem;
+}
+
 /* --- Results --- */
 .results-table {
   width: 100%;
@@ -634,6 +739,19 @@ header h1 {
   color: var(--color-text-muted);
 }
 
+.results-table td:first-child {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.results-table td:nth-child(2),
+.results-table td:nth-child(3),
+.results-table td:nth-child(4) {
+  white-space: nowrap;
+}
+
 .saved--positive {
   color: var(--color-success);
   font-weight: 600;
@@ -647,6 +765,8 @@ header h1 {
   display: flex;
   gap: 0.75rem;
   justify-content: center;
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
 }
 
 /* --- Buttons --- */
@@ -693,6 +813,80 @@ header h1 {
 
 .options-panel[hidden] {
   display: none;
+}
+
+/* --- State transitions --- */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.state--entering {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* --- Zero-diff dash --- */
+.inspect-diff--zero {
+  color: var(--color-text-muted);
+}
+
+/* --- Stale results indicator --- */
+@keyframes stale-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(37, 99, 235, 0); }
+}
+
+.btn--stale {
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
+  animation: stale-pulse 2s ease-in-out 1;
+}
+
+.stale-banner {
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: var(--radius);
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  color: var(--color-primary);
+  margin-bottom: 1rem;
+}
+
+/* --- Hint banner --- */
+.hint-banner-row td {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.hint-banner {
+  border-left: 3px solid var(--cat-images);
+  background: rgba(245, 158, 11, 0.05);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
+.hint-banner__link {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.hint-banner__link:hover {
+  color: var(--color-primary-hover);
 }
 
 /* --- Footer --- */
