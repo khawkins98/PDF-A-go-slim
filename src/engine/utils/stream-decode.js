@@ -5,7 +5,7 @@
  * Image-native filters (DCTDecode, JPXDecode, CCITTFaxDecode, JBIG2Decode) are
  * intentionally skipped — they should be passed through as-is.
  */
-import { inflateSync } from 'fflate';
+import { inflateSync, decompressSync } from 'fflate';
 
 /** Filters we can decode. */
 const DECODABLE_FILTERS = new Set([
@@ -166,7 +166,12 @@ function paethPredictor(a, b, c) {
 // --- Individual decoders ---
 
 function decodeFlateDecode(data) {
-  return inflateSync(data);
+  try {
+    return inflateSync(data);
+  } catch {
+    // Some zlib streams (e.g. from pako) need the full zlib wrapper handling
+    return decompressSync(data);
+  }
 }
 
 /**

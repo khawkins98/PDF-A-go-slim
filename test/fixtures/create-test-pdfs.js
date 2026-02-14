@@ -517,6 +517,81 @@ export async function createPdfWithHighDpiImage() {
 /**
  * Create a PDF with a non-standard font name — should be skipped.
  */
+/**
+ * Create a PDF with an embedded font using pdf-lib's embedFont (Type0/Identity-H).
+ * Uses drawText() with known characters so we can test the full subsetting pipeline.
+ * pdf-lib creates a Type0 font with a CIDFont descendant, Identity-H encoding,
+ * and a ToUnicode CMap — ideal for testing font subsetting.
+ */
+export async function createPdfWithEmbeddedFont() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  // Use a small set of known characters
+  page.drawText('Hello', { x: 10, y: 100, size: 12, font });
+  return doc;
+}
+
+/**
+ * Create a PDF with manual content stream text operators for parser unit tests.
+ * Builds the content stream, Resources, and font references by hand.
+ */
+export async function createPdfWithContentStreamText() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  // Create a fake font file (needs to be >10KB for subsetting)
+  const fontFileData = new Uint8Array(15000);
+  for (let i = 0; i < fontFileData.length; i++) fontFileData[i] = i % 256;
+  const fontFileCompressed = deflateSync(fontFileData, { level: 6 });
+
+  const fontFileDict = doc.context.obj({});
+  fontFileDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  fontFileDict.set(PDFName.of('Length'), doc.context.obj(fontFileCompressed.length));
+  fontFileDict.set(PDFName.of('Length1'), doc.context.obj(fontFileData.length));
+  const fontFileStream = PDFRawStream.of(fontFileDict, fontFileCompressed);
+  const fontFileRef = doc.context.register(fontFileStream);
+
+  // Create FontDescriptor
+  const fontDescriptor = doc.context.obj({});
+  fontDescriptor.set(PDFName.of('Type'), PDFName.of('FontDescriptor'));
+  fontDescriptor.set(PDFName.of('FontName'), PDFName.of('TestFont'));
+  fontDescriptor.set(PDFName.of('Flags'), doc.context.obj(32));
+  fontDescriptor.set(PDFName.of('FontBBox'), doc.context.obj([-166, -225, 1000, 931]));
+  fontDescriptor.set(PDFName.of('ItalicAngle'), doc.context.obj(0));
+  fontDescriptor.set(PDFName.of('Ascent'), doc.context.obj(718));
+  fontDescriptor.set(PDFName.of('Descent'), doc.context.obj(-207));
+  fontDescriptor.set(PDFName.of('FontFile2'), fontFileRef);
+  const fontDescRef = doc.context.register(fontDescriptor);
+
+  // Create Font dict (simple TrueType with WinAnsiEncoding)
+  const fontDict = doc.context.obj({});
+  fontDict.set(PDFName.of('Type'), PDFName.of('Font'));
+  fontDict.set(PDFName.of('Subtype'), PDFName.of('TrueType'));
+  fontDict.set(PDFName.of('BaseFont'), PDFName.of('TestFont'));
+  fontDict.set(PDFName.of('Encoding'), PDFName.of('WinAnsiEncoding'));
+  fontDict.set(PDFName.of('FontDescriptor'), fontDescRef);
+  const fontRef = doc.context.register(fontDict);
+
+  // Create a content stream with text operators
+  const contentText = 'BT /F1 12 Tf (Hello) Tj ET';
+  const contentBytes = new TextEncoder().encode(contentText);
+  const contentDict = doc.context.obj({});
+  contentDict.set(PDFName.of('Length'), doc.context.obj(contentBytes.length));
+  const contentStream = PDFRawStream.of(contentDict, contentBytes);
+  const contentRef = doc.context.register(contentStream);
+
+  // Wire up Resources and Contents on the page
+  const resources = doc.context.obj({});
+  const fontsDict = doc.context.obj({});
+  fontsDict.set(PDFName.of('F1'), fontRef);
+  resources.set(PDFName.of('Font'), fontsDict);
+  page.node.set(PDFName.of('Resources'), resources);
+  page.node.set(PDFName.of('Contents'), contentRef);
+
+  return doc;
+}
+
 export async function createPdfWithNonStandardFont() {
   const doc = await PDFDocument.create();
   const page = doc.addPage([200, 200]);

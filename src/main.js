@@ -26,12 +26,13 @@ const qualityValue = document.getElementById('quality-value');
 const dpiRow = document.querySelector('.control-row--dpi');
 const dpiInput = document.getElementById('max-dpi');
 const unembedCheckbox = document.getElementById('unembed-fonts');
+const subsetCheckbox = document.getElementById('subset-fonts');
 
 // --- Presets ---
 const PRESETS = {
-  lossless: { lossy: false, imageQuality: 0.85, unembedStandardFonts: true },
-  web:      { lossy: true,  imageQuality: 0.75, unembedStandardFonts: true, maxImageDpi: 150 },
-  print:    { lossy: true,  imageQuality: 0.92, unembedStandardFonts: true, maxImageDpi: 300 },
+  lossless: { lossy: false, imageQuality: 0.85, unembedStandardFonts: true, subsetFonts: true },
+  web:      { lossy: true,  imageQuality: 0.75, unembedStandardFonts: true, subsetFonts: true, maxImageDpi: 150 },
+  print:    { lossy: true,  imageQuality: 0.92, unembedStandardFonts: true, subsetFonts: true, maxImageDpi: 300 },
 };
 
 function applyPreset(name) {
@@ -59,6 +60,9 @@ function applyPreset(name) {
 
   // Unembed checkbox
   unembedCheckbox.checked = p.unembedStandardFonts;
+
+  // Subset checkbox
+  subsetCheckbox.checked = p.subsetFonts;
 }
 
 function syncPresetIndicator() {
@@ -66,6 +70,7 @@ function syncPresetIndicator() {
   for (const [name, p] of Object.entries(PRESETS)) {
     if (current.lossy === p.lossy &&
         current.unembedStandardFonts === p.unembedStandardFonts &&
+        current.subsetFonts === p.subsetFonts &&
         (!current.lossy || (current.imageQuality === p.imageQuality &&
                             current.maxImageDpi === p.maxImageDpi))) {
       presetBtns.forEach((btn) => {
@@ -86,6 +91,7 @@ function collectOptions() {
     imageQuality: lossy ? parseInt(qualitySlider.value, 10) / 100 : undefined,
     maxImageDpi: lossy && dpiVal > 0 ? dpiVal : undefined,
     unembedStandardFonts: unembedCheckbox.checked,
+    subsetFonts: subsetCheckbox.checked,
   };
 }
 
@@ -113,6 +119,8 @@ qualitySlider.addEventListener('input', () => {
 dpiInput.addEventListener('input', syncPresetIndicator);
 
 unembedCheckbox.addEventListener('change', syncPresetIndicator);
+
+subsetCheckbox.addEventListener('change', syncPresetIndicator);
 
 // --- Helpers ---
 function formatSize(bytes) {
@@ -181,6 +189,8 @@ function formatPassStats(passStats) {
     parts.push(`${rest.downsampled} image${rest.downsampled !== 1 ? 's' : ''} downsampled`);
   if (rest.unembedded != null && rest.unembedded > 0)
     parts.push(`${rest.unembedded} font${rest.unembedded !== 1 ? 's' : ''} unembedded`);
+  if (rest.subsetted != null && rest.subsetted > 0)
+    parts.push(`${rest.subsetted} font${rest.subsetted !== 1 ? 's' : ''} subsetted`);
   if (rest.deduplicated != null && rest.deduplicated > 0)
     parts.push(`${rest.deduplicated} duplicate${rest.deduplicated !== 1 ? 's' : ''} removed`);
   if (rest.stripped != null && rest.stripped > 0)

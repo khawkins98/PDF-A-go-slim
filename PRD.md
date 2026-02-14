@@ -97,6 +97,7 @@ src/
       streams.js              # Recompress streams with fflate level 9
       images.js               # FlateDecode → JPEG recompression (lossy, opt-in)
       font-unembed.js         # Remove embedded base-14 standard fonts
+      font-subset.js          # Subset embedded fonts via harfbuzzjs WASM
       dedup.js                # Hash-based object deduplication (djb2)
       fonts.js                # Consolidate duplicate embedded fonts
       metadata.js             # Strip XMP, Illustrator, Photoshop bloat keys
@@ -104,6 +105,10 @@ src/
     utils/
       stream-decode.js        # Decoders: Flate, LZW, ASCII85, ASCIIHex, RunLength, PNG prediction
       pdf-traversal.js        # BFS graph walker from PDF trailer
+      content-stream-parser.js # Extract char codes per font from content streams
+      unicode-mapper.js       # Map char codes → Unicode codepoints
+      glyph-list.js           # Adobe Glyph List + standard encoding tables
+      harfbuzz-subsetter.js   # harfbuzzjs WASM wrapper for font subsetting
 ```
 
 ### Options Schema
@@ -116,6 +121,7 @@ All passes receive an `options` object. Each pass checks its own flags and ignor
   imageQuality: 0.85,            // JPEG quality 0-1 (only when lossy=true)
   maxImageDpi: undefined,        // Downsample images above this DPI (only when lossy=true)
   unembedStandardFonts: true,    // Remove embedded base-14 fonts (default on, lossless)
+  subsetFonts: true,             // Subset embedded fonts to used glyphs (default on, lossless)
 }
 ```
 
@@ -129,9 +135,9 @@ All passes receive an `options` object. Each pass checks its own flags and ignor
 
 **Font Unembedding**: Type1 and TrueType only. Type0/CIDFont composites use 2-byte Identity-H encoding — unembedding would require rewriting content stream text operators, which is too risky. Fonts with custom `/Encoding << /Differences [...] >>` are also skipped.
 
-**Future considerations for image processing**: OffscreenCanvas + Canvas API could enable WebP encoding (`canvas.toBlob('image/webp', quality)`) in browsers that support it. Worth exploring for P1 image downsampling.
+**Font Subsetting**: [harfbuzzjs](https://github.com/nicbou/harfbuzzjs) WASM (~596 KB gzipped) for TrueType/OpenType subsetting. We call the C API directly (`hb_subset_or_fail`) rather than using the JS wrapper (which has CJS/ESM interop issues — see `docs/learnings.md`). Supports Type1/TrueType (simple, 1-byte char codes via Encoding/Differences → Adobe Glyph List) and Type0/Identity-H (2-byte CIDs via ToUnicode CMap, with `retain-gids` to preserve CID=GID mapping). WASM is lazy-loaded as a separate Vite chunk.
 
-**Future considerations for font subsetting**: [fontkit](https://github.com/foliojs/fontkit) or [subset-font](https://github.com/nicbou/subset-font) for TrueType/OpenType subsetting in the browser.
+**Future considerations for image processing**: OffscreenCanvas + Canvas API could enable WebP encoding (`canvas.toBlob('image/webp', quality)`) in browsers that support it.
 
 **WASM Option**: For maximum compression, compile [QPDF](https://github.com/qpdf/qpdf) (Apache 2.0) to WASM. MuPDF and Ghostscript are AGPL — licensing concerns for bundling. Ship as an optional heavy module (~5MB).
 
@@ -222,7 +228,7 @@ Works on mobile for quick single-file optimization. Batch features are desktop-f
 - [x] Optimization summary (per-pass stats in expandable detail rows)
 - [x] Re-optimize button (re-run with different settings from results screen)
 - [x] Credits & attribution (footer with package links)
-- [ ] Font subsetting
+- [x] Font subsetting (harfbuzzjs WASM, Type1/TrueType + Type0/Identity-H, retain-gids)
 - [ ] Linearization
 - [ ] Side-by-side preview (via PDF-A-go-go)
 

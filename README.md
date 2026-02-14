@@ -5,9 +5,9 @@ A browser-based PDF optimization tool that reduces file size entirely client-sid
 ## Features
 
 - **Drag-and-drop** — drop one or more PDFs, or use the file picker
-- **7 optimization passes** — stream recompression, image recompression, standard font unembedding, object deduplication, font deduplication, metadata stripping, unreferenced object removal
+- **8 optimization passes** — stream recompression, image recompression, standard font unembedding, font subsetting, object deduplication, font deduplication, metadata stripping, unreferenced object removal
 - **Optimization presets** — Lossless (default), Web (lossy, 75% quality), Print (lossy, 92% quality)
-- **Advanced controls** — lossy/lossless toggle, image quality slider, font unembedding checkbox
+- **Advanced controls** — lossy/lossless toggle, image quality slider, font unembedding and subsetting checkboxes
 - **Per-file stats** — expandable detail rows showing what each pass accomplished
 - **Privacy-first** — files never leave your browser; all processing runs in a Web Worker
 - **Batch capable** — optimize multiple PDFs at once with individual or bulk download
@@ -39,10 +39,11 @@ index.html → src/main.js (UI, drag-and-drop, options panel, worker orchestrati
                  ↓
              src/engine/pipeline.js (sequential optimization passes with progress)
                  ↓
-             src/engine/optimize/  (7 passes, run in order):
+             src/engine/optimize/  (8 passes, run in order):
                streams.js      — recompress streams with fflate level 9
                images.js       — FlateDecode → JPEG recompression (lossy, opt-in)
                font-unembed.js — remove embedded base-14 standard fonts
+               font-subset.js  — subset embedded fonts via harfbuzzjs WASM
                dedup.js        — hash-based object deduplication (djb2)
                fonts.js        — consolidate duplicate embedded fonts
                metadata.js     — strip XMP, Illustrator, Photoshop bloat keys
@@ -54,6 +55,7 @@ index.html → src/main.js (UI, drag-and-drop, options panel, worker orchestrati
 - [pdf-lib](https://github.com/Hopding/pdf-lib) — low-level PDF object access
 - [fflate](https://github.com/101arrowz/fflate) — pure-JS zlib compression
 - [jpeg-js](https://github.com/jpeg-js/jpeg-js) — pure-JS JPEG encoder
+- [harfbuzzjs](https://github.com/nicbou/harfbuzzjs) — WASM font subsetting
 - [Vite](https://vitejs.dev/) — build tooling
 - [Vitest](https://vitest.dev/) — test runner
 

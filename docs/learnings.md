@@ -35,6 +35,13 @@ PDF content streams use postfix notation. Text-showing operators:
 
 The strings are **not Unicode** — they're character codes whose meaning depends on the active font's encoding. The `Tf` operator sets the current font.
 
+**Edge cases in content stream parsing:**
+- Content streams can be an array of stream refs (concatenated in order)
+- pdf-lib represents programmatically-created content as `PDFContentStream` (not `PDFRawStream`) — must check for `getUnencodedContents()` method
+- Form XObjects (`/Subtype /Form`) referenced by the `Do` operator have their own `/Resources` and content stream — must recurse into them
+- Inline images (`BI`/`ID`/`EI`) must be skipped — the `ID` marker is followed by raw binary data terminated by `EI`
+- Font names in content streams (e.g., `/F1` in `Tf`) must be resolved through the page's `/Resources/Font` dict to find the actual font object ref
+
 ---
 
 ## Tooling & Libraries
@@ -91,6 +98,20 @@ Area-average (box filter) resampling before JPEG encoding. For each destination 
 
 DPI estimation uses a page map built by walking all pages' `Resources → XObject` dicts to find which ref appears on which page size. Conservative approach: uses `Math.min(dpiX, dpiY)` so we never over-downsample.
 
+### Font Subsetting
+
+Strips unused glyph outlines from embedded font programs. Typical savings: 50–98% per font. Lossless — only removes glyphs the document doesn't reference.
+
+**Character code → Unicode pipeline:**
+- Simple fonts (Type1/TrueType): charCode → `/Encoding` (WinAnsi, MacRoman, or `/Differences` array) → glyph name → Adobe Glyph List → Unicode codepoint
+- Composite fonts (Type0/Identity-H): 2-byte charCode → `/ToUnicode` CMap → Unicode codepoint
+
+**retain-gids flag:** For Type0/Identity-H fonts, harfbuzzjs must be called with `HB_SUBSET_FLAGS_RETAIN_GIDS` (0x2). Without it, the subsetter would renumber glyph IDs, breaking the CID=GID identity mapping. With retain-gids, GID slots for removed glyphs are zeroed out but keep their positions, so no updates to `/CIDToGIDMap` or `/W` (widths) are needed.
+
+**V1 scope:** Only Type1/TrueType (simple) and Type0 with Identity-H + Identity CIDToGIDMap are supported. Type0 with non-Identity CMaps, Type3 fonts, fonts < 10 KB, and fonts without `/ToUnicode` or recognizable encoding are skipped.
+
+**Pass ordering matters:** font-subset runs after font-unembed (no point subsetting fonts we'll remove) and before dedup (so dedup can catch fonts that become identical after subsetting).
+
 ### Metadata Stripping
 
 Application-private data is surprisingly large. Illustrator's `AIPrivateData` can be hundreds of KB. XMP metadata, `PieceInfo`, Photoshop IRB — all safe to strip without affecting the visual output or user-facing metadata (title, author, subject are preserved separately in `/Info`).
@@ -133,6 +154,24 @@ WASM modules (like harfbuzzjs for font subsetting) can be instantiated inside We
 | **fonteditor-core** | ~1.6 MB | Yes | Converts to TTF | Active | Disqualified — CFF conversion is lossy |
 | **opentype.js** | ~3.8 MB | Partial | No subsetting | Moderate | Disqualified — no subset API |
 
-**Decision:** `subset-font` (wraps harfbuzzjs) is the recommended choice. HarfBuzz is used by Chrome, Firefox, and Android — it correctly handles compound glyphs, GSUB/GPOS layout tables, and complex scripts. The ~3.1 MB WASM cost can be mitigated with lazy loading.
+**Decision:** Direct harfbuzzjs WASM (calling the C API ourselves) is the best choice. HarfBuzz is used by Chrome, Firefox, and Android — it correctly handles compound glyphs, GSUB/GPOS layout tables, and complex scripts. The ~596 KB gzipped WASM cost is mitigated with lazy loading as a separate chunk.
 
-**Key trade-off:** `subset-font`'s API is text/Unicode-based (you pass characters to keep), so PDF character codes must be reverse-mapped to Unicode via the font's `/ToUnicode` CMap or `/Encoding`. fontkit's glyph-ID API would be more natural for PDF work, but the library is unmaintained.
+**Key trade-off:** harfbuzzjs's API is Unicode-based (you pass codepoints to keep), so PDF character codes must be reverse-mapped to Unicode via the font's `/ToUnicode` CMap or `/Encoding`.
+
+### harfbuzzjs CJS/ESM Interop
+
+harfbuzzjs's `index.js` does `module.exports = new Promise(...)`. When Vitest transforms this CJS module into ESM, the Promise's `.then` method leaks onto the module namespace object, making it look like a thenable. `await import('harfbuzzjs')` then tries to call `.then()` on the module, causing `TypeError: Method Promise.prototype.then called on incompatible receiver [object Module]`.
+
+**Fix:** Don't import the harfbuzzjs JS wrapper at all. Load `hb-subset.wasm` directly via `require.resolve('harfbuzzjs/hb-subset.wasm')` (Node) or `new URL('harfbuzzjs/hb-subset.wasm', import.meta.url)` (browser) and call `WebAssembly.instantiate()` ourselves. The JS wrapper is for the shaping API; we only need the subsetting C API exports.
+
+### pdf-lib Lazy Object Creation
+
+pdf-lib creates font dict objects lazily — after `embedFont()` + `drawText()`, the actual PDF objects (FontDescriptor, FontFile2, CIDFont, etc.) don't exist in `context` until `save()` is called. Testing font subsetting requires a save/reload cycle: `doc.save({ useObjectStreams: false })` then `PDFDocument.load(saved)`.
+
+### pdf-lib Uses pako Internally
+
+pdf-lib uses pako for internal compression. fflate's `inflateSync` can fail with "unexpected EOF" on some pako-produced zlib streams, but `decompressSync` (full zlib-wrapper handling) succeeds. The `decodeFlateDecode` function should try `inflateSync` first and fall back to `decompressSync`.
+
+### Node.js fetch() Detection
+
+Node.js 18+ has a global `fetch()`, so `typeof fetch === 'function'` is true in both browser and Node. For environment detection, use `typeof process !== 'undefined' && process.versions?.node` to identify Node.js before checking for `fetch`.
