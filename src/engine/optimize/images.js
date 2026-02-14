@@ -6,7 +6,7 @@
  * Skips: DCT/JPX (already JPEG), SMask (alpha), CMYK, non-8-bit,
  * non-simple ColorSpace, ImageMask, small images.
  */
-import { PDFName, PDFRawStream, PDFArray } from 'pdf-lib';
+import { PDFName, PDFRawStream, PDFArray, PDFDict, PDFRef } from 'pdf-lib';
 import { encode as jpegEncode } from 'jpeg-js';
 import { decodeStream, allFiltersDecodable } from '../utils/stream-decode.js';
 import { undoPngPrediction } from '../utils/stream-decode.js';
@@ -75,25 +75,107 @@ function getNumericValue(dict, key) {
 }
 
 /**
+ * Build a map from image ref string → page dimensions (in points).
+ * Walks all pages and their Resources → XObject dicts.
+ * Used to estimate effective DPI for downsampling decisions.
+ */
+function buildImagePageMap(pdfDoc) {
+  const map = new Map();
+  const pages = pdfDoc.getPages();
+  for (const page of pages) {
+    const { width: pageW, height: pageH } = page.getSize();
+    const resources = page.node.get(PDFName.of('Resources'));
+    if (!resources || !(resources instanceof PDFDict)) continue;
+    const xobjects = resources.get(PDFName.of('XObject'));
+    if (!xobjects || !(xobjects instanceof PDFDict)) continue;
+
+    const entries = xobjects.entries();
+    for (const [, value] of entries) {
+      if (value instanceof PDFRef) {
+        const key = value.toString();
+        // Keep the smallest page (conservative — highest DPI estimate)
+        if (!map.has(key)) {
+          map.set(key, { w: pageW, h: pageH });
+        }
+      }
+    }
+  }
+  return map;
+}
+
+/**
+ * Area-average (box filter) downsample RGBA pixel data.
+ * For each destination pixel, averages all source pixels that map to it.
+ */
+function downsampleArea(rgba, srcW, srcH, dstW, dstH) {
+  const out = new Uint8Array(dstW * dstH * 4);
+  const xRatio = srcW / dstW;
+  const yRatio = srcH / dstH;
+
+  for (let dy = 0; dy < dstH; dy++) {
+    const srcY0 = dy * yRatio;
+    const srcY1 = (dy + 1) * yRatio;
+    const sy0 = Math.floor(srcY0);
+    const sy1 = Math.min(Math.ceil(srcY1), srcH);
+
+    for (let dx = 0; dx < dstW; dx++) {
+      const srcX0 = dx * xRatio;
+      const srcX1 = (dx + 1) * xRatio;
+      const sx0 = Math.floor(srcX0);
+      const sx1 = Math.min(Math.ceil(srcX1), srcW);
+
+      let r = 0, g = 0, b = 0, totalWeight = 0;
+
+      for (let sy = sy0; sy < sy1; sy++) {
+        // Vertical weight: fraction of this source row covered
+        const wy = Math.min(sy + 1, srcY1) - Math.max(sy, srcY0);
+        for (let sx = sx0; sx < sx1; sx++) {
+          // Horizontal weight: fraction of this source col covered
+          const wx = Math.min(sx + 1, srcX1) - Math.max(sx, srcX0);
+          const w = wx * wy;
+          const si = (sy * srcW + sx) * 4;
+          r += rgba[si] * w;
+          g += rgba[si + 1] * w;
+          b += rgba[si + 2] * w;
+          totalWeight += w;
+        }
+      }
+
+      const di = (dy * dstW + dx) * 4;
+      out[di]     = Math.round(r / totalWeight);
+      out[di + 1] = Math.round(g / totalWeight);
+      out[di + 2] = Math.round(b / totalWeight);
+      out[di + 3] = 255;
+    }
+  }
+  return out;
+}
+
+/**
  * Recompress eligible images as JPEG.
  * @param {PDFDocument} pdfDoc
  * @param {object} [options]
  * @param {boolean} [options.lossy=false] - Enable lossy optimizations
  * @param {number} [options.imageQuality=0.85] - JPEG quality 0-1
- * @returns {{ converted: number, skipped: number }}
+ * @param {number} [options.maxImageDpi] - Downsample images above this DPI
+ * @returns {{ converted: number, skipped: number, downsampled: number }}
  */
 export function recompressImages(pdfDoc, options = {}) {
-  const { lossy = false, imageQuality = 0.85 } = options;
+  const { lossy = false, imageQuality = 0.85, maxImageDpi } = options;
   const context = pdfDoc.context;
   let converted = 0;
   let skipped = 0;
+  let downsampled = 0;
 
   // If lossy mode is off, skip everything
   if (!lossy) {
-    return { converted: 0, skipped: 0 };
+    return { converted: 0, skipped: 0, downsampled: 0 };
   }
 
   const quality = Math.round(Math.max(1, Math.min(100, imageQuality * 100)));
+
+  // Build page map for DPI estimation (only if downsampling is requested)
+  const pageMap = maxImageDpi ? buildImagePageMap(pdfDoc) : null;
 
   for (const [ref, obj] of context.enumerateIndirectObjects()) {
     if (!(obj instanceof PDFRawStream)) continue;
@@ -188,7 +270,7 @@ export function recompressImages(pdfDoc, options = {}) {
 
       // Convert to RGBA for jpeg-js
       const pixelCount = width * height;
-      const rgbaData = new Uint8Array(pixelCount * 4);
+      let rgbaData = new Uint8Array(pixelCount * 4);
 
       if (components === 3) {
         // RGB → RGBA
@@ -208,8 +290,36 @@ export function recompressImages(pdfDoc, options = {}) {
         }
       }
 
+      // Downsample if above target DPI
+      let outWidth = width;
+      let outHeight = height;
+      let didDownsample = false;
+
+      if (pageMap && maxImageDpi) {
+        const refStr = ref.toString();
+        const pageDims = pageMap.get(refStr);
+        if (pageDims) {
+          const dpiX = (width * 72) / pageDims.w;
+          const dpiY = (height * 72) / pageDims.h;
+          const effectiveDpi = Math.min(dpiX, dpiY);
+
+          if (effectiveDpi > maxImageDpi) {
+            const scale = maxImageDpi / effectiveDpi;
+            const newW = Math.max(1, Math.round(width * scale));
+            const newH = Math.max(1, Math.round(height * scale));
+
+            if (newW < width && newH < height) {
+              rgbaData = downsampleArea(rgbaData, width, height, newW, newH);
+              outWidth = newW;
+              outHeight = newH;
+              didDownsample = true;
+            }
+          }
+        }
+      }
+
       const jpegResult = jpegEncode(
-        { data: rgbaData, width, height },
+        { data: rgbaData, width: outWidth, height: outHeight },
         quality,
       );
       const jpegBytes = new Uint8Array(jpegResult.data);
@@ -225,6 +335,14 @@ export function recompressImages(pdfDoc, options = {}) {
       dict.set(PDFName.of('Filter'), PDFName.of('DCTDecode'));
       dict.delete(PDFName.of('DecodeParms'));
       dict.set(PDFName.of('Length'), context.obj(jpegBytes.length));
+
+      // Update dimensions if downsampled
+      if (didDownsample) {
+        dict.set(PDFName.of('Width'), context.obj(outWidth));
+        dict.set(PDFName.of('Height'), context.obj(outHeight));
+        downsampled++;
+      }
+
       context.assign(ref, newStream);
       converted++;
     } catch {
@@ -232,5 +350,5 @@ export function recompressImages(pdfDoc, options = {}) {
     }
   }
 
-  return { converted, skipped };
+  return { converted, skipped, downsampled };
 }

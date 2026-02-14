@@ -261,6 +261,17 @@ header h1 {
   color: var(--color-text);
 }
 
+.dpi-input {
+  width: 5rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-top: 0.35rem;
+}
+
 /* --- Pass stats detail rows --- */
 .pass-stats-row td {
   padding: 0;

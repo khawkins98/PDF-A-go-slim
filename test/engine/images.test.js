@@ -6,6 +6,7 @@ import {
   createPdfWithFlatDecodeGrayImage,
   createPdfWithJpegImage,
   createPdfWithAlphaImage,
+  createPdfWithHighDpiImage,
 } from '../fixtures/create-test-pdfs.js';
 
 describe('recompressImages', () => {
@@ -91,6 +92,62 @@ describe('recompressImages', () => {
   it('produces valid reloadable PDF', async () => {
     const doc = await createPdfWithFlatDecodeRgbImage();
     recompressImages(doc, { lossy: true });
+
+    const saved = await doc.save();
+    const reloaded = await PDFDocument.load(saved);
+    expect(reloaded.getPageCount()).toBe(1);
+  });
+
+  it('downsamples high-DPI image when maxImageDpi is set', async () => {
+    const doc = await createPdfWithHighDpiImage();
+    const result = recompressImages(doc, { lossy: true, maxImageDpi: 150 });
+
+    expect(result.converted).toBe(1);
+    expect(result.downsampled).toBe(1);
+
+    // Verify dimensions were updated in the image dict
+    let foundImage = false;
+    for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+      if (!(obj instanceof PDFRawStream)) continue;
+      const subtype = obj.dict.get(PDFName.of('Subtype'));
+      if (subtype instanceof PDFName && subtype.decodeText() === 'Image') {
+        const filter = obj.dict.get(PDFName.of('Filter'));
+        if (filter instanceof PDFName && filter.decodeText() === 'DCTDecode') {
+          const w = obj.dict.get(PDFName.of('Width'));
+          const h = obj.dict.get(PDFName.of('Height'));
+          const wVal = Number(w.toString());
+          const hVal = Number(h.toString());
+          // Original is 400x400 on 100x100pt page (288 DPI), target 150 DPI
+          // scale = 150/288 ≈ 0.52, so ~208x208
+          expect(wVal).toBeLessThan(400);
+          expect(hVal).toBeLessThan(400);
+          foundImage = true;
+        }
+      }
+    }
+    expect(foundImage).toBe(true);
+  });
+
+  it('skips downsampling when already below target DPI', async () => {
+    // 100x100 image on 200x200pt page = 36 DPI — well below 150
+    const doc = await createPdfWithFlatDecodeRgbImage();
+    const result = recompressImages(doc, { lossy: true, maxImageDpi: 150 });
+
+    expect(result.downsampled).toBe(0);
+    // Should still convert to JPEG though
+    expect(result.converted).toBe(1);
+  });
+
+  it('returns downsampled count of 0 when maxImageDpi not set', async () => {
+    const doc = await createPdfWithFlatDecodeRgbImage();
+    const result = recompressImages(doc, { lossy: true });
+
+    expect(result.downsampled).toBe(0);
+  });
+
+  it('produces valid reloadable PDF after downsampling', async () => {
+    const doc = await createPdfWithHighDpiImage();
+    recompressImages(doc, { lossy: true, maxImageDpi: 150 });
 
     const saved = await doc.save();
     const reloaded = await PDFDocument.load(saved);

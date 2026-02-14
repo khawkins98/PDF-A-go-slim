@@ -23,13 +23,15 @@ const modeBtns = document.querySelectorAll('.mode-btn');
 const qualityRow = document.querySelector('.control-row--quality');
 const qualitySlider = document.getElementById('quality-slider');
 const qualityValue = document.getElementById('quality-value');
+const dpiRow = document.querySelector('.control-row--dpi');
+const dpiInput = document.getElementById('max-dpi');
 const unembedCheckbox = document.getElementById('unembed-fonts');
 
 // --- Presets ---
 const PRESETS = {
   lossless: { lossy: false, imageQuality: 0.85, unembedStandardFonts: true },
-  web:      { lossy: true,  imageQuality: 0.75, unembedStandardFonts: true },
-  print:    { lossy: true,  imageQuality: 0.92, unembedStandardFonts: true },
+  web:      { lossy: true,  imageQuality: 0.75, unembedStandardFonts: true, maxImageDpi: 150 },
+  print:    { lossy: true,  imageQuality: 0.92, unembedStandardFonts: true, maxImageDpi: 300 },
 };
 
 function applyPreset(name) {
@@ -51,6 +53,10 @@ function applyPreset(name) {
   qualitySlider.value = Math.round(p.imageQuality * 100);
   qualityValue.textContent = Math.round(p.imageQuality * 100);
 
+  // DPI input
+  dpiRow.hidden = !p.lossy;
+  dpiInput.value = p.maxImageDpi || '';
+
   // Unembed checkbox
   unembedCheckbox.checked = p.unembedStandardFonts;
 }
@@ -60,7 +66,8 @@ function syncPresetIndicator() {
   for (const [name, p] of Object.entries(PRESETS)) {
     if (current.lossy === p.lossy &&
         current.unembedStandardFonts === p.unembedStandardFonts &&
-        (!current.lossy || current.imageQuality === p.imageQuality)) {
+        (!current.lossy || (current.imageQuality === p.imageQuality &&
+                            current.maxImageDpi === p.maxImageDpi))) {
       presetBtns.forEach((btn) => {
         btn.classList.toggle('preset-btn--active', btn.dataset.preset === name);
       });
@@ -73,9 +80,11 @@ function syncPresetIndicator() {
 
 function collectOptions() {
   const lossy = document.querySelector('.mode-btn--active')?.dataset.mode === 'lossy';
+  const dpiVal = parseInt(dpiInput.value, 10);
   return {
     lossy,
     imageQuality: lossy ? parseInt(qualitySlider.value, 10) / 100 : undefined,
+    maxImageDpi: lossy && dpiVal > 0 ? dpiVal : undefined,
     unembedStandardFonts: unembedCheckbox.checked,
   };
 }
@@ -89,7 +98,9 @@ modeBtns.forEach((btn) => {
   btn.addEventListener('click', () => {
     modeBtns.forEach((b) => b.classList.remove('mode-btn--active'));
     btn.classList.add('mode-btn--active');
-    qualityRow.hidden = btn.dataset.mode !== 'lossy';
+    const isLossy = btn.dataset.mode === 'lossy';
+    qualityRow.hidden = !isLossy;
+    dpiRow.hidden = !isLossy;
     syncPresetIndicator();
   });
 });
@@ -98,6 +109,8 @@ qualitySlider.addEventListener('input', () => {
   qualityValue.textContent = qualitySlider.value;
   syncPresetIndicator();
 });
+
+dpiInput.addEventListener('input', syncPresetIndicator);
 
 unembedCheckbox.addEventListener('change', syncPresetIndicator);
 
@@ -164,6 +177,8 @@ function formatPassStats(passStats) {
     parts.push(`${rest.recompressed} stream${rest.recompressed !== 1 ? 's' : ''} recompressed`);
   if (rest.converted != null && rest.converted > 0)
     parts.push(`${rest.converted} image${rest.converted !== 1 ? 's' : ''} converted to JPEG`);
+  if (rest.downsampled != null && rest.downsampled > 0)
+    parts.push(`${rest.downsampled} image${rest.downsampled !== 1 ? 's' : ''} downsampled`);
   if (rest.unembedded != null && rest.unembedded > 0)
     parts.push(`${rest.unembedded} font${rest.unembedded !== 1 ? 's' : ''} unembedded`);
   if (rest.deduplicated != null && rest.deduplicated > 0)

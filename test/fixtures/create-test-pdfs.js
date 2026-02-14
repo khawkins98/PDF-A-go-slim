@@ -467,6 +467,54 @@ export async function createPdfWithType0StandardFont() {
 }
 
 /**
+ * Create a PDF with a high-DPI image (400x400px on a 100x100pt page = ~288 DPI).
+ * Used to test downsampling behavior.
+ */
+export async function createPdfWithHighDpiImage() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([100, 100]);
+
+  const width = 400;
+  const height = 400;
+  const components = 3;
+  const pixels = new Uint8Array(width * height * components);
+
+  // Smooth sine-wave pattern (photo-like, per project conventions)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * components;
+      const xf = x / width;
+      const yf = y / height;
+      pixels[idx]     = Math.round(127 + 127 * Math.sin(xf * 7.3 + yf * 2.1));
+      pixels[idx + 1] = Math.round(127 + 127 * Math.sin(yf * 5.7 + xf * 3.9));
+      pixels[idx + 2] = Math.round(127 + 127 * Math.sin((xf + yf) * 4.1));
+    }
+  }
+
+  const compressed = deflateSync(pixels, { level: 6 });
+
+  const imgDict = doc.context.obj({});
+  imgDict.set(PDFName.of('Type'), PDFName.of('XObject'));
+  imgDict.set(PDFName.of('Subtype'), PDFName.of('Image'));
+  imgDict.set(PDFName.of('Width'), doc.context.obj(width));
+  imgDict.set(PDFName.of('Height'), doc.context.obj(height));
+  imgDict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
+  imgDict.set(PDFName.of('BitsPerComponent'), doc.context.obj(8));
+  imgDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  imgDict.set(PDFName.of('Length'), doc.context.obj(compressed.length));
+
+  const imgStream = PDFRawStream.of(imgDict, compressed);
+  const imgRef = doc.context.register(imgStream);
+
+  const xobjectDict = doc.context.obj({});
+  xobjectDict.set(PDFName.of('Img0'), imgRef);
+  page.node.set(PDFName.of('Resources'), doc.context.obj({}));
+  page.node.get(PDFName.of('Resources')).set(PDFName.of('XObject'), xobjectDict);
+
+  return doc;
+}
+
+/**
  * Create a PDF with a non-standard font name — should be skipped.
  */
 export async function createPdfWithNonStandardFont() {
