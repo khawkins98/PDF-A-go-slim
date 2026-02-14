@@ -3,6 +3,7 @@ import { PDFDocument, PDFName, PDFDict } from 'pdf-lib';
 import { unembedStandardFonts } from '../../src/engine/optimize/font-unembed.js';
 import {
   createPdfWithEmbeddedStandardFont,
+  createPdfWithEmbeddedStandardFontAndToUnicode,
   createPdfWithSubsetPrefixedFont,
   createPdfWithType0StandardFont,
   createPdfWithNonStandardFont,
@@ -81,6 +82,44 @@ describe('unembedStandardFonts', () => {
       }
     }
     expect(found).toBe(true);
+  });
+
+  it('preserves ToUnicode CMap when unembedding', async () => {
+    const doc = await createPdfWithEmbeddedStandardFontAndToUnicode();
+
+    // Verify ToUnicode exists before
+    let fontBefore = null;
+    for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+      if (!(obj instanceof PDFDict)) continue;
+      const type = obj.get(PDFName.of('Type'));
+      if (type instanceof PDFName && type.decodeText() === 'Font') {
+        if (obj.get(PDFName.of('ToUnicode'))) {
+          fontBefore = obj;
+          break;
+        }
+      }
+    }
+    expect(fontBefore).not.toBeNull();
+
+    const result = unembedStandardFonts(doc);
+    expect(result.unembedded).toBe(1);
+
+    // ToUnicode must survive unembedding
+    let foundToUnicode = false;
+    for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+      if (!(obj instanceof PDFDict)) continue;
+      const type = obj.get(PDFName.of('Type'));
+      if (type instanceof PDFName && type.decodeText() === 'Font') {
+        const baseFont = obj.get(PDFName.of('BaseFont'));
+        if (baseFont instanceof PDFName && baseFont.decodeText() === 'Helvetica') {
+          expect(obj.get(PDFName.of('ToUnicode'))).toBeDefined();
+          // FontDescriptor should be gone
+          expect(obj.get(PDFName.of('FontDescriptor'))).toBeUndefined();
+          foundToUnicode = true;
+        }
+      }
+    }
+    expect(foundToUnicode).toBe(true);
   });
 
   it('disabled when options.unembedStandardFonts === false', async () => {

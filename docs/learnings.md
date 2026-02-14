@@ -59,6 +59,8 @@ The strings are **not Unicode** — they're character codes whose meaning depend
 
 Pure JS JPEG encoder/decoder (~15 KB). Chosen over `OffscreenCanvas` because OffscreenCanvas isn't available in Node test environments (vitest). Works in both Web Workers and Node.
 
+**Buffer shim required in browser:** The encoder (`lib/encoder.js`) checks `typeof module === 'undefined'` to decide whether to return `new Uint8Array(byteout)` (browser) or `Buffer.from(byteout)` (Node). In a Vite-bundled Web Worker, the bundler shims `module` for CJS compatibility, so the check fails and the encoder takes the Node.js `Buffer.from()` path — which doesn't exist in browsers. The decoder has a `useTArray: true` option that avoids `Buffer`, but the encoder has no equivalent. Fix: provide a minimal `globalThis.Buffer` shim (`{ from: arr => new Uint8Array(arr), alloc: size => new Uint8Array(size) }`) before jpeg-js is invoked.
+
 ### fflate
 
 Pure JS zlib, faster and smaller than pako. Used for `deflateSync`/`inflateSync`. Level 9 recompression of existing streams is a reliable win — many PDFs use low compression levels or no compression at all.
@@ -83,14 +85,20 @@ The PDF spec guarantees that all conforming readers provide the 14 base fonts (H
 
 **Not safe to unembed:** Type0/CIDFont composites (use 2-byte Identity-H encoding; unembedding would require rewriting content stream text operators) and fonts with custom `/Encoding << /Differences [...] >>` arrays (the differences might reference glyphs not present in the reader's built-in font).
 
-### Image Recompression (FlateDecode → JPEG)
+### Image Recompression
 
-FlateDecode images in PDFs are essentially raw pixel data compressed with zlib. Converting to JPEG is a massive win for photographic content. Key considerations:
+Two paths for lossy image optimization:
 
-- **Skip DCT/JPX** — already JPEG-compressed, re-encoding would only degrade quality.
+1. **FlateDecode → JPEG**: Raw pixel data compressed with zlib is decoded and re-encoded as JPEG. Massive win for photographic content.
+2. **DCTDecode → DCTDecode**: Existing JPEG images are decoded via `jpeg-js` and re-encoded at the target quality/DPI. This is the common case in real-world PDFs.
+
+Key considerations:
+
+- **Skip JPXDecode** — JPEG2000 images can't be decoded by `jpeg-js`.
+- **DCTDecode images are re-encoded** — decoded with `jpegDecode(rawBytes, { useTArray: true })` (the `useTArray` flag is critical for Web Worker compatibility — without it, jpeg-js tries to use Node.js `Buffer`). Re-encoded at the user's target quality. Generation loss is mitigated by the per-image size guard.
 - **Skip SMask images** — these have alpha channels that JPEG can't represent.
-- **Skip small images** — below 10 KB decoded, the overhead isn't worth it.
-- **Size guard per image** — only replace if JPEG output is smaller than the original compressed stream.
+- **Skip small images** — below 10 KB decoded RGBA data, the overhead isn't worth it.
+- **Size guard per image** — only replace if JPEG output is smaller than the original compressed stream. This prevents quality degradation when re-encoding at a similar or higher quality than the original.
 
 ### Image Downsampling
 
@@ -115,6 +123,16 @@ Strips unused glyph outlines from embedded font programs. Typical savings: 50–
 ### Metadata Stripping
 
 Application-private data is surprisingly large. Illustrator's `AIPrivateData` can be hundreds of KB. XMP metadata, `PieceInfo`, Photoshop IRB — all safe to strip without affecting the visual output or user-facing metadata (title, author, subject are preserved separately in `/Info`).
+
+### Accessibility Impact of Optimization
+
+PDF optimization can silently break accessibility. Key risks discovered:
+
+- **ToUnicode CMaps** are critical for screen readers. When unembedding standard fonts, the entire font dict gets rebuilt — must explicitly save and restore `/ToUnicode` before clearing entries.
+- **XMP metadata** can contain `dc:language`, the document language tag. Screen readers use `/Lang` (on the catalog) to determine pronunciation. Before stripping XMP, extract `dc:language` and migrate it to `/Lang` if not already set.
+- **Object deduplication** is safe for structure elements because `dedup.js` only processes `PDFRawStream` objects, and `/StructElem` entries are plain `PDFDict` objects. No fix needed, but worth noting.
+- **Tagged PDFs** (those with `/MarkInfo` and `/StructTreeRoot`) need special care. The BFS traversal in `unreferenced.js` should reach the structure tree through the catalog's `/Root`, but tagged PDFs haven't been tested. This is tracked as future work.
+- **PDF/A compliance** requires embedded fonts. Font unembedding directly violates PDF/A — a conformance check should disable it for PDF/A inputs.
 
 ---
 
@@ -165,6 +183,30 @@ PDF font names often carry a 6-letter subset prefix (e.g., `ABCDEF+Helvetica`). 
 ---
 
 ## Code Architecture
+
+### Debug Mode (`?debug` URL Parameter)
+
+Debug mode is activated by adding `?debug` to the URL (e.g., `localhost:5173/?debug`). It provides structured diagnostic information without cluttering the UI for normal users.
+
+**How it works:**
+- `collectOptions()` in `main.js` reads the `?debug` URL param and sets `options.debug: true`
+- `pipeline.js` wraps each pass with `Date.now()` timing, adding `_ms` to every pass's stats object
+- Individual passes can return a `_debug` array of structured log entries and a `skipReasons` counter object when `options.debug` is true — this replaces ad-hoc `console.log` debugging
+- `main.js` renders a collapsible `<details>` debug panel below each file's results when debug mode is active
+
+**Adding debug output to a new pass:**
+```js
+export function myPass(pdfDoc, options = {}) {
+  const { debug = false } = options;
+  const debugLog = debug ? [] : null;
+  // ... during processing:
+  if (debugLog) debugLog.push({ ref: ref.toString(), action: 'skip', reason: 'some reason' });
+  // ... return:
+  return { myCount, ...(debugLog && { _debug: debugLog }) };
+}
+```
+
+The `_debug` field is optional — passes that don't return it are simply displayed with their timing. The UI auto-discovers `_debug` arrays and renders them in the debug panel.
 
 ### Layer Discipline: Utils Should Not Import from Optimize Passes
 

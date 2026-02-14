@@ -171,6 +171,9 @@ export function unembedStandardFonts(pdfDoc, options = {}) {
       continue;
     }
 
+    // Save accessibility-critical entries before clearing
+    const toUnicodeRef = obj.get(PDFName.of('ToUnicode'));
+
     // Replace font dict with simple standard font reference
     // Clear existing entries and rebuild
     const keysToRemove = [];
@@ -186,6 +189,11 @@ export function unembedStandardFonts(pdfDoc, options = {}) {
     obj.set(PDFName.of('Subtype'), PDFName.of('Type1'));
     obj.set(PDFName.of('BaseFont'), PDFName.of(canonicalName));
     obj.set(PDFName.of('Encoding'), PDFName.of('WinAnsiEncoding'));
+
+    // Restore ToUnicode CMap — needed for text extraction / screen readers
+    if (toUnicodeRef) {
+      obj.set(PDFName.of('ToUnicode'), toUnicodeRef);
+    }
 
     // Mark FontDescriptor and FontFile for deletion
     refsToDelete.add(fontDescriptorRef);

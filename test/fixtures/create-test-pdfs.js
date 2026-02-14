@@ -358,6 +358,108 @@ export async function createPdfWithAlphaImage() {
   return doc;
 }
 
+/**
+ * Create a PDF with a large DCTDecode (JPEG) image — 100x100 at quality 95.
+ * Large enough (40 KB RGBA) to exceed MIN_DECODED_SIZE, so re-encoding
+ * at a lower quality will produce smaller output.
+ */
+export async function createPdfWithLargeJpegImage() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  const width = 100;
+  const height = 100;
+  const rgbaData = new Uint8Array(width * height * 4);
+
+  // Smooth sine-wave pattern (photo-like, per project conventions)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const xf = x / width;
+      const yf = y / height;
+      rgbaData[idx]     = Math.round(127 + 127 * Math.sin(xf * 7.3 + yf * 2.1));
+      rgbaData[idx + 1] = Math.round(127 + 127 * Math.sin(yf * 5.7 + xf * 3.9));
+      rgbaData[idx + 2] = Math.round(127 + 127 * Math.sin((xf + yf) * 4.1));
+      rgbaData[idx + 3] = 255;
+    }
+  }
+
+  const jpegData = new Uint8Array(
+    jpegEncode({ data: rgbaData, width, height }, 95).data,
+  );
+
+  const imgDict = doc.context.obj({});
+  imgDict.set(PDFName.of('Type'), PDFName.of('XObject'));
+  imgDict.set(PDFName.of('Subtype'), PDFName.of('Image'));
+  imgDict.set(PDFName.of('Width'), doc.context.obj(width));
+  imgDict.set(PDFName.of('Height'), doc.context.obj(height));
+  imgDict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
+  imgDict.set(PDFName.of('BitsPerComponent'), doc.context.obj(8));
+  imgDict.set(PDFName.of('Filter'), PDFName.of('DCTDecode'));
+  imgDict.set(PDFName.of('Length'), doc.context.obj(jpegData.length));
+
+  const imgStream = PDFRawStream.of(imgDict, jpegData);
+  const imgRef = doc.context.register(imgStream);
+
+  const xobjectDict = doc.context.obj({});
+  xobjectDict.set(PDFName.of('Img0'), imgRef);
+  page.node.set(PDFName.of('Resources'), doc.context.obj({}));
+  page.node.get(PDFName.of('Resources')).set(PDFName.of('XObject'), xobjectDict);
+
+  return doc;
+}
+
+/**
+ * Create a PDF with a high-DPI DCTDecode (JPEG) image.
+ * 400x400 pixels on a 100x100pt page = ~288 DPI.
+ * Used to test downsampling of existing JPEG images.
+ */
+export async function createPdfWithHighDpiJpegImage() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([100, 100]);
+
+  const width = 400;
+  const height = 400;
+  const rgbaData = new Uint8Array(width * height * 4);
+
+  // Smooth sine-wave pattern (photo-like, per project conventions)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const xf = x / width;
+      const yf = y / height;
+      rgbaData[idx]     = Math.round(127 + 127 * Math.sin(xf * 7.3 + yf * 2.1));
+      rgbaData[idx + 1] = Math.round(127 + 127 * Math.sin(yf * 5.7 + xf * 3.9));
+      rgbaData[idx + 2] = Math.round(127 + 127 * Math.sin((xf + yf) * 4.1));
+      rgbaData[idx + 3] = 255;
+    }
+  }
+
+  const jpegData = new Uint8Array(
+    jpegEncode({ data: rgbaData, width, height }, 95).data,
+  );
+
+  const imgDict = doc.context.obj({});
+  imgDict.set(PDFName.of('Type'), PDFName.of('XObject'));
+  imgDict.set(PDFName.of('Subtype'), PDFName.of('Image'));
+  imgDict.set(PDFName.of('Width'), doc.context.obj(width));
+  imgDict.set(PDFName.of('Height'), doc.context.obj(height));
+  imgDict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
+  imgDict.set(PDFName.of('BitsPerComponent'), doc.context.obj(8));
+  imgDict.set(PDFName.of('Filter'), PDFName.of('DCTDecode'));
+  imgDict.set(PDFName.of('Length'), doc.context.obj(jpegData.length));
+
+  const imgStream = PDFRawStream.of(imgDict, jpegData);
+  const imgRef = doc.context.register(imgStream);
+
+  const xobjectDict = doc.context.obj({});
+  xobjectDict.set(PDFName.of('Img0'), imgRef);
+  page.node.set(PDFName.of('Resources'), doc.context.obj({}));
+  page.node.get(PDFName.of('Resources')).set(PDFName.of('XObject'), xobjectDict);
+
+  return doc;
+}
+
 // --- Font unembedding test fixtures ---
 
 /**
@@ -588,6 +690,100 @@ export async function createPdfWithContentStreamText() {
   resources.set(PDFName.of('Font'), fontsDict);
   page.node.set(PDFName.of('Resources'), resources);
   page.node.set(PDFName.of('Contents'), contentRef);
+
+  return doc;
+}
+
+/**
+ * Create a PDF with an embedded standard font that has a ToUnicode CMap.
+ * Used to verify that unembedding preserves ToUnicode for accessibility.
+ */
+export async function createPdfWithEmbeddedStandardFontAndToUnicode() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  // Create a fake FontFile2
+  const fontFileData = new Uint8Array(5000);
+  for (let i = 0; i < fontFileData.length; i++) fontFileData[i] = i % 256;
+  const fontFileCompressed = deflateSync(fontFileData, { level: 6 });
+
+  const fontFileDict = doc.context.obj({});
+  fontFileDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  fontFileDict.set(PDFName.of('Length'), doc.context.obj(fontFileCompressed.length));
+  fontFileDict.set(PDFName.of('Length1'), doc.context.obj(fontFileData.length));
+  const fontFileStream = PDFRawStream.of(fontFileDict, fontFileCompressed);
+  const fontFileRef = doc.context.register(fontFileStream);
+
+  // Create FontDescriptor
+  const fontDescriptor = doc.context.obj({});
+  fontDescriptor.set(PDFName.of('Type'), PDFName.of('FontDescriptor'));
+  fontDescriptor.set(PDFName.of('FontName'), PDFName.of('Helvetica'));
+  fontDescriptor.set(PDFName.of('Flags'), doc.context.obj(32));
+  fontDescriptor.set(PDFName.of('FontFile2'), fontFileRef);
+  const fontDescRef = doc.context.register(fontDescriptor);
+
+  // Create a ToUnicode CMap stream
+  const cmapText =
+    '/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n' +
+    '/CMapType 2 def\n1 begincodespacerange\n<00> <FF>\nendcodespacerange\n' +
+    '1 beginbfchar\n<66> <FB01>\nendbfchar\nendcmap\n' +
+    'CMapName currentdict /CMap defineresource pop\nend\nend';
+  const cmapBytes = new TextEncoder().encode(cmapText);
+  const cmapDict = doc.context.obj({});
+  cmapDict.set(PDFName.of('Length'), doc.context.obj(cmapBytes.length));
+  const cmapStream = PDFRawStream.of(cmapDict, cmapBytes);
+  const cmapRef = doc.context.register(cmapStream);
+
+  // Create Font dict with ToUnicode
+  const fontDict = doc.context.obj({});
+  fontDict.set(PDFName.of('Type'), PDFName.of('Font'));
+  fontDict.set(PDFName.of('Subtype'), PDFName.of('Type1'));
+  fontDict.set(PDFName.of('BaseFont'), PDFName.of('Helvetica'));
+  fontDict.set(PDFName.of('Encoding'), PDFName.of('WinAnsiEncoding'));
+  fontDict.set(PDFName.of('FontDescriptor'), fontDescRef);
+  fontDict.set(PDFName.of('ToUnicode'), cmapRef);
+  const fontRef = doc.context.register(fontDict);
+
+  const resources = doc.context.obj({});
+  const fontsDict = doc.context.obj({});
+  fontsDict.set(PDFName.of('F1'), fontRef);
+  resources.set(PDFName.of('Font'), fontsDict);
+  page.node.set(PDFName.of('Resources'), resources);
+
+  return doc;
+}
+
+/**
+ * Create a PDF with XMP metadata containing dc:language.
+ * Used to verify that /Lang is migrated from XMP before stripping.
+ */
+export async function createMetadataBloatPdfWithLang() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText('Lang Test', { x: 10, y: 100, size: 12, font });
+
+  doc.setTitle('Test Document');
+
+  // XMP with dc:language
+  const xmpData = new TextEncoder().encode(
+    '<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>' +
+      '<x:xmpmeta xmlns:x="adobe:ns:meta/">' +
+      '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"' +
+      ' xmlns:dc="http://purl.org/dc/elements/1.1/">' +
+      '<rdf:Description>' +
+      '<dc:language><rdf:Bag><rdf:li xml:lang="x-default">en-US</rdf:li>' +
+      '</rdf:Bag></dc:language>' +
+      '</rdf:Description>' +
+      '</rdf:RDF></x:xmpmeta><?xpacket end="w"?>',
+  );
+  const xmpDict = doc.context.obj({});
+  xmpDict.set(PDFName.of('Type'), PDFName.of('Metadata'));
+  xmpDict.set(PDFName.of('Subtype'), PDFName.of('XML'));
+  xmpDict.set(PDFName.of('Length'), doc.context.obj(xmpData.length));
+  const xmpStream = PDFRawStream.of(xmpDict, xmpData);
+  const xmpRef = doc.context.register(xmpStream);
+  doc.catalog.set(PDFName.of('Metadata'), xmpRef);
 
   return doc;
 }

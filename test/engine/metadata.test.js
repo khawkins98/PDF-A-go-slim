@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { PDFDocument, PDFName } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFString } from 'pdf-lib';
 import { stripMetadata } from '../../src/engine/optimize/metadata.js';
-import { createMetadataBloatPdf } from '../fixtures/create-test-pdfs.js';
+import { createMetadataBloatPdf, createMetadataBloatPdfWithLang } from '../fixtures/create-test-pdfs.js';
 
 describe('stripMetadata', () => {
   it('removes XMP metadata from catalog', async () => {
@@ -37,6 +37,35 @@ describe('stripMetadata', () => {
     // Title and author from /Info should still be accessible
     expect(doc.getTitle()).toBe('Test Document');
     expect(doc.getAuthor()).toBe('Test Author');
+  });
+
+  it('migrates dc:language from XMP to /Lang on catalog', async () => {
+    const doc = await createMetadataBloatPdfWithLang();
+
+    // /Lang should NOT be on catalog before stripping
+    expect(doc.catalog.get(PDFName.of('Lang'))).toBeUndefined();
+
+    stripMetadata(doc);
+
+    // XMP is gone
+    expect(doc.catalog.get(PDFName.of('Metadata'))).toBeUndefined();
+
+    // /Lang should now be set on catalog
+    const lang = doc.catalog.get(PDFName.of('Lang'));
+    expect(lang).toBeDefined();
+    expect(lang.decodeText()).toBe('en-US');
+  });
+
+  it('does not overwrite existing /Lang when stripping XMP', async () => {
+    const doc = await createMetadataBloatPdfWithLang();
+    // Pre-set a different /Lang
+    doc.catalog.set(PDFName.of('Lang'), PDFString.of('de'));
+
+    stripMetadata(doc);
+
+    // Original /Lang should be preserved, not overwritten
+    const lang = doc.catalog.get(PDFName.of('Lang'));
+    expect(lang.decodeText()).toBe('de');
   });
 
   it('produces a valid PDF after stripping', async () => {

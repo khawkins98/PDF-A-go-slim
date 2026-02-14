@@ -240,6 +240,26 @@ Works on mobile for quick single-file optimization. Batch features are desktop-f
 - [ ] Watch mode (Node)
 - [ ] WASM Ghostscript fallback
 
+## Accessibility & PDF/A Considerations
+
+PDF optimization can degrade accessibility. The following mitigations are in place and planned:
+
+### Already addressed
+
+- **ToUnicode CMap preservation** — `font-unembed.js` preserves `/ToUnicode` entries when replacing standard font dicts, so screen readers retain glyph-to-character mapping.
+- **Document language migration** — `metadata.js` extracts `dc:language` from XMP and sets `/Lang` on the catalog before stripping XMP, preserving the language tag for assistive technology.
+- **Dedup safety** — `dedup.js` only deduplicates `PDFRawStream` objects. Structure tree elements (`/StructElem`) are plain `PDFDict` objects and are never merged.
+
+### Future work
+
+| Item | Priority | Description |
+|------|----------|-------------|
+| **Tagged PDF detection** | P2 | Detect `/MarkInfo` and `/StructTreeRoot` on the catalog. When present, warn the user or skip aggressive passes (font unembedding, unreferenced removal) that could damage the accessibility tree. |
+| **PDF/A awareness** | P2 | PDF/A requires embedded fonts — font unembedding directly violates PDF/A. Detect PDF/A conformance level (via XMP `pdfaid:part`) and disable font-unembed for those files. |
+| **Structure tree protection** | P2 | Ensure `unreferenced.js` BFS traversal always reaches `/StructTreeRoot` and its descendants so tagged structure is never removed as orphaned. |
+| **XMP accessibility metadata** | P3 | Before stripping XMP, check for additional accessibility properties beyond language (e.g., `pdfuaid:part` for PDF/UA conformance) and preserve or migrate them. |
+| **Accessible PDF test suite** | P3 | Add test fixtures with tagged content, structure trees, and `/Lang` to verify accessibility data survives the full pipeline. |
+
 ## Learnings & Documentation
 
 Technical learnings, design decisions, and pitfalls encountered during development are captured in [`docs/learnings.md`](docs/learnings.md). This is a living document — update it whenever we discover something non-obvious about PDF internals, tooling trade-offs, or browser constraints.
