@@ -49,8 +49,8 @@ const VIEWER_CONFIG = {
 };
 
 /**
- * Build a compare <tr> for a result row.
- * @param {File} originalFile - The original PDF File object
+ * Build a preview <tr> for a result row showing the optimized PDF.
+ * @param {File} originalFile - The original PDF File object (kept for API compat)
  * @param {Blob} optimizedBlob - The optimized PDF as a Blob
  * @returns {HTMLTableRowElement}
  */
@@ -62,30 +62,28 @@ export function buildCompareRow(originalFile, optimizedBlob) {
 
   const toggleBtn = document.createElement('button');
   toggleBtn.className = 'compare-toggle';
-  toggleBtn.textContent = 'Compare';
+  toggleBtn.textContent = 'Preview';
   td.appendChild(toggleBtn);
 
   const viewerContainer = document.createElement('div');
-  viewerContainer.className = 'compare-viewers';
+  viewerContainer.className = 'compare-viewer-wrap';
   viewerContainer.hidden = true;
   td.appendChild(viewerContainer);
 
   tr.appendChild(td);
 
   let expanded = false;
-  let originalUrl = null;
-  let optimizedUrl = null;
+  let blobUrl = null;
 
   toggleBtn.addEventListener('click', async () => {
     if (expanded) {
-      // Collapse — destroy viewers and revoke URLs
+      // Collapse — destroy viewer and revoke URL
       destroyCompareViewers(viewerContainer);
       viewerContainer.hidden = true;
       viewerContainer.innerHTML = '';
-      toggleBtn.textContent = 'Compare';
+      toggleBtn.textContent = 'Preview';
       toggleBtn.classList.remove('toggle--open');
-      if (originalUrl) { URL.revokeObjectURL(originalUrl); activeBlobUrls.delete(originalUrl); originalUrl = null; }
-      if (optimizedUrl) { URL.revokeObjectURL(optimizedUrl); activeBlobUrls.delete(optimizedUrl); optimizedUrl = null; }
+      if (blobUrl) { URL.revokeObjectURL(blobUrl); activeBlobUrls.delete(blobUrl); blobUrl = null; }
       expanded = false;
       return;
     }
@@ -98,86 +96,44 @@ export function buildCompareRow(originalFile, optimizedBlob) {
       await loadPdfAGoGo();
     } catch (err) {
       viewerContainer.hidden = false;
-      viewerContainer.innerHTML = `<div class="compare-error">Could not load comparison viewer: ${err.message}</div>`;
-      toggleBtn.textContent = 'Compare';
+      viewerContainer.innerHTML = `<div class="compare-error">Could not load preview: ${err.message}</div>`;
+      toggleBtn.textContent = 'Preview';
       toggleBtn.disabled = false;
       return;
     }
 
-    originalUrl = URL.createObjectURL(originalFile);
-    optimizedUrl = URL.createObjectURL(optimizedBlob);
-    activeBlobUrls.add(originalUrl);
-    activeBlobUrls.add(optimizedUrl);
+    blobUrl = URL.createObjectURL(optimizedBlob);
+    activeBlobUrls.add(blobUrl);
 
     viewerContainer.innerHTML = '';
     viewerContainer.hidden = false;
 
-    const leftSide = buildSide('Original', formatSize(originalFile.size), originalUrl);
-    const rightSide = buildSide('Optimized', formatSize(optimizedBlob.size), optimizedUrl);
-    viewerContainer.appendChild(leftSide.el);
-    viewerContainer.appendChild(rightSide.el);
+    const header = document.createElement('div');
+    header.className = 'compare-side__label';
+    header.textContent = `Optimized \u2014 ${formatSize(optimizedBlob.size)}`;
+    viewerContainer.appendChild(header);
 
-    // Initialize viewers
+    const viewer = document.createElement('div');
+    viewer.className = 'compare-side__viewer pdfagogo-container';
+    viewer.dataset.pdfUrl = blobUrl;
+    viewerContainer.appendChild(viewer);
+
+    // Initialize viewer
     try {
       const pdfagogo = window.flipbook?.default || window.flipbook;
-      await pdfagogo.initializeContainer(leftSide.viewer, { pdfUrl: originalUrl, ...VIEWER_CONFIG });
-      await pdfagogo.initializeContainer(rightSide.viewer, { pdfUrl: optimizedUrl, ...VIEWER_CONFIG });
-
-      activeContainers.push(leftSide.viewer, rightSide.viewer);
-
-      // Scroll sync via 'seen' event with re-entrancy guard
-      let syncing = false;
-      const leftInstance = leftSide.viewer._pdfagogoInstance;
-      const rightInstance = rightSide.viewer._pdfagogoInstance;
-
-      if (leftInstance && rightInstance) {
-        const leftViewer = leftSide.viewer.pdfViewer;
-        const rightViewer = rightSide.viewer.pdfViewer;
-
-        if (leftViewer && rightViewer) {
-          leftViewer.on('seen', (pageNum) => {
-            if (syncing) return;
-            syncing = true;
-            rightViewer.go_to_page(pageNum - 1);
-            syncing = false;
-          });
-
-          rightViewer.on('seen', (pageNum) => {
-            if (syncing) return;
-            syncing = true;
-            leftViewer.go_to_page(pageNum - 1);
-            syncing = false;
-          });
-        }
-      }
+      await pdfagogo.initializeContainer(viewer, { pdfUrl: blobUrl, ...VIEWER_CONFIG });
+      activeContainers.push(viewer);
     } catch (err) {
       viewerContainer.innerHTML = `<div class="compare-error">Error initializing viewer: ${err.message}</div>`;
     }
 
-    toggleBtn.textContent = 'Hide comparison';
+    toggleBtn.textContent = 'Hide preview';
     toggleBtn.classList.add('toggle--open');
     toggleBtn.disabled = false;
     expanded = true;
   });
 
   return tr;
-}
-
-function buildSide(label, sizeText, url) {
-  const el = document.createElement('div');
-  el.className = 'compare-side';
-
-  const header = document.createElement('div');
-  header.className = 'compare-side__label';
-  header.textContent = `${label} \u2014 ${sizeText}`;
-  el.appendChild(header);
-
-  const viewer = document.createElement('div');
-  viewer.className = 'compare-side__viewer pdfagogo-container';
-  viewer.dataset.pdfUrl = url;
-  el.appendChild(viewer);
-
-  return { el, viewer };
 }
 
 function destroyCompareViewers(container) {
@@ -207,13 +163,13 @@ export function destroyAllComparisons() {
   }
   activeBlobUrls.clear();
 
-  // Also collapse any open compare viewers in the DOM
-  document.querySelectorAll('.compare-viewers').forEach((el) => {
+  // Also collapse any open viewers in the DOM
+  document.querySelectorAll('.compare-viewer-wrap').forEach((el) => {
     el.hidden = true;
     el.innerHTML = '';
   });
   document.querySelectorAll('.compare-toggle.toggle--open').forEach((btn) => {
-    btn.textContent = 'Compare';
+    btn.textContent = 'Preview';
     btn.classList.remove('toggle--open');
   });
 }

@@ -1074,16 +1074,11 @@ header h1 {
   cursor: wait;
 }
 
-.compare-viewers {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+.compare-viewer-wrap {
   padding: 0.5rem 0.75rem 0.75rem;
-}
-
-.compare-side {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  margin: 0.3rem 0.75rem 0.5rem;
   overflow: hidden;
 }
 
@@ -1094,10 +1089,11 @@ header h1 {
   font-weight: 600;
   color: var(--color-text-muted);
   border-bottom: 1px solid var(--color-border);
+  margin: -0.5rem -0.75rem 0;
 }
 
 .compare-side__viewer {
-  height: 500px;
+  height: 700px;
   position: relative;
 }
 
@@ -1109,11 +1105,7 @@ header h1 {
 }
 
 @media (max-width: 640px) {
-  .compare-viewers {
-    grid-template-columns: 1fr;
-  }
-
   .compare-side__viewer {
-    height: 350px;
+    height: 450px;
   }
 }
