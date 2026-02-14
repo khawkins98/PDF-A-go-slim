@@ -67,7 +67,7 @@ export async function optimize(inputBytes, options = {}, onProgress) {
   stats.inspect = { before: inspectBefore, after: inspectAfter };
 
   const outputBytes = await pdfDoc.save({
-    useObjectStreams: true,
+    useObjectStreams: !(pdfTraits.isPdfA && pdfTraits.pdfALevel?.startsWith('1')),
     addDefaultPage: false,
     updateFieldAppearances: false,
   });

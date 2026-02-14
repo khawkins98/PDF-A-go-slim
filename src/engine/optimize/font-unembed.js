@@ -103,9 +103,9 @@ export function unembedStandardFonts(pdfDoc, options = {}) {
     return { unembedded: 0, skipped: 0 };
   }
 
-  // PDF/A requires all fonts to be embedded — skip this pass entirely
-  if (_pdfTraits?.isPdfA) {
-    return { unembedded: 0, skipped: 0, pdfaSkipped: true };
+  // PDF/A and PDF/UA require all fonts to be embedded — skip this pass entirely
+  if (_pdfTraits?.isPdfA || _pdfTraits?.isPdfUA) {
+    return { unembedded: 0, skipped: 0, pdfaSkipped: _pdfTraits?.isPdfA || false, pdfuaSkipped: _pdfTraits?.isPdfUA || false };
   }
 
   // Collect refs to delete after processing (FontDescriptor, FontFile streams)

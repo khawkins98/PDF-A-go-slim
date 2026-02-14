@@ -984,6 +984,82 @@ export async function createPdfAWithBloat() {
   return doc;
 }
 
+/**
+ * Create a PDF/A-2b document with conformance declared in XMP metadata.
+ * PDF/A-2 (based on PDF 1.7) allows object streams, unlike PDF/A-1.
+ */
+export async function createPdfA2Pdf() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  doc.setTitle('PDF/A-2 Test');
+
+  // XMP with pdfaid:part=2, pdfaid:conformance=B
+  const xmpData = new TextEncoder().encode(
+    '<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>' +
+      '<x:xmpmeta xmlns:x="adobe:ns:meta/">' +
+      '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"' +
+      ' xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/">' +
+      '<rdf:Description rdf:about="">' +
+      '<pdfaid:part>2</pdfaid:part>' +
+      '<pdfaid:conformance>B</pdfaid:conformance>' +
+      '</rdf:Description>' +
+      '</rdf:RDF></x:xmpmeta><?xpacket end="w"?>',
+  );
+  const xmpDict = doc.context.obj({});
+  xmpDict.set(PDFName.of('Type'), PDFName.of('Metadata'));
+  xmpDict.set(PDFName.of('Subtype'), PDFName.of('XML'));
+  xmpDict.set(PDFName.of('Length'), doc.context.obj(xmpData.length));
+  const xmpStream = PDFRawStream.of(xmpDict, xmpData);
+  const xmpRef = doc.context.register(xmpStream);
+  doc.catalog.set(PDFName.of('Metadata'), xmpRef);
+
+  return doc;
+}
+
+/**
+ * Create a PDF/UA document with an embedded standard font.
+ * Used to verify that font-unembed skips PDF/UA files.
+ */
+export async function createPdfUAWithEmbeddedFont() {
+  const doc = await createPdfUAPdf();
+
+  const page = doc.getPage(0);
+  const fontFileData = new Uint8Array(5000);
+  for (let i = 0; i < fontFileData.length; i++) fontFileData[i] = i % 256;
+  const fontFileCompressed = deflateSync(fontFileData, { level: 6 });
+
+  const fontFileDict = doc.context.obj({});
+  fontFileDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  fontFileDict.set(PDFName.of('Length'), doc.context.obj(fontFileCompressed.length));
+  fontFileDict.set(PDFName.of('Length1'), doc.context.obj(fontFileData.length));
+  const fontFileStream = PDFRawStream.of(fontFileDict, fontFileCompressed);
+  const fontFileRef = doc.context.register(fontFileStream);
+
+  const fontDescriptor = doc.context.obj({});
+  fontDescriptor.set(PDFName.of('Type'), PDFName.of('FontDescriptor'));
+  fontDescriptor.set(PDFName.of('FontName'), PDFName.of('Helvetica'));
+  fontDescriptor.set(PDFName.of('Flags'), doc.context.obj(32));
+  fontDescriptor.set(PDFName.of('FontFile2'), fontFileRef);
+  const fontDescRef = doc.context.register(fontDescriptor);
+
+  const fontDict = doc.context.obj({});
+  fontDict.set(PDFName.of('Type'), PDFName.of('Font'));
+  fontDict.set(PDFName.of('Subtype'), PDFName.of('Type1'));
+  fontDict.set(PDFName.of('BaseFont'), PDFName.of('Helvetica'));
+  fontDict.set(PDFName.of('Encoding'), PDFName.of('WinAnsiEncoding'));
+  fontDict.set(PDFName.of('FontDescriptor'), fontDescRef);
+  const fontRef = doc.context.register(fontDict);
+
+  const resources = doc.context.obj({});
+  const fontsDict = doc.context.obj({});
+  fontsDict.set(PDFName.of('F1'), fontRef);
+  resources.set(PDFName.of('Font'), fontsDict);
+  page.node.set(PDFName.of('Resources'), resources);
+
+  return doc;
+}
+
 export async function createPdfWithNonStandardFont() {
   const doc = await PDFDocument.create();
   const page = doc.addPage([200, 200]);

@@ -5,6 +5,7 @@ import { optimize } from '../../src/engine/pipeline.js';
 import {
   createTaggedPdf,
   createPdfAPdf,
+  createPdfA2Pdf,
   createPdfAWithEmbeddedFont,
 } from '../fixtures/create-test-pdfs.js';
 
@@ -238,5 +239,62 @@ describe('optimize pipeline', () => {
     expect(unembedPass).toBeDefined();
     expect(unembedPass.pdfaSkipped).toBe(true);
     expect(unembedPass.unembedded).toBe(0);
+  });
+
+  it('disables object streams for PDF/A-1', async () => {
+    // Create a PDF/A-1b fixture with enough bloat that optimization
+    // still reduces size even without object streams (avoiding size guard)
+    const doc = await createPdfAPdf(); // PDF/A-1b
+    for (let i = 0; i < 5; i++) {
+      const data = new Uint8Array(1000);
+      for (let j = 0; j < data.length; j++) data[j] = (i + j) % 256;
+      const dict = doc.context.obj({});
+      dict.set(PDFName.of('Length'), doc.context.obj(data.length));
+      doc.context.register(PDFRawStream.of(dict, data));
+    }
+
+    const inputBytes = new Uint8Array(await doc.save({ useObjectStreams: false }));
+
+    const { output, stats } = await optimize(inputBytes);
+
+    expect(stats.pdfTraits.isPdfA).toBe(true);
+    expect(stats.pdfTraits.pdfALevel).toBe('1B');
+    expect(stats.sizeGuard).toBeUndefined();
+
+    // Verify output is a valid PDF that can be reloaded
+    const reloaded = await PDFDocument.load(output);
+    expect(reloaded.getPageCount()).toBe(1);
+
+    // PDF/A-1 output should NOT contain object streams.
+    const outputText = new TextDecoder('latin1').decode(output);
+    expect(outputText).not.toContain('/Type /ObjStm');
+  });
+
+  it('enables object streams for PDF/A-2', async () => {
+    // Same bloat pattern, but PDF/A-2 should still use object streams
+    const doc = await createPdfA2Pdf(); // PDF/A-2b
+    for (let i = 0; i < 5; i++) {
+      const data = new Uint8Array(1000);
+      for (let j = 0; j < data.length; j++) data[j] = (i + j) % 256;
+      const dict = doc.context.obj({});
+      dict.set(PDFName.of('Length'), doc.context.obj(data.length));
+      doc.context.register(PDFRawStream.of(dict, data));
+    }
+
+    const inputBytes = new Uint8Array(await doc.save({ useObjectStreams: false }));
+
+    const { output, stats } = await optimize(inputBytes);
+
+    expect(stats.pdfTraits.isPdfA).toBe(true);
+    expect(stats.pdfTraits.pdfALevel).toBe('2B');
+    expect(stats.sizeGuard).toBeUndefined();
+
+    // Verify output is valid
+    const reloaded = await PDFDocument.load(output);
+    expect(reloaded.getPageCount()).toBe(1);
+
+    // PDF/A-2 should still use object streams for better compression.
+    const outputText = new TextDecoder('latin1').decode(output);
+    expect(outputText).toContain('/Type /ObjStm');
   });
 });

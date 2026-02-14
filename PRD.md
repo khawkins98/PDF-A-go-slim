@@ -254,14 +254,14 @@ PDF optimization can degrade accessibility. The following mitigations are in pla
 - **PDF/A awareness** — Pipeline auto-detects PDF/A conformance level (via XMP `pdfaid:part`) and disables font unembedding and XMP stripping for PDF/A files. Bloat keys are still stripped.
 - **Structure tree protection** — Confirmed via tests that `unreferenced.js` BFS traversal reaches `/StructTreeRoot` and its descendants through the catalog. Tagged structure is never removed as orphaned.
 - **XMP accessibility metadata** — `parseConformanceFromXmp()` detects `pdfuaid:part` (PDF/UA) and `pdfaid:part`/`pdfaid:conformance` (PDF/A). XMP is preserved for PDF/A files.
-- **Accessible PDF test suite** — Test fixtures for tagged PDFs, PDF/A-1b, PDF/UA, and tagged PDFs with orphans. End-to-end pipeline tests verify accessibility data survives optimization.
+- **Accessible PDF test suite** — Test fixtures for tagged PDFs, PDF/A-1b, PDF/A-2b, PDF/UA, and tagged PDFs with orphans. End-to-end pipeline tests verify accessibility data survives optimization.
+- **PDF/A-1 object stream protection** — Pipeline conditionally disables `useObjectStreams` when `pdfALevel` starts with `1`, preserving strict PDF/A-1 conformance. PDF/A-2+ files still use object streams for better compression.
+- **PDF/UA font protection** — Font unembedding is blocked for PDF/UA documents (`isPdfUA` triggers skip), matching the PDF/A behavior. Ensures all fonts remain embedded as required by ISO 14289.
 
 ### Future work
 
 | Item | Priority | Description |
 |------|----------|-------------|
-| **PDF/A-1 object stream restriction** | P2 | PDF/A-1 (based on PDF 1.4) prohibits object streams, but the pipeline saves with `useObjectStreams: true`. This could break strict PDF/A-1 conformance. Should conditionally disable object streams when `pdfALevel` starts with `1`. PDF/A-2+ allows object streams and is unaffected. |
-| **PDF/UA font protection** | P2 | PDF/UA (ISO 14289) also requires all fonts to be embedded. Currently only PDF/A triggers the font-unembed skip — PDF/UA should too. |
 | **UI accessibility warnings** | P3 | Surface `pdfTraits` in the results UI to warn users when they're optimizing tagged/PDF-A/PDF-UA documents. Show the detected conformance level (e.g., "PDF/A-1b detected — font unembedding and XMP removal disabled"). |
 
 ## Learnings & Documentation

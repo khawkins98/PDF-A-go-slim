@@ -147,7 +147,7 @@ Within each level, conformance 'a' requires tagged structure (StructTreeRoot, Ma
 - Removing XMP metadata — **blocked** for PDF/A (the `pdfaid:` declaration itself lives in XMP)
 - Using `useObjectStreams: true` for PDF/A-1 — **known limitation** (see below)
 
-**Known limitation — object streams and PDF/A-1:** Our pipeline saves with `useObjectStreams: true` for better compression. PDF/A-2+ allows object streams, but PDF/A-1 (based on PDF 1.4) does not. This means a PDF/A-1 file will lose strict conformance after optimization. Fixing this requires conditionally disabling object streams when `pdfALevel` starts with `1`. Tracked as future work.
+**Object streams and PDF/A-1 (resolved):** PDF/A-1 (based on PDF 1.4) prohibits object streams. The pipeline now conditionally disables `useObjectStreams` when `pdfALevel` starts with `1`. PDF/A-2+ files still benefit from object stream compression.
 
 ### PDF/UA Requirements
 
@@ -158,7 +158,7 @@ PDF/UA (ISO 14289) governs universal accessibility. Key requirements:
 - Logical reading order via depth-first traversal of the structure tree
 - Images and graphics require `/Alt` or `/ActualText` attributes
 
-Currently PDF/UA detection is informational only (`stats.pdfTraits.isPdfUA`). Font unembedding should also be blocked for PDF/UA — tracked as future work.
+Font unembedding is blocked for PDF/UA documents, matching the PDF/A behavior. The pass returns `pdfuaSkipped: true` when `_pdfTraits.isPdfUA` is set.
 
 ### Accessibility Impact of Optimization
 
