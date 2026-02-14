@@ -114,6 +114,7 @@ All passes receive an `options` object. Each pass checks its own flags and ignor
 {
   lossy: false,                  // Master switch for lossy optimizations (default off)
   imageQuality: 0.85,            // JPEG quality 0-1 (only when lossy=true)
+  maxImageDpi: undefined,        // Downsample images above this DPI (only when lossy=true)
   unembedStandardFonts: true,    // Remove embedded base-14 fonts (default on, lossless)
 }
 ```
@@ -215,15 +216,15 @@ Works on mobile for quick single-file optimization. Batch features are desktop-f
 
 ### P1 — Enhanced (in progress)
 - [x] Image recompression (FlateDecode → JPEG via jpeg-js, lossy opt-in)
+- [x] Image downsampling (area-average box filter, DPI-aware via page map; Web=150, Print=300)
 - [x] Standard font unembedding (14 base fonts, Type1/TrueType only)
 - [x] Optimization presets (Lossless / Web / Print) with UI controls
 - [x] Optimization summary (per-pass stats in expandable detail rows)
-- [ ] Image downsampling (DPI reduction)
+- [x] Re-optimize button (re-run with different settings from results screen)
+- [x] Credits & attribution (footer with package links)
 - [ ] Font subsetting
 - [ ] Linearization
 - [ ] Side-by-side preview (via PDF-A-go-go)
-- [ ] Re-optimize button (re-run with different settings from results screen)
-- [ ] Credits & attribution (footer/about with package links)
 
 ### P2 — Power User
 - [ ] Object inspector
