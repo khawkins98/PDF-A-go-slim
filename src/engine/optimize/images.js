@@ -1,13 +1,25 @@
 /**
  * Image recompression pass.
  *
- * Converts eligible FlateDecode raster images to JPEG.
+ * Converts eligible FlateDecode raster images to JPEG and re-encodes
+ * existing DCTDecode (JPEG) images at the target quality/DPI.
  * Only active when options.lossy is true.
- * Skips: DCT/JPX (already JPEG), SMask (alpha), CMYK, non-8-bit,
+ * Skips: JPX (JPEG2000), SMask (alpha), CMYK, non-8-bit,
  * non-simple ColorSpace, ImageMask, small images.
  */
+// jpeg-js encoder uses Buffer.from() to wrap its output. In a Vite-bundled
+// Web Worker, `typeof module !== 'undefined'` (due to ESM shimming) so the
+// encoder skips its Uint8Array path and calls Buffer.from(), which doesn't
+// exist in browsers. Provide a minimal shim before importing.
+if (typeof globalThis.Buffer === 'undefined') {
+  globalThis.Buffer = {
+    from: (arr) => new Uint8Array(arr),
+    alloc: (size) => new Uint8Array(size),
+  };
+}
+
 import { PDFName, PDFRawStream, PDFArray, PDFDict, PDFRef } from 'pdf-lib';
-import { encode as jpegEncode } from 'jpeg-js';
+import { encode as jpegEncode, decode as jpegDecode } from 'jpeg-js';
 import { decodeStream, allFiltersDecodable, undoPngPrediction, getFilterNames } from '../utils/stream-decode.js';
 
 /**
@@ -193,15 +205,17 @@ function downsampleArea(rgba, srcW, srcH, dstW, dstH) {
  * @returns {{ converted: number, skipped: number, downsampled: number }}
  */
 export function recompressImages(pdfDoc, options = {}) {
-  const { lossy = false, imageQuality = 0.85, maxImageDpi } = options;
+  const { lossy = false, imageQuality = 0.85, maxImageDpi, debug = false } = options;
   const context = pdfDoc.context;
   let converted = 0;
   let skipped = 0;
   let downsampled = 0;
+  const debugLog = debug ? [] : null;
+  const skipReasons = debug ? { imageMask: 0, smask: 0, jpx: 0, filters: 0, bpc: 0, colorspace: 0, dimensions: 0, smallImage: 0, sizeGuard: 0, error: 0 } : null;
 
   // If lossy mode is off, skip everything
   if (!lossy) {
-    return { converted: 0, skipped: 0, downsampled: 0 };
+    return { converted: 0, skipped: 0, downsampled: 0, ...(debug && { _debug: [], skipReasons: {} }) };
   }
 
   const quality = Math.round(Math.max(1, Math.min(100, imageQuality * 100)));
@@ -221,127 +235,155 @@ export function recompressImages(pdfDoc, options = {}) {
     // Skip ImageMask
     const imageMask = dict.get(PDFName.of('ImageMask'));
     if (imageMask && imageMask.toString() === 'true') {
+      if (debugLog) { debugLog.push({ ref: ref.toString(), action: 'skip', reason: 'ImageMask' }); skipReasons.imageMask++; }
       skipped++;
       continue;
     }
 
     // Skip images with SMask (alpha channel)
     if (dict.get(PDFName.of('SMask'))) {
+      if (debugLog) { debugLog.push({ ref: ref.toString(), action: 'skip', reason: 'SMask' }); skipReasons.smask++; }
       skipped++;
       continue;
     }
 
-    // Check filters — skip if already DCT/JPX
+    // Check filters
     const filters = getFilterNames(dict);
+    let isDCT = false;
     if (filters) {
-      const hasImageNative = filters.some(
-        (f) => f === 'DCTDecode' || f === 'DCT' || f === 'JPXDecode',
-      );
-      if (hasImageNative) {
+      // JPXDecode (JPEG2000) — jpeg-js can't decode it
+      if (filters.some((f) => f === 'JPXDecode')) {
+        if (debugLog) { debugLog.push({ ref: ref.toString(), action: 'skip', reason: 'JPXDecode' }); skipReasons.jpx++; }
+        skipped++;
+        continue;
+      }
+      // DCTDecode — we can decode and re-encode at target quality
+      isDCT = filters.some((f) => f === 'DCTDecode' || f === 'DCT');
+      // Non-DCT: check that all filters are decodable
+      if (!isDCT && !allFiltersDecodable(filters)) {
+        if (debugLog) { debugLog.push({ ref: ref.toString(), action: 'skip', reason: 'non-decodable filters', filters }); skipReasons.filters++; }
         skipped++;
         continue;
       }
     }
 
-    // Skip if filters aren't decodable
-    if (filters && !allFiltersDecodable(filters)) {
-      skipped++;
-      continue;
-    }
+    // For non-DCT images, verify BPC and colorspace (jpeg-js handles DCT internally)
+    let components = 3;
+    if (!isDCT) {
+      const bpc = getNumericValue(dict, 'BitsPerComponent');
+      if (bpc !== undefined && bpc !== 8) {
+        if (debugLog) { debugLog.push({ ref: ref.toString(), action: 'skip', reason: 'BPC', bpc }); skipReasons.bpc++; }
+        skipped++;
+        continue;
+      }
 
-    // Must be 8-bit
-    const bpc = getNumericValue(dict, 'BitsPerComponent');
-    if (bpc !== undefined && bpc !== 8) {
-      skipped++;
-      continue;
-    }
-
-    // Must have a simple color space
-    const colorSpace = getSimpleColorSpace(dict);
-    if (!colorSpace) {
-      skipped++;
-      continue;
+      const colorSpace = getSimpleColorSpace(dict);
+      if (!colorSpace) {
+        if (debugLog) { debugLog.push({ ref: ref.toString(), action: 'skip', reason: 'colorspace', value: dict.get(PDFName.of('ColorSpace'))?.toString() }); skipReasons.colorspace++; }
+        skipped++;
+        continue;
+      }
+      components = colorSpace === 'DeviceRGB' ? 3 : 1;
     }
 
     const width = getNumericValue(dict, 'Width');
     const height = getNumericValue(dict, 'Height');
     if (!width || !height) {
+      if (debugLog) { debugLog.push({ ref: ref.toString(), action: 'skip', reason: 'no dimensions' }); skipReasons.dimensions++; }
       skipped++;
       continue;
     }
 
-    const components = colorSpace === 'DeviceRGB' ? 3 : 1;
-
     try {
       const rawBytes = obj.contents;
+      let rgbaData;
+      let outWidth = width;
+      let outHeight = height;
 
-      // Decode through filter pipeline
-      let decoded = filters ? decodeStream(rawBytes, filters) : rawBytes;
+      if (isDCT) {
+        // Decode JPEG to get raw pixel data
+        const jpegResult = jpegDecode(rawBytes, { useTArray: true });
+        rgbaData = jpegResult.data;
+        // Use decoded dimensions (more reliable than dict for JPEG)
+        outWidth = jpegResult.width;
+        outHeight = jpegResult.height;
 
-      // Check DecodeParms for PNG prediction
-      const decodeParms = getDecodeParms(dict);
-      if (decodeParms) {
-        const predictor = getNumericValue(decodeParms, 'Predictor');
-        if (predictor && predictor >= 10) {
-          const columns =
-            getNumericValue(decodeParms, 'Columns') || width;
-          const colors =
-            getNumericValue(decodeParms, 'Colors') || components;
-          const bitsPerComp =
-            getNumericValue(decodeParms, 'BitsPerComponent') || 8;
-          const bytesPerPixel = (colors * bitsPerComp) / 8;
-          decoded = undoPngPrediction(decoded, columns, bytesPerPixel);
-        }
-      }
-
-      // Skip small images
-      if (decoded.length < MIN_DECODED_SIZE) {
-        skipped++;
-        continue;
-      }
-
-      // Convert to RGBA for jpeg-js
-      const pixelCount = width * height;
-      let rgbaData = new Uint8Array(pixelCount * 4);
-
-      if (components === 3) {
-        // RGB → RGBA
-        for (let i = 0; i < pixelCount; i++) {
-          rgbaData[i * 4] = decoded[i * 3];
-          rgbaData[i * 4 + 1] = decoded[i * 3 + 1];
-          rgbaData[i * 4 + 2] = decoded[i * 3 + 2];
-          rgbaData[i * 4 + 3] = 255;
+        // Skip small images
+        if (rgbaData.length < MIN_DECODED_SIZE) {
+          if (debugLog) { debugLog.push({ ref: ref.toString(), action: 'skip', reason: 'small image (DCT)', decodedSize: rgbaData.length }); skipReasons.smallImage++; }
+          skipped++;
+          continue;
         }
       } else {
-        // Gray → RGBA
-        for (let i = 0; i < pixelCount; i++) {
-          rgbaData[i * 4] = decoded[i];
-          rgbaData[i * 4 + 1] = decoded[i];
-          rgbaData[i * 4 + 2] = decoded[i];
-          rgbaData[i * 4 + 3] = 255;
+        // Decode through filter pipeline
+        let decoded = filters ? decodeStream(rawBytes, filters) : rawBytes;
+
+        // Check DecodeParms for PNG prediction
+        const decodeParms = getDecodeParms(dict);
+        if (decodeParms) {
+          const predictor = getNumericValue(decodeParms, 'Predictor');
+          if (predictor && predictor >= 10) {
+            const columns =
+              getNumericValue(decodeParms, 'Columns') || width;
+            const colors =
+              getNumericValue(decodeParms, 'Colors') || components;
+            const bitsPerComp =
+              getNumericValue(decodeParms, 'BitsPerComponent') || 8;
+            const bytesPerPixel = (colors * bitsPerComp) / 8;
+            decoded = undoPngPrediction(decoded, columns, bytesPerPixel);
+          }
+        }
+
+        // Skip small images
+        if (decoded.length < MIN_DECODED_SIZE) {
+          if (debugLog) { debugLog.push({ ref: ref.toString(), action: 'skip', reason: 'small image', decodedSize: decoded.length }); skipReasons.smallImage++; }
+          skipped++;
+          continue;
+        }
+
+        // Convert to RGBA for jpeg-js
+        const pixelCount = width * height;
+        rgbaData = new Uint8Array(pixelCount * 4);
+
+        if (components === 3) {
+          // RGB → RGBA
+          for (let i = 0; i < pixelCount; i++) {
+            rgbaData[i * 4] = decoded[i * 3];
+            rgbaData[i * 4 + 1] = decoded[i * 3 + 1];
+            rgbaData[i * 4 + 2] = decoded[i * 3 + 2];
+            rgbaData[i * 4 + 3] = 255;
+          }
+        } else {
+          // Gray → RGBA
+          for (let i = 0; i < pixelCount; i++) {
+            rgbaData[i * 4] = decoded[i];
+            rgbaData[i * 4 + 1] = decoded[i];
+            rgbaData[i * 4 + 2] = decoded[i];
+            rgbaData[i * 4 + 3] = 255;
+          }
         }
       }
 
       // Downsample if above target DPI
-      let outWidth = width;
-      let outHeight = height;
+      const imgW = outWidth;
+      const imgH = outHeight;
       let didDownsample = false;
 
       if (pageMap && maxImageDpi) {
         const refStr = ref.toString();
         const pageDims = pageMap.get(refStr);
         if (pageDims) {
-          const dpiX = (width * 72) / pageDims.w;
-          const dpiY = (height * 72) / pageDims.h;
+          const dpiX = (imgW * 72) / pageDims.w;
+          const dpiY = (imgH * 72) / pageDims.h;
           const effectiveDpi = Math.min(dpiX, dpiY);
 
           if (effectiveDpi > maxImageDpi) {
             const scale = maxImageDpi / effectiveDpi;
-            const newW = Math.max(1, Math.round(width * scale));
-            const newH = Math.max(1, Math.round(height * scale));
+            const newW = Math.max(1, Math.round(imgW * scale));
+            const newH = Math.max(1, Math.round(imgH * scale));
 
-            if (newW < width && newH < height) {
-              rgbaData = downsampleArea(rgbaData, width, height, newW, newH);
+            if (newW < imgW && newH < imgH) {
+              rgbaData = downsampleArea(rgbaData, imgW, imgH, newW, newH);
               outWidth = newW;
               outHeight = newH;
               didDownsample = true;
@@ -350,17 +392,20 @@ export function recompressImages(pdfDoc, options = {}) {
         }
       }
 
-      const jpegResult = jpegEncode(
+      const encodedResult = jpegEncode(
         { data: rgbaData, width: outWidth, height: outHeight },
         quality,
       );
-      const jpegBytes = new Uint8Array(jpegResult.data);
+      const jpegBytes = new Uint8Array(encodedResult.data);
 
       // Only replace if JPEG is smaller
       if (jpegBytes.length >= rawBytes.length) {
+        if (debugLog) { debugLog.push({ ref: ref.toString(), action: 'skip', reason: 'size guard', beforeSize: rawBytes.length, afterSize: jpegBytes.length }); skipReasons.sizeGuard++; }
         skipped++;
         continue;
       }
+
+      if (debugLog) { debugLog.push({ ref: ref.toString(), action: 'convert', beforeSize: rawBytes.length, afterSize: jpegBytes.length, width: outWidth, height: outHeight, didDownsample }); }
 
       // Update the stream
       const newStream = PDFRawStream.of(dict, jpegBytes);
@@ -377,10 +422,11 @@ export function recompressImages(pdfDoc, options = {}) {
 
       context.assign(ref, newStream);
       converted++;
-    } catch {
+    } catch (err) {
+      if (debugLog) { debugLog.push({ ref: ref.toString(), action: 'skip', reason: 'error', message: err.message }); skipReasons.error++; }
       skipped++;
     }
   }
 
-  return { converted, skipped, downsampled };
+  return { converted, skipped, downsampled, ...(debugLog && { _debug: debugLog, skipReasons }) };
 }

@@ -12,6 +12,7 @@ A browser-based PDF optimization tool that reduces file size entirely client-sid
 - **Object inspector** — before/after breakdown of PDF objects by category (fonts, images, page content, metadata, document structure, other data) with proportional size bars, per-item diffs, sub-grouped "Other Data", and collapsible lists
 - **Privacy-first** — files never leave your browser; all processing runs in a Web Worker
 - **Batch capable** — optimize multiple PDFs at once with individual or bulk download
+- **Debug mode** — add `?debug` to the URL to see per-pass timing, image skip reason breakdowns, and per-image conversion details
 
 ## Quick Start
 

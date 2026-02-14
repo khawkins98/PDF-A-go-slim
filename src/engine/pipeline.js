@@ -49,8 +49,9 @@ export async function optimize(inputBytes, options = {}, onProgress) {
     if (onProgress) onProgress((i + 0.5) / PASSES.length, name);
 
     try {
+      const t0 = Date.now();
       const passStats = await fn(pdfDoc, options);
-      stats.passes.push({ name, ...passStats });
+      stats.passes.push({ name, _ms: Date.now() - t0, ...passStats });
     } catch (err) {
       stats.passes.push({ name, error: err.message });
     }
