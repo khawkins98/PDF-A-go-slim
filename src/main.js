@@ -93,6 +93,7 @@ function collectOptions() {
     maxImageDpi: lossy && dpiVal > 0 ? dpiVal : undefined,
     unembedStandardFonts: unembedCheckbox.checked,
     subsetFonts: subsetCheckbox.checked,
+    debug: new URLSearchParams(window.location.search).has('debug'),
   };
 }
 
@@ -226,7 +227,7 @@ function formatPassStats(passStats) {
   if (rest.recompressed != null && rest.recompressed > 0)
     parts.push(`${rest.recompressed} stream${rest.recompressed !== 1 ? 's' : ''} recompressed`);
   if (rest.converted != null && rest.converted > 0)
-    parts.push(`${rest.converted} image${rest.converted !== 1 ? 's' : ''} converted to JPEG`);
+    parts.push(`${rest.converted} image${rest.converted !== 1 ? 's' : ''} recompressed`);
   if (rest.downsampled != null && rest.downsampled > 0)
     parts.push(`${rest.downsampled} image${rest.downsampled !== 1 ? 's' : ''} downsampled`);
   if (rest.unembedded != null && rest.unembedded > 0)
@@ -443,6 +444,87 @@ function buildInspectPanel(stats) {
   </div>`;
 }
 
+// --- Debug panel ---
+function buildDebugPanel(stats) {
+  if (!stats?.passes) return null;
+
+  // Per-pass timing table
+  const timingRows = stats.passes.map((p) => {
+    const ms = p._ms != null ? `${p._ms} ms` : '—';
+    const err = p.error ? ` <span style="color:var(--color-error)">(error)</span>` : '';
+    return `<tr><td>${escapeHtml(p.name)}</td><td style="text-align:right">${ms}${err}</td></tr>`;
+  }).join('');
+
+  const totalMs = stats.passes.reduce((s, p) => s + (p._ms || 0), 0);
+
+  let html = `<table class="debug-table">
+    <thead><tr><th>Pass</th><th style="text-align:right">Time</th></tr></thead>
+    <tbody>${timingRows}
+      <tr style="font-weight:600"><td>Total</td><td style="text-align:right">${totalMs} ms</td></tr>
+    </tbody>
+  </table>`;
+
+  // Image debug details (from images pass)
+  const imagesPass = stats.passes.find((p) => p._debug);
+  if (imagesPass) {
+    const { skipReasons, _debug } = imagesPass;
+
+    if (skipReasons && Object.values(skipReasons).some((v) => v > 0)) {
+      const reasonRows = Object.entries(skipReasons)
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td style="text-align:right">${v}</td></tr>`)
+        .join('');
+      html += `<h4 style="margin-top:0.75rem">Image skip reasons</h4>
+        <table class="debug-table">
+          <thead><tr><th>Reason</th><th style="text-align:right">Count</th></tr></thead>
+          <tbody>${reasonRows}</tbody>
+        </table>`;
+    }
+
+    const converted = _debug.filter((e) => e.action === 'convert');
+    if (converted.length > 0) {
+      const convRows = converted.map((e) => {
+        const saved = e.beforeSize - e.afterSize;
+        const pct = e.beforeSize > 0 ? ((saved / e.beforeSize) * 100).toFixed(1) : '0';
+        const ds = e.didDownsample ? ' (downsampled)' : '';
+        return `<tr>
+          <td title="${escapeHtml(e.ref)}">${escapeHtml(e.ref)}</td>
+          <td style="text-align:right">${formatSize(e.beforeSize)}</td>
+          <td style="text-align:right">${formatSize(e.afterSize)}</td>
+          <td style="text-align:right">-${pct}%${ds}</td>
+        </tr>`;
+      }).join('');
+      html += `<h4 style="margin-top:0.75rem">Converted images</h4>
+        <table class="debug-table">
+          <thead><tr><th>Ref</th><th style="text-align:right">Before</th><th style="text-align:right">After</th><th style="text-align:right">Saved</th></tr></thead>
+          <tbody>${convRows}</tbody>
+        </table>`;
+    }
+
+    const skips = _debug.filter((e) => e.action === 'skip');
+    if (skips.length > 0) {
+      const skipRows = skips.map((e) => {
+        const detail = e.message || e.value || (e.filters ? e.filters.join(',') : '') || '';
+        return `<tr>
+          <td title="${escapeHtml(e.ref)}">${escapeHtml(e.ref)}</td>
+          <td>${escapeHtml(e.reason)}</td>
+          <td>${escapeHtml(detail)}</td>
+        </tr>`;
+      }).join('');
+      html += `<h4 style="margin-top:0.75rem">Skipped images</h4>
+        <table class="debug-table">
+          <thead><tr><th>Ref</th><th>Reason</th><th>Detail</th></tr></thead>
+          <tbody>${skipRows}</tbody>
+        </table>`;
+    }
+  }
+
+  return `<details class="debug-panel">
+    <summary class="debug-panel__toggle">Debug info</summary>
+    <div class="debug-panel__body">${html}</div>
+  </details>`;
+}
+
 // --- Main flow ---
 async function handleFiles(files) {
   const pdfFiles = Array.from(files).filter(
@@ -589,6 +671,20 @@ async function handleFiles(files) {
       });
     }
 
+    // Debug panel (only when ?debug URL param is present)
+    if (options.debug) {
+      const debugHtml = buildDebugPanel(r.stats);
+      if (debugHtml) {
+        const debugTr = document.createElement('tr');
+        debugTr.className = 'debug-row';
+        const debugTd = document.createElement('td');
+        debugTd.colSpan = 5;
+        debugTd.innerHTML = debugHtml;
+        debugTr.appendChild(debugTd);
+        resultsBody.appendChild(debugTr);
+      }
+    }
+
     // Hint banner: suggest lossy preset when images dominate and savings are low
     if (!options.lossy && r.stats?.inspect?.before) {
       const cats = r.stats.inspect.before.categories;
@@ -725,5 +821,13 @@ btnStartOver.addEventListener('click', () => {
   if (heroCard) heroCard.remove();
   showState('idle');
 });
+
+// --- Debug mode indicator ---
+if (new URLSearchParams(window.location.search).has('debug')) {
+  const banner = document.createElement('div');
+  banner.className = 'debug-banner';
+  banner.innerHTML = 'Debug mode active — extra diagnostics will appear in results';
+  document.body.insertBefore(banner, document.body.firstChild);
+}
 
 showState('idle');

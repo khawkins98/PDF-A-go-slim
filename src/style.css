@@ -889,6 +889,78 @@ header h1 {
   color: var(--color-primary-hover);
 }
 
+/* --- Debug panel --- */
+.debug-row td {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.debug-panel {
+  border-left: 3px solid var(--color-text-muted);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: rgba(0, 0, 0, 0.02);
+  padding: 0;
+}
+
+.debug-panel__toggle {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: 0.5rem 0.75rem;
+  list-style: none;
+}
+
+.debug-panel__toggle::-webkit-details-marker {
+  display: none;
+}
+
+.debug-panel__toggle::before {
+  content: '\25B6';
+  display: inline-block;
+  margin-right: 0.4rem;
+  font-size: 0.6rem;
+  transition: transform 0.15s;
+}
+
+.debug-panel[open] > .debug-panel__toggle::before {
+  transform: rotate(90deg);
+}
+
+.debug-panel__body {
+  padding: 0.5rem 0.75rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+.debug-panel__body h4 {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.debug-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.debug-table th,
+.debug-table td {
+  padding: 0.2rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.debug-table th {
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 /* --- Footer --- */
 .site-footer {
   text-align: center;
@@ -906,4 +978,23 @@ header h1 {
 
 .site-footer a:hover {
   color: var(--color-text);
+}
+
+.site-footer .debug-link {
+  opacity: 0.5;
+}
+
+.site-footer .debug-link:hover {
+  opacity: 1;
+}
+
+/* --- Debug mode banner --- */
+.debug-banner {
+  background: var(--color-text);
+  color: #fff;
+  text-align: center;
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
