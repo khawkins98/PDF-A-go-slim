@@ -4,6 +4,24 @@
  * Lazily loads the WASM module on first use.
  * Provides a simple API: give it font bytes + Unicode codepoints,
  * get back the subset font bytes.
+ *
+ * Why we load the WASM binary directly instead of using the harfbuzzjs JS wrapper:
+ * The harfbuzzjs npm package sets `module.exports = Promise`, which makes the
+ * module itself a "thenable". When ESM `import()` encounters a thenable, it
+ * awaits it — but the resolved value is the WASM instance, not the expected
+ * JS API. This causes breakage in Vitest and other ESM environments. By loading
+ * hb-subset.wasm directly and calling the C API via WebAssembly.instantiate,
+ * we bypass the CJS/ESM interop issue entirely.
+ *
+ * WASM memory lifecycle for each subsetFont() call:
+ * 1. malloc() — allocate buffer in WASM linear memory for font bytes
+ * 2. Copy font bytes into WASM memory
+ * 3. hb_blob_create → hb_face_create — create HarfBuzz font face
+ * 4. hb_subset_input_create — configure which codepoints to keep
+ * 5. hb_subset_or_fail — produce the subset face
+ * 6. hb_face_reference_blob → hb_blob_get_data — extract result bytes
+ * 7. Copy result out of WASM memory (memory may have grown during subsetting)
+ * 8. finally: destroy blob, face, input; free() the font buffer
  */
 
 const HB_MEMORY_MODE_WRITABLE = 2;
@@ -15,6 +33,11 @@ let wasmExports = null;
 /**
  * Lazily load the harfbuzzjs subset WASM module.
  * Caches the instance after first load.
+ *
+ * Node vs browser detection: uses `process.versions?.node` to distinguish
+ * environments. In browsers, fetch() loads the WASM from a URL relative to
+ * this module. In Node.js (tests), we read the file directly from the
+ * harfbuzzjs package using createRequire + require.resolve.
  */
 async function getExports() {
   if (wasmExports) return wasmExports;

@@ -8,14 +8,22 @@
  */
 import { PDFName, PDFRawStream, PDFArray, PDFDict, PDFRef } from 'pdf-lib';
 import { encode as jpegEncode } from 'jpeg-js';
-import { decodeStream, allFiltersDecodable } from '../utils/stream-decode.js';
-import { undoPngPrediction } from '../utils/stream-decode.js';
-import { getFilterNames } from './streams.js';
+import { decodeStream, allFiltersDecodable, undoPngPrediction, getFilterNames } from '../utils/stream-decode.js';
 
-/** Minimum decoded pixel data size worth converting (10 KB). */
+/**
+ * Minimum decoded pixel data size worth converting (10 KB).
+ * Below this threshold the JPEG header overhead often exceeds any savings
+ * from lossy compression, so we skip small images entirely.
+ */
 const MIN_DECODED_SIZE = 10 * 1024;
 
-/** ColorSpace names we can handle. */
+/**
+ * ColorSpace names we can safely convert to JPEG.
+ * Only DeviceRGB and DeviceGray are handled because:
+ * - CMYK requires color profile handling and jpeg-js doesn't support it
+ * - ICCBased/Indexed/Lab colorspaces need profile-aware decoding
+ * - DeviceGray is treated as single-component → expanded to RGBA for jpeg-js
+ */
 const SIMPLE_COLORSPACES = new Set([
   'DeviceRGB',
   'DeviceGray',
@@ -77,7 +85,17 @@ function getNumericValue(dict, key) {
 /**
  * Build a map from image ref string → page dimensions (in points).
  * Walks all pages and their Resources → XObject dicts.
+ *
  * Used to estimate effective DPI for downsampling decisions.
+ * DPI is calculated as: (image pixels * 72) / page dimension in points.
+ * The 72 factor comes from PDF's coordinate system where 1 point = 1/72 inch.
+ *
+ * When the same image appears on multiple pages, we keep the smallest page
+ * dimensions (most conservative — yields the highest DPI estimate) to avoid
+ * downsampling an image that would appear blurry on its smallest usage.
+ *
+ * @param {PDFDocument} pdfDoc
+ * @returns {Map<string, {w: number, h: number}>} image ref → page dimensions
  */
 function buildImagePageMap(pdfDoc) {
   const map = new Map();
@@ -105,7 +123,21 @@ function buildImagePageMap(pdfDoc) {
 
 /**
  * Area-average (box filter) downsample RGBA pixel data.
- * For each destination pixel, averages all source pixels that map to it.
+ *
+ * For each destination pixel, computes a weighted average of all source pixels
+ * that overlap its area. Fractional pixel coverage at boundaries is handled
+ * via weight calculation: w = (overlap in X) * (overlap in Y).
+ *
+ * This produces higher quality than nearest-neighbor or bilinear for
+ * downscaling, as it accounts for all source pixels contributing to each
+ * output pixel rather than sampling a single point.
+ *
+ * @param {Uint8Array} rgba - Source RGBA pixel data
+ * @param {number} srcW - Source width in pixels
+ * @param {number} srcH - Source height in pixels
+ * @param {number} dstW - Destination width in pixels
+ * @param {number} dstH - Destination height in pixels
+ * @returns {Uint8Array} Downsampled RGBA pixel data
  */
 function downsampleArea(rgba, srcW, srcH, dstW, dstH) {
   const out = new Uint8Array(dstW * dstH * 4);

@@ -20,13 +20,11 @@ import { deflateSync } from 'fflate';
 import { extractUsedCharCodes } from '../utils/content-stream-parser.js';
 import { charCodesToUnicode, isIdentityHFont } from '../utils/unicode-mapper.js';
 import { subsetFont } from '../utils/harfbuzz-subsetter.js';
-import { decodeStream, allFiltersDecodable } from '../utils/stream-decode.js';
-import { getFilterNames } from './streams.js';
+import { decodeStream, allFiltersDecodable, getFilterNames } from '../utils/stream-decode.js';
+import { FONT_FILE_KEYS } from '../utils/hash.js';
 
 /** Minimum font stream size worth subsetting (10 KB). */
 const MIN_FONT_SIZE = 10 * 1024;
-
-const FONT_FILE_KEYS = ['FontFile', 'FontFile2', 'FontFile3'];
 
 /**
  * Subset embedded fonts in the document.

@@ -6,8 +6,7 @@
  */
 import { PDFName, PDFDict, PDFRef, PDFRawStream, PDFArray } from 'pdf-lib';
 import { ADOBE_GLYPH_LIST, WIN_ANSI_ENCODING, MAC_ROMAN_ENCODING } from './glyph-list.js';
-import { decodeStream, allFiltersDecodable } from './stream-decode.js';
-import { getFilterNames } from '../optimize/streams.js';
+import { decodeStream, allFiltersDecodable, getFilterNames } from './stream-decode.js';
 
 /**
  * Map raw char code byte arrays to Unicode codepoints.
@@ -264,6 +263,7 @@ function parseToUnicodeCMap(fontDict, context) {
 
 /**
  * Parse CMap text to extract char code → Unicode mappings.
+ * @internal Exported only for testing — not part of the public API.
  */
 export function parseCMapText(text) {
   const map = new Map();

@@ -103,6 +103,7 @@ src/
       metadata.js             # Strip XMP, Illustrator, Photoshop bloat keys
       unreferenced.js         # Remove unreachable objects via BFS traversal
     utils/
+      hash.js                 # Shared hashing (hashBytes) + font constants (FONT_FILE_KEYS)
       stream-decode.js        # Decoders: Flate, LZW, ASCII85, ASCIIHex, RunLength, PNG prediction
       pdf-traversal.js        # BFS graph walker from PDF trailer
       content-stream-parser.js # Extract char codes per font from content streams

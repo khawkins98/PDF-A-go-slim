@@ -3,10 +3,24 @@
  *
  * Extracts text-related operations to build a map of
  * fontRef → Set<charCode bytes> for every font used in the document.
+ *
+ * Parsing strategy: a stack-based state machine using PDF's postfix notation.
+ * Operands (strings, numbers, names, arrays) are pushed onto a stack.
+ * When an operator keyword is encountered, it pops its arguments from the stack.
+ *
+ * Key operators handled:
+ * - Tf: sets the current font (font name + size)
+ * - Tj, TJ, ', ": text-showing operators that emit character codes
+ * - Do: invokes an XObject — if it's a Form XObject, recurse into it
+ * - BI: inline image marker — skipped (no text data)
+ *
+ * Form XObject recursion: Form XObjects can contain their own content streams
+ * and resource dictionaries. When `Do` references a Form, we decode its stream
+ * and recursively parse it, using the Form's own Resources (falling back to
+ * the parent page's Resources).
  */
 import { PDFName, PDFDict, PDFArray, PDFRef, PDFRawStream } from 'pdf-lib';
-import { decodeStream, allFiltersDecodable } from './stream-decode.js';
-import { getFilterNames } from '../optimize/streams.js';
+import { decodeStream, allFiltersDecodable, getFilterNames } from './stream-decode.js';
 
 /**
  * Extract all character codes used per font across the entire document.
@@ -68,6 +82,11 @@ function getContentStreams(context, pageNode) {
 
 /**
  * Concatenate multiple content streams into one byte array.
+ * PDF allows page content to be split across multiple streams — they are
+ * logically concatenated with whitespace separators before parsing.
+ * @param {object} context - PDF context for resolving refs
+ * @param {PDFRef[]} refs - Content stream references
+ * @returns {Uint8Array} Combined decoded bytes
  */
 function concatStreams(context, refs) {
   const chunks = [];
@@ -117,6 +136,14 @@ function concatStreams(context, refs) {
  * Parse a content stream byte array, extracting text operations.
  *
  * Uses a simple stack-based approach: push operands, dispatch on operators.
+ * Tokenizes bytes into operands (strings, numbers, names, arrays) and
+ * operator keywords. Inline images (BI...ID...EI) are detected at the
+ * operator level and skipped — their binary data is not parsed.
+ *
+ * @param {object} context - PDF context for resolving refs
+ * @param {Uint8Array} bytes - Decoded content stream bytes
+ * @param {PDFDict|null} resources - Page/form Resources dictionary
+ * @param {Map} result - Accumulated fontRef → charCodes map (mutated)
  */
 function parseContentStream(context, bytes, resources, result) {
   const len = bytes.length;

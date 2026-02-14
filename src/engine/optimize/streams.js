@@ -6,38 +6,15 @@
  * Only replaces if recompressed size < original. Skips image-native filters.
  */
 import { deflateSync } from 'fflate';
-import { PDFName, PDFRawStream, PDFArray } from 'pdf-lib';
+import { PDFName, PDFRawStream } from 'pdf-lib';
 import {
   decodeStream,
   hasImageFilter,
   allFiltersDecodable,
+  getFilterNames,
 } from '../utils/stream-decode.js';
 
-/**
- * Extract filter names from a stream's dictionary.
- * Returns an array of filter name strings, or null if no filters.
- */
-export function getFilterNames(dict) {
-  const filterEntry = dict.get(PDFName.of('Filter'));
-  if (!filterEntry) return null;
-
-  if (filterEntry instanceof PDFName) {
-    return [filterEntry.decodeText()];
-  }
-
-  if (filterEntry instanceof PDFArray) {
-    const names = [];
-    for (let i = 0; i < filterEntry.size(); i++) {
-      const item = filterEntry.get(i);
-      if (item instanceof PDFName) {
-        names.push(item.decodeText());
-      }
-    }
-    return names;
-  }
-
-  return null;
-}
+export { getFilterNames };
 
 /**
  * Recompress all eligible streams in the document.

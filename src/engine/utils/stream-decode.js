@@ -6,6 +6,33 @@
  * intentionally skipped — they should be passed through as-is.
  */
 import { inflateSync, decompressSync } from 'fflate';
+import { PDFName, PDFArray } from 'pdf-lib';
+
+/**
+ * Extract filter names from a stream's dictionary.
+ * Returns an array of filter name strings, or null if no filters.
+ */
+export function getFilterNames(dict) {
+  const filterEntry = dict.get(PDFName.of('Filter'));
+  if (!filterEntry) return null;
+
+  if (filterEntry instanceof PDFName) {
+    return [filterEntry.decodeText()];
+  }
+
+  if (filterEntry instanceof PDFArray) {
+    const names = [];
+    for (let i = 0; i < filterEntry.size(); i++) {
+      const item = filterEntry.get(i);
+      if (item instanceof PDFName) {
+        names.push(item.decodeText());
+      }
+    }
+    return names;
+  }
+
+  return null;
+}
 
 /** Filters we can decode. */
 const DECODABLE_FILTERS = new Set([

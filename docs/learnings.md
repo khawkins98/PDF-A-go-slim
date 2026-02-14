@@ -132,6 +132,24 @@ When reading numeric values from pdf-lib dicts in tests, `Number(val.toString())
 
 ---
 
+## Code Architecture
+
+### Layer Discipline: Utils Should Not Import from Optimize Passes
+
+During initial development, `getFilterNames()` ended up in `streams.js` (an optimization pass) even though it's a general utility for reading PDF stream filter dictionaries. Four other modules — including two utils — imported it from there, creating a cross-layer dependency (utils → optimize). This was refactored: `getFilterNames()` now lives in `stream-decode.js` alongside other filter-related utilities (`hasImageFilter`, `allFiltersDecodable`). `streams.js` re-exports it for backward compatibility.
+
+**Rule of thumb:** if more than one optimization pass needs a function, it belongs in `utils/`. If a util needs a function from a pass, that function is in the wrong place.
+
+### Shared Constants and Functions
+
+`hashBytes()` (djb2 hash) and `FONT_FILE_KEYS` (`['FontFile', 'FontFile2', 'FontFile3']`) were independently duplicated across `dedup.js`, `fonts.js`, and `font-subset.js`. Extracted into `utils/hash.js`. When adding new passes that need hashing or font-file traversal, import from there rather than copying.
+
+### ASCII85 Encoding Gotcha
+
+ASCII85 encodes 4 bytes into 5 ASCII characters. A 5-character group always decodes to 4 bytes — there's no 3-byte output from a full 5-char group. Short final groups (fewer than 5 chars) produce fewer bytes (count - 1), but a complete group like `9jqo^` decodes to 4 bytes (`Man ` with trailing space), not 3.
+
+---
+
 ## Browser Constraints
 
 ### Web Worker Boundary

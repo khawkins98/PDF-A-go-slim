@@ -1,3 +1,12 @@
+/**
+ * Web Worker for off-main-thread PDF optimization.
+ *
+ * Message protocol:
+ *   Inbound:  { type: 'optimize', buffer: ArrayBuffer, options: object }
+ *   Outbound: { type: 'progress', progress: number, pass: string }
+ *           | { type: 'result', result: ArrayBuffer, stats: object }
+ *           | { type: 'error', error: string }
+ */
 import { optimize } from './engine/pipeline.js';
 
 self.onmessage = async (e) => {
