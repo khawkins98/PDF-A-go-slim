@@ -73,9 +73,14 @@ export async function optimize(inputBytes, options = {}, onProgress) {
 
   stats.documentInfo = {
     pageCount: pdfDoc.getPages().length,
-    producer: pdfDoc.getProducer() || null,
-    creator: pdfDoc.getCreator() || null,
     title: pdfDoc.getTitle() || null,
+    author: pdfDoc.getAuthor() || null,
+    subject: pdfDoc.getSubject() || null,
+    keywords: pdfDoc.getKeywords() || null,
+    creator: pdfDoc.getCreator() || null,
+    producer: pdfDoc.getProducer() || null,
+    creationDate: pdfDoc.getCreationDate()?.toISOString() || null,
+    modificationDate: pdfDoc.getModificationDate()?.toISOString() || null,
   };
 
   const inspectBefore = inspectDocument(pdfDoc);

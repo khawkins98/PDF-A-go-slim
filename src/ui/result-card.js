@@ -1,4 +1,4 @@
-import { formatSize } from './helpers.js';
+import { formatSize, escapeHtml } from './helpers.js';
 import { buildStatsDetail, buildDebugPanel } from './stats.js';
 import { buildInspectPanel, initInspectorInteractions } from './inspector.js';
 import { applyPreset } from './options.js';
@@ -287,17 +287,37 @@ export function buildResultsPaletteContent(results, blobUrls, options, { animate
  * @param {Object} options - Current optimization options
  * @returns {HTMLElement|null}
  */
+function formatMetaDate(iso) {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch { return null; }
+}
+
 function buildMetaHeader(stats) {
   if (!stats?.documentInfo) return '';
   const info = stats.documentInfo;
   const traits = stats.pdfTraits || {};
+  const esc = escapeHtml;
+
+  const row = (label, value) =>
+    `<span class="inspector-meta__label">${label}</span><span class="inspector-meta__value" title="${esc(value)}">${esc(value)}</span>`;
+
   const rows = [];
-  rows.push(`<span class="inspector-meta__label">Pages</span><span class="inspector-meta__value">${info.pageCount}</span>`);
-  if (info.producer) rows.push(`<span class="inspector-meta__label">Producer</span><span class="inspector-meta__value">${info.producer}</span>`);
-  if (traits.pdfALevel) {
-    rows.push(`<span class="inspector-meta__label">PDF/A</span><span class="inspector-meta__value">${traits.pdfALevel}</span>`);
-  }
-  rows.push(`<span class="inspector-meta__label">Tagged</span><span class="inspector-meta__value">${traits.isTagged ? 'Yes' : 'No'}</span>`);
+  rows.push(row('Pages', String(info.pageCount)));
+  if (info.title) rows.push(row('Title', info.title));
+  if (info.author) rows.push(row('Author', info.author));
+  if (info.subject) rows.push(row('Subject', info.subject));
+  if (info.keywords) rows.push(row('Keywords', info.keywords));
+  if (info.creator) rows.push(row('Creator', info.creator));
+  if (info.producer) rows.push(row('Producer', info.producer));
+  const created = formatMetaDate(info.creationDate);
+  if (created) rows.push(row('Created', created));
+  const modified = formatMetaDate(info.modificationDate);
+  if (modified) rows.push(row('Modified', modified));
+  if (traits.pdfALevel) rows.push(row('PDF/A', traits.pdfALevel));
+  rows.push(row('Tagged', traits.isTagged ? 'Yes' : 'No'));
   return `<div class="inspector-meta">${rows.join('')}</div>`;
 }
 
