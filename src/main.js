@@ -129,7 +129,7 @@ const settingsPalette = createPalette({
 const resultsPalette = createPalette({
   id: 'results',
   title: 'Results',
-  defaultPosition: { top: 110, left: 520 },
+  defaultPosition: { top: 20, left: 800 },
   width: 260,
 });
 
