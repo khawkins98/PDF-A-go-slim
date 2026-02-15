@@ -331,6 +331,21 @@ body {
   min-width: 6px;
 }
 
+.palette__close-box {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  background: var(--color-surface);
+  cursor: pointer;
+  margin-right: 3px;
+}
+
+.palette__close-box:hover {
+  background: var(--color-surface-light);
+}
+
 .palette__collapse-box {
   width: 9px;
   height: 9px;
@@ -1768,6 +1783,15 @@ body {
   background: none;
 }
 
+.palette--sticky .palette__close-box {
+  border-color: #d4c94a;
+  background: #f0e868;
+}
+
+.palette--sticky .palette__close-box:hover {
+  background: #f8f080;
+}
+
 .palette--sticky .palette__collapse-box {
   border-color: #d4c94a;
   background: #f0e868;
@@ -2129,6 +2153,10 @@ body[data-theme="forest"] .palette--sticky .palette__title {
   color: #2a2200;
 }
 
+body[data-theme="dark"] .palette--sticky .palette__close-box,
+body[data-theme="amber"] .palette--sticky .palette__close-box,
+body[data-theme="ocean"] .palette--sticky .palette__close-box,
+body[data-theme="forest"] .palette--sticky .palette__close-box,
 body[data-theme="dark"] .palette--sticky .palette__collapse-box,
 body[data-theme="amber"] .palette--sticky .palette__collapse-box,
 body[data-theme="ocean"] .palette--sticky .palette__collapse-box,

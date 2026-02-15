@@ -28,8 +28,8 @@ export function initDrag(el, handleEl) {
   let startX, startY, startLeft, startTop, dragging = false;
 
   function onPointerDown(e) {
-    // Don't drag when clicking collapse boxes
-    if (e.target.closest('[class*="collapse-box"]')) return;
+    // Don't drag when clicking collapse or close boxes
+    if (e.target.closest('[class*="collapse-box"]') || e.target.closest('[class*="close-box"]')) return;
     if (isMobile()) return;
 
     dragging = true;
@@ -82,7 +82,7 @@ export function initDrag(el, handleEl) {
 
   handleEl.addEventListener('mousedown', onPointerDown);
   handleEl.addEventListener('touchstart', (e) => {
-    if (e.target.closest('[class*="collapse-box"]')) return;
+    if (e.target.closest('[class*="collapse-box"]') || e.target.closest('[class*="close-box"]')) return;
     if (isMobile()) return;
     const touch = e.touches[0];
     onPointerDown({ clientX: touch.clientX, clientY: touch.clientY, target: e.target, preventDefault() {} });
@@ -94,10 +94,10 @@ export function initDrag(el, handleEl) {
 
 /**
  * Create a floating palette window.
- * @param {{ id: string, title: string, defaultPosition: { top: number, left: number }, width: number }} opts
+ * @param {{ id: string, title: string, defaultPosition: { top: number, left: number }, width: number, closable?: boolean }} opts
  * @returns {{ element: HTMLElement, bodyEl: HTMLElement, setContent: (nodeOrHtml: Node|string) => void, shade: () => void, unshade: () => void, isShaded: () => boolean }}
  */
-export function createPalette({ id, title, defaultPosition, width }) {
+export function createPalette({ id, title, defaultPosition, width, closable = false }) {
   const el = document.createElement('div');
   el.className = 'palette';
   el.id = `palette-${id}`;
@@ -109,6 +109,16 @@ export function createPalette({ id, title, defaultPosition, width }) {
   // Title bar
   const titleBar = document.createElement('div');
   titleBar.className = 'palette__title-bar';
+
+  // Close box (Mac OS classic: left side of title bar)
+  let closeBox = null;
+  if (closable) {
+    closeBox = document.createElement('div');
+    closeBox.className = 'palette__close-box';
+    closeBox.setAttribute('aria-label', 'Close');
+    closeBox.setAttribute('role', 'button');
+    titleBar.appendChild(closeBox);
+  }
 
   const stripes1 = document.createElement('div');
   stripes1.className = 'palette__stripes';
@@ -169,6 +179,14 @@ export function createPalette({ id, title, defaultPosition, width }) {
     e.stopPropagation();
     toggleShade();
   });
+
+  // Close box hides the palette
+  if (closeBox) {
+    closeBox.addEventListener('click', (e) => {
+      e.stopPropagation();
+      el.hidden = true;
+    });
+  }
 
   // Init drag
   initDrag(el, titleBar);

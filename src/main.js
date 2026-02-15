@@ -159,12 +159,13 @@ resultsPalette.showEmpty('Nothing to report yet');
 inspectorPalette.showEmpty('Waiting for a PDF to dissect');
 previewPalette.showEmpty('No document loaded');
 
-// --- Read Me palette (Mac Stickies style) ---
+// --- Read Me palette (Mac Stickies style, open by default) ---
 const readmePalette = createPalette({
   id: 'readme',
   title: 'Read Me',
   defaultPosition: { top: 400, left: 20 },
   width: 340,
+  closable: true,
 });
 readmePalette.element.classList.add('palette--sticky');
 
@@ -172,14 +173,14 @@ const readmeContent = document.createElement('div');
 readmeContent.className = 'readme-content';
 readmeContent.innerHTML = renderMarkdown(readmeText);
 readmePalette.setContent(readmeContent);
-readmePalette.hide();
 
-// --- Appearance palette (hidden by default) ---
+// --- Appearance palette (hidden by default, closable) ---
 const appearancePalette = createPalette({
   id: 'appearance',
   title: 'Appearance',
   defaultPosition: { top: 200, left: 520 },
   width: 240,
+  closable: true,
 });
 appearancePalette.setContent(buildAppearanceContent());
 appearancePalette.hide();
