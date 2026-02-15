@@ -26,9 +26,9 @@ The UI is a **Mac OS 8 multi-window desktop** with a persistent drop zone in the
 
 ### Window Manager (`src/ui/palette.js`)
 
-Core module (~120 lines) managing the floating palette system:
+Core module (~200 lines) managing the floating palette system:
 
-- **`createPalette({ id, title, defaultPosition, width })`** — Creates a palette DOM element with title bar, body, close/collapse boxes. Returns API: `{ element, bodyEl, setContent(), showEmpty(), shade(), unshade(), isShaded(), show(), hide() }`
+- **`createPalette({ id, title, defaultPosition, width })`** — Creates a palette DOM element with title bar, body, and collapse box. Returns API: `{ element, bodyEl, setContent(), showEmpty(), shade(), unshade(), isShaded(), show(), hide() }`
 - **`initWindowManager()`** — Sets up the `.desktop` container reference
 - **`initDrag(el, handleEl)`** — Makes any element draggable by its title bar. Handles mouse and touch events. Disabled on mobile (<768px)
 - **`bringToFront(el)`** — Increments z-index counter and applies to element. Any mousedown on a palette calls this
@@ -36,7 +36,7 @@ Core module (~120 lines) managing the floating palette system:
 
 ### Drag System
 
-- `mousedown` on title bar (excluding close/collapse boxes) starts drag
+- `mousedown` on title bar (excluding collapse box) starts drag
 - `mousemove` on document updates `style.left`/`style.top`
 - `mouseup` ends drag, removes `.palette--dragging`
 - Touch equivalents for mobile (but drag itself disabled via `isMobile()` check)
@@ -47,7 +47,7 @@ Core module (~120 lines) managing the floating palette system:
 Mac OS classic behavior: double-click title bar or click collapse box to collapse palette to just its title bar.
 
 - `.palette--shaded .palette__body { display: none }` — body collapses
-- Close box hides the palette entirely (`el.hidden = true`)
+- No close box in current implementation — palettes are always present (can be hidden programmatically via `hide()`/`show()` API)
 
 ### State Model
 
@@ -64,9 +64,9 @@ The old three-state machine (`idle → processing → results`) with `showState(
 |---------|-----------------|
 | Main window | `top: 20, left: 20`, `width: 480px` |
 | Settings | `top: 20, left: 520`, `width: 260px` |
-| Results | `top: 300, left: 520`, `width: 260px` |
-| Inspector | `top: 360, left: 20`, `width: 480px` |
-| Preview | `top: 360, left: 520`, `width: 380px` |
+| Results | `top: 110, left: 520`, `width: 260px` |
+| Inspector | `top: 320, left: 20`, `width: 480px` |
+| Preview | `top: 280, left: 520`, `width: 400px` |
 
 ### Mobile (<768px)
 
@@ -102,14 +102,14 @@ The new direction borrows **structural patterns** from classic desktop applicati
 ### Main Document Window
 
 The main `.app-window` is a draggable document window with:
-- **Title bar** — 19px height, Platinum-style gray bar with centered title, horizontal ridges extending from title to edges, close box (left) and zoom/collapse boxes (right). `cursor: grab`.
+- **Title bar** — 19px height, Platinum-style gray bar with centered title, horizontal ridges extending from title to edges, collapse box (right). `cursor: grab`.
 - **Status bar** — bottom bar with sunken fields showing app state. Idle text shows the tagline.
 - Decorative elements hidden on mobile.
 
 ### Palettes
 
 Floating palette windows with thinner title bars:
-- **Title bar** — 15px height, horizontal stripes (tighter pattern than document window ridges), close box + collapse box only (no zoom box)
+- **Title bar** — 15px height, horizontal stripes (tighter pattern than document window ridges), collapse box only (no close or zoom box)
 - **Body** — 8px padding, scrollable, max-height 70vh
 - `.palette--shaded` collapses body, `.palette--dragging` adds enhanced shadow
 
@@ -164,11 +164,11 @@ Not everything should be expanded. These remain controlled:
 
   | HIG Chapter | Specification | Implementation |
   |-------------|---------------|----------------|
-  | Ch 5 (p99-102) Windows | Gray title bar, centered title, horizontal ridges, close/zoom/collapse boxes | `.title-bar` with ridges via `repeating-linear-gradient`, decorative 13x13 boxes |
-  | Ch 5 (p105-106) Floating windows | Thinner title bar, stripes, close/collapse only | `.palette__title-bar` at 15px, `.palette__stripes` |
+  | Ch 5 (p99-102) Windows | Gray title bar, centered title, horizontal ridges, close/zoom/collapse boxes | `.title-bar` with ridges via `repeating-linear-gradient`, collapse box only (11×11) |
+  | Ch 5 (p105-106) Floating windows | Thinner title bar, stripes, close/collapse only | `.palette__title-bar` at 15px, `.palette__stripes`, collapse box only (9×9) |
   | Ch 2 (p42-45), Ch 6 (p110-111) Controls | Folder tabs for multi-pane navigation, active tab merges with content | `.tab-control` folder tabs in Settings palette |
   | Ch 2 (p21-23), Ch 3 (p68-69) Buttons | Default button gets 3px outset ring (black border with gap) | `.btn--default` with concentric `box-shadow` rings |
-  | Ch 3 (p67-86) Layout | 20px button height, 58px min width, 12px horizontal button gaps | `.btn` min-height/min-width, `.results-actions` gap |
+  | Ch 3 (p67-86) Layout | 20px button height, 58px min width, 12px horizontal button gaps | `.btn` min-height/min-width, `.settings-actions`/`.main-actions` spacing |
   | Ch 2 (p50) Separators | 2px engraved lines (1px dark + 1px light) | `box-shadow` pattern replacing `border-top: 1px solid` |
   | Ch 2 (p46) Placards | Sunken info panel at window bottom | `.status-bar` with engraved top separator, idle tagline |
   | WindowShade | Double-click title bar collapses window to title bar | `.palette--shaded` class, dblclick handler |

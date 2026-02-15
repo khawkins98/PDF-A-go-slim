@@ -47,12 +47,12 @@ index.html → src/main.js (UI state machine, drag-and-drop, worker orchestratio
                hash.js                   — shared djb2 hash + FONT_FILE_KEYS constant
 
              src/ui/  (UI modules, imported by main.js):
-               palette.js      — createPalette(), initWindowManager(), initDrag(), bringToFront() (floating window manager)
-               result-card.js  — buildSingleFileCard(), buildSummaryCard(), buildFileCard(), buildResultsPaletteContent(), buildInspectorPaletteContent()
+               palette.js      — createPalette(), initWindowManager(), initDrag(), bringToFront(), isMobile() (floating window manager)
+               result-card.js  — buildSingleFileCard(), buildSummaryCard(), buildFileTableHeader(), buildFileCard(), buildResultsPaletteContent(), buildInspectorPaletteContent()
                compare.js      — buildCompareSection(), buildPreviewContent() (direct-render for Preview palette), destroyAllComparisons()
-               stats.js        — buildStatsDetail(), buildDebugPanel()
+               stats.js        — buildStatsDetail(), buildDebugPanel(), formatPassStats()
                inspector.js    — buildInspectPanel() (object breakdown grid), initInspectorInteractions() ("Show more" delegation)
-               options.js      — collectOptions(), applyPreset(), syncPresetIndicator()
+               options.js      — collectOptions(), applyPreset(), syncPresetIndicator(), getCurrentPresetLabel(), initOptionsListeners()
                helpers.js      — formatSize(), escapeHtml()
 
 scripts/
@@ -80,7 +80,7 @@ test/
 - **Options/presets:** `collectOptions()` reads UI state → options object. Three presets (lossless/web/print) map to option combinations. `syncPresetIndicator()` highlights the matching preset when manual settings change.
 - **Utils layer discipline:** If more than one optimization pass needs a function, it belongs in `utils/`. Passes should not import from each other.
 - **Options panel:** `#options-panel` lives in HTML (so `options.js` module-level querySelectorAll finds elements on import), then physically moved into the Settings palette body on init. Event listeners survive DOM relocation.
-- **Stale results detection:** After results render, changing any option triggers `checkStaleResults()` which compares current options JSON vs last-run options. Adds `.btn--stale` to Re-optimize button inside the Results palette. Re-optimize re-runs `handleFiles(lastFiles)` with current options.
+- **Stale results detection:** After results render, changing any option triggers `checkStaleResults()` which compares current options JSON vs last-run options. Adds `.btn--stale` to Re-optimize button inside the Settings palette. Re-optimize re-runs `handleFiles(lastFiles)` with current options.
 - **Debug mode:** Add `?debug` to the URL. Shows a persistent banner, per-pass timing, image skip reason breakdowns, and per-image conversion details in a collapsible "Debug info" section. Pass stats objects can include a `_debug` field with additional diagnostics.
 - **Minimum processing display time:** 800ms before transitioning to results, preventing jarring flashes on fast files.
 

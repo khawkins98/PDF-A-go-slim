@@ -1,7 +1,6 @@
 import { formatSize } from './helpers.js';
 import { buildStatsDetail, buildDebugPanel } from './stats.js';
 import { buildInspectPanel, initInspectorInteractions } from './inspector.js';
-import { buildPreviewContent } from './compare.js';
 import { applyPreset } from './options.js';
 
 /**

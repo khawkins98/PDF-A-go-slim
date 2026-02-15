@@ -1,6 +1,6 @@
 import './style.css';
-import { formatSize } from './ui/helpers.js';
-import { collectOptions, initOptionsListeners, getCurrentPresetLabel } from './ui/options.js';
+import { formatSize, escapeHtml } from './ui/helpers.js';
+import { collectOptions, initOptionsListeners } from './ui/options.js';
 import { buildResultsPaletteContent, buildInspectorPaletteContent } from './ui/result-card.js';
 import { buildPreviewContent, destroyAllComparisons } from './ui/compare.js';
 import { initWindowManager, createPalette, initDrag } from './ui/palette.js';
@@ -285,7 +285,7 @@ async function handleFiles(files) {
     const li = document.createElement('li');
     li.className = 'file-item';
     li.innerHTML = `
-      <span class="file-item__name">${file.name}</span>
+      <span class="file-item__name">${escapeHtml(file.name)}</span>
       <span class="file-item__pass">Starting&hellip;</span>
       <div class="file-item__bar"><div class="file-item__fill file-item__fill--active" style="width:0%"></div></div>
     `;
