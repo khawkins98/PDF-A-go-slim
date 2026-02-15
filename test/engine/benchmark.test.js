@@ -14,6 +14,7 @@ import {
   createPdfA1bDocument,
   createMultiFontDuplicatesPdf,
   createKitchenSinkPdf,
+  createCalRGBGraphicsPdf,
 } from '../fixtures/create-benchmark-pdfs.js';
 import {
   getEmbeddedFonts,
@@ -21,6 +22,7 @@ import {
   getStructureTreeInfo,
   getDocumentGeometry,
   getImageInfo,
+  getColorSpaceInfo,
 } from '../utils/pdf-verify.js';
 
 // Helper to find a pass by name substring
@@ -408,5 +410,79 @@ describe('Benchmark: Kitchen sink', () => {
   it('output is a valid reloadable PDF', async () => {
     const reloaded = await PDFDocument.load(output, { updateMetadata: false });
     expect(reloaded.getPageCount()).toBe(4);
+  });
+});
+
+// --- Suite 7: CalRGB color space graphics ---
+
+describe('Benchmark: CalRGB color space graphics', () => {
+  let inputBytes, output, stats, outputDoc;
+
+  beforeAll(async () => {
+    inputBytes = await createCalRGBGraphicsPdf();
+    const result = await optimize(inputBytes);
+    output = result.output;
+    stats = result.stats;
+    outputDoc = await PDFDocument.load(output, { updateMetadata: false });
+  });
+
+  it('achieves some size reduction', () => {
+    expect(stats.savedPercent).toBeGreaterThan(0);
+    expect(stats.sizeGuard).toBeUndefined();
+  });
+
+  it('does not trigger content guard', () => {
+    expect(stats.contentGuard).toBeUndefined();
+    expect(stats.contentWarnings).toBeUndefined();
+  });
+
+  it('preserves page count and dimensions', () => {
+    const geom = getDocumentGeometry(outputDoc);
+    expect(geom.pageCount).toBe(1);
+    expect(geom.pages[0].width).toBe(612);
+    expect(geom.pages[0].height).toBe(792);
+  });
+
+  it('output is a valid reloadable PDF', async () => {
+    const reloaded = await PDFDocument.load(output, { updateMetadata: false });
+    expect(reloaded.getPageCount()).toBe(1);
+  });
+
+  it('preserves CalRGB and CalGray color space definitions', () => {
+    const csInfo = getColorSpaceInfo(outputDoc);
+    expect(csInfo.length).toBeGreaterThanOrEqual(3);
+    const types = csInfo.map((cs) => cs.type);
+    expect(types).toContain('CalRGB');
+    expect(types).toContain('CalGray');
+  });
+
+  it('content stream survives optimization', () => {
+    const page = outputDoc.getPages()[0];
+    const contents = page.node.get(PDFName.of('Contents'));
+    expect(contents).toBeDefined();
+    // Verify the ref resolves to an actual object
+    if (contents instanceof PDFName) {
+      // Shouldn't happen, but guard
+    } else {
+      const resolved = outputDoc.context.lookup(contents);
+      expect(resolved).toBeDefined();
+    }
+  });
+
+  it('strips metadata (XMP and PieceInfo)', () => {
+    const meta = getMetadataStatus(outputDoc);
+    expect(meta.hasXmp).toBe(false);
+    expect(meta.hasPieceInfo).toBe(false);
+  });
+
+  it('removes unreferenced objects', () => {
+    const unreferenced = findPass(stats, 'Removing');
+    expect(unreferenced.removed).toBeGreaterThanOrEqual(1);
+  });
+
+  it('all passes complete without errors', () => {
+    for (const pass of stats.passes) {
+      expect(pass.error).toBeUndefined();
+    }
   });
 });

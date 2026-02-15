@@ -4,7 +4,7 @@
  * Pure functions that examine a loaded PDFDocument and return structured results.
  * Used by benchmark tests to assert output state after optimization.
  */
-import { PDFName, PDFDict, PDFRef, PDFRawStream, PDFString } from 'pdf-lib';
+import { PDFName, PDFDict, PDFArray, PDFRef, PDFRawStream, PDFString } from 'pdf-lib';
 import { FONT_FILE_KEYS } from '../../src/engine/utils/hash.js';
 
 /**
@@ -218,4 +218,51 @@ export function getImageInfo(pdfDoc) {
   }
 
   return images;
+}
+
+/**
+ * Get color space information from all pages.
+ * Walks each page's Resources/ColorSpace dict and reports entries.
+ *
+ * @param {import('pdf-lib').PDFDocument} pdfDoc
+ * @returns {Array<{ page: number, name: string, type: string }>}
+ */
+export function getColorSpaceInfo(pdfDoc) {
+  const context = pdfDoc.context;
+  const pages = pdfDoc.getPages();
+  const result = [];
+
+  for (let i = 0; i < pages.length; i++) {
+    const pageNode = pages[i].node;
+    const resourcesVal = pageNode.get(PDFName.of('Resources'));
+    const resources = resourcesVal instanceof PDFRef
+      ? context.lookup(resourcesVal)
+      : resourcesVal;
+    if (!(resources instanceof PDFDict)) continue;
+
+    const csVal = resources.get(PDFName.of('ColorSpace'));
+    const csDict = csVal instanceof PDFRef ? context.lookup(csVal) : csVal;
+    if (!(csDict instanceof PDFDict)) continue;
+
+    for (const [key, value] of csDict.entries()) {
+      const csName = key instanceof PDFName ? key.decodeText() : key.toString();
+
+      // Color space value can be a PDFName (simple) or PDFArray ([/CalRGB <<...>>])
+      let csType = null;
+      const resolved = value instanceof PDFRef ? context.lookup(value) : value;
+
+      if (resolved instanceof PDFName) {
+        csType = resolved.decodeText();
+      } else if (resolved instanceof PDFArray && resolved.size() > 0) {
+        const first = resolved.get(0);
+        if (first instanceof PDFName) {
+          csType = first.decodeText();
+        }
+      }
+
+      result.push({ page: i + 1, name: csName, type: csType });
+    }
+  }
+
+  return result;
 }

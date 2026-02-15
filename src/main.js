@@ -1,8 +1,33 @@
 import './style.css';
-import { formatSize } from './ui/helpers.js';
-import { collectOptions, applyPreset, initOptionsListeners, getCurrentPresetLabel } from './ui/options.js';
-import { buildSingleFileCard, buildSummaryCard, buildFileCard } from './ui/result-card.js';
-import { destroyAllComparisons } from './ui/compare.js';
+import { formatSize, escapeHtml, renderMarkdown } from './ui/helpers.js';
+import { collectOptions, initOptionsListeners } from './ui/options.js';
+import { buildResultsPaletteContent, buildInspectorPaletteContent } from './ui/result-card.js';
+import { buildDebugPanel } from './ui/stats.js';
+import { buildPreviewContent, destroyAllComparisons } from './ui/compare.js';
+import { initWindowManager, createPalette, initDrag, bringToFront } from './ui/palette.js';
+import { createControlStrip } from './ui/control-strip.js';
+import { buildAppearanceContent, initAppearance, playStartupChime, showHappyMac, showSadMac } from './ui/appearance.js';
+import readmeText from '../README.md?raw';
+
+// --- Sample PDFs (pdf.js test suite — CORS-accessible via GitHub raw) ---
+const SAMPLE_PDF_BASE = 'https://raw.githubusercontent.com/mozilla/pdf.js/master/test/pdfs/';
+const SAMPLE_PDFS = [
+  { name: 'tracemonkey.pdf', label: 'Research Paper', url: `${SAMPLE_PDF_BASE}tracemonkey.pdf` },
+  { name: 'TAMReview.pdf', label: 'TAM Review', url: `${SAMPLE_PDF_BASE}TAMReview.pdf` },
+  { name: 'calrgb.pdf', label: 'Color Graphics', url: `${SAMPLE_PDF_BASE}calrgb.pdf` },
+];
+
+async function fetchPdfAsFile(url, name) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  return new File([blob], name, { type: 'application/pdf' });
+}
+
+// Suppress benign ResizeObserver loop error (triggered by viewer resize ↔ layout cycle)
+window.addEventListener('error', (e) => {
+  if (e.message?.includes('ResizeObserver loop')) e.stopImmediatePropagation();
+});
 
 // --- Friendly pass name labels (pipeline names stay unchanged for test compat) ---
 const PASS_LABELS = {
@@ -56,6 +81,7 @@ let lastFiles = null;
 let lastRunOptions = null;
 let activeWorker = null;
 let cancelled = false;
+let hasPlayedChime = false;
 
 // --- DOM refs ---
 const dropZone = document.getElementById('drop-zone');
@@ -63,72 +89,210 @@ const dropArea = dropZone.querySelector('.drop-area');
 const fileInput = document.getElementById('file-input');
 const processingSection = document.getElementById('processing');
 const fileList = document.getElementById('file-list');
-const resultsSection = document.getElementById('results');
-const resultsSummary = document.getElementById('results-summary');
-const resultsFiles = document.getElementById('results-files');
-const resultsSettingsBar = document.getElementById('results-settings');
-const settingsPresetLabel = document.getElementById('settings-preset-label');
-const btnToggleSettings = document.getElementById('btn-toggle-settings');
-const resultsSettingsBody = document.getElementById('results-settings-body');
-const optionsIdleSlot = document.getElementById('options-idle-slot');
-const btnReoptimize = document.getElementById('btn-reoptimize');
-const btnStartOver = document.getElementById('btn-start-over');
 const dropOverlay = document.getElementById('drop-overlay');
 const btnCancel = document.getElementById('btn-cancel');
+const mainActions = document.getElementById('main-actions');
+const btnStartOver = document.getElementById('btn-start-over');
+const settingsActions = document.getElementById('settings-actions');
+const btnReoptimize = document.getElementById('btn-reoptimize');
+const statusLeft = document.getElementById('status-left');
 
-// --- Settings bar toggle ---
-btnToggleSettings.addEventListener('click', () => {
-  const isOpen = !resultsSettingsBody.hidden;
-  resultsSettingsBody.hidden = isOpen;
-  btnToggleSettings.textContent = isOpen ? 'Change settings' : 'Hide settings';
+// --- Initialize window manager ---
+initWindowManager();
+initAppearance();
+
+// Make main window draggable + shadable
+const mainWindow = document.getElementById('main-window');
+const mainTitleBar = mainWindow.querySelector('.title-bar');
+initDrag(mainWindow, mainTitleBar);
+
+const mainCollapseBox = mainTitleBar.querySelector('.title-bar__collapse-box');
+function toggleMainShade() {
+  mainWindow.classList.toggle('app-window--shaded');
+}
+mainTitleBar.addEventListener('dblclick', toggleMainShade);
+if (mainCollapseBox) {
+  mainCollapseBox.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleMainShade();
+  });
+}
+
+// --- Create palettes ---
+const settingsPalette = createPalette({
+  id: 'settings',
+  title: 'Settings',
+  defaultPosition: { top: 20, left: 520 },
+  width: 260,
+});
+
+const resultsPalette = createPalette({
+  id: 'results',
+  title: 'Results',
+  defaultPosition: { top: 20, left: 800 },
+  width: 260,
+});
+
+const inspectorPalette = createPalette({
+  id: 'inspector',
+  title: 'Inspector',
+  defaultPosition: { top: 320, left: 20 },
+  width: 480,
+});
+
+const previewPalette = createPalette({
+  id: 'preview',
+  title: 'Preview',
+  defaultPosition: { top: 280, left: 520 },
+  width: 600,
+});
+// Set an initial height so the viewer favors landscape proportions.
+// CSS resize:both lets the user adjust from here.
+previewPalette.element.style.height = '460px';
+
+// Move #options-panel into Settings palette
+const optionsPanel = document.getElementById('options-panel');
+optionsPanel.hidden = false;
+settingsPalette.setContent(optionsPanel);
+
+// Set empty states for result palettes
+resultsPalette.showEmpty('Nothing to report yet');
+inspectorPalette.showEmpty('Waiting for a PDF to dissect');
+previewPalette.showEmpty('No document loaded');
+
+// --- Read Me palette (Mac Stickies style, open by default) ---
+const readmePalette = createPalette({
+  id: 'readme',
+  title: 'Read Me',
+  defaultPosition: { top: 400, left: 20 },
+  width: 340,
+  closable: true,
+});
+readmePalette.element.classList.add('palette--sticky');
+
+const readmeContent = document.createElement('div');
+readmeContent.className = 'readme-content';
+readmeContent.innerHTML = renderMarkdown(readmeText);
+readmePalette.setContent(readmeContent);
+
+// --- Appearance palette (hidden by default, closable) ---
+const appearancePalette = createPalette({
+  id: 'appearance',
+  title: 'Appearance',
+  defaultPosition: { top: 200, left: 520 },
+  width: 240,
+  closable: true,
+});
+appearancePalette.setContent(buildAppearanceContent());
+appearancePalette.hide();
+
+// --- Debug Console palette (only when ?debug) ---
+const isDebug = new URLSearchParams(window.location.search).has('debug');
+let debugPalette;
+if (isDebug) {
+  debugPalette = createPalette({
+    id: 'debug',
+    title: 'Debug Console',
+    defaultPosition: { top: 440, left: 520 },
+    width: 480,
+    closable: true,
+  });
+  debugPalette.showEmpty('Run optimization to see diagnostics');
+}
+
+// Establish initial z-order: Read Me behind work palettes
+bringToFront(readmePalette.element);
+bringToFront(settingsPalette.element);
+bringToFront(resultsPalette.element);
+bringToFront(previewPalette.element);
+bringToFront(inspectorPalette.element);
+
+function toggleAppearancePalette() {
+  if (appearancePalette.element.hidden) {
+    appearancePalette.show();
+  }
+  bringToFront(appearancePalette.element);
+}
+
+// --- Desktop icon handlers ---
+document.getElementById('icon-readme').addEventListener('click', () => {
+  if (readmePalette.element.hidden) readmePalette.show();
+  bringToFront(readmePalette.element);
+});
+
+document.getElementById('icon-appearance').addEventListener('click', toggleAppearancePalette);
+
+// --- Sample PDF desktop icons (drag-to-optimize) ---
+const SAMPLE_TYPE = 'application/x-pdf-sample';
+const desktopIcons = document.getElementById('desktop-icons');
+
+// PDF document SVG icon (shared across sample icons)
+const pdfIconSvg = `<svg class="desktop-icon__img" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+  <polyline points="14 2 14 8 20 8"/>
+  <text x="12" y="17" text-anchor="middle" font-size="6" font-weight="bold" fill="currentColor" stroke="none">PDF</text>
+</svg>`;
+
+SAMPLE_PDFS.forEach((sample) => {
+  const icon = document.createElement('button');
+  icon.type = 'button';
+  icon.className = 'desktop-icon desktop-icon--sample';
+  icon.draggable = true;
+  icon.innerHTML = `${pdfIconSvg}<span class="desktop-icon__label">${escapeHtml(sample.label)}</span>`;
+
+  // Drag: set custom type so drop handlers can distinguish from native file drags
+  icon.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData(SAMPLE_TYPE, JSON.stringify({ name: sample.name, url: sample.url }));
+    e.dataTransfer.effectAllowed = 'copy';
+  });
+
+  // Click fallback: fetch + optimize directly
+  icon.addEventListener('click', async () => {
+    if (icon.classList.contains('desktop-icon--loading')) return;
+    const labelEl = icon.querySelector('.desktop-icon__label');
+    const originalLabel = labelEl.textContent;
+    icon.classList.add('desktop-icon--loading');
+    labelEl.textContent = 'Loading\u2026';
+    try {
+      const file = await fetchPdfAsFile(sample.url, sample.name);
+      await handleFiles([file]);
+    } catch (err) {
+      console.error(`Sample PDF fetch failed (${sample.name}):`, err);
+    } finally {
+      icon.classList.remove('desktop-icon--loading');
+      labelEl.textContent = originalLabel;
+    }
+  });
+
+  desktopIcons.appendChild(icon);
 });
 
 // --- Stale results detection ---
 function checkStaleResults() {
-  if (!lastRunOptions || resultsSection.hidden) return;
+  if (!lastRunOptions) return;
   const current = JSON.stringify(collectOptions());
   const isStale = current !== lastRunOptions;
-
   btnReoptimize.classList.toggle('btn--stale', isStale);
-  resultsSettingsBar.classList.toggle('results-settings--stale', isStale);
-
-  // Update the preset label
-  settingsPresetLabel.textContent = getCurrentPresetLabel();
 }
 
+// --- Control Strip ---
+createControlStrip({
+  onAboutClick: showAboutDialog,
+  onAppearanceClick: toggleAppearancePalette,
+});
+
 // --- Initialize options panel listeners ---
-initOptionsListeners({ onOptionsChanged: checkStaleResults });
+initOptionsListeners({
+  onOptionsChanged: checkStaleResults,
+});
 
-// --- Helpers ---
-function showState(state) {
-  dropZone.hidden = state !== 'idle';
-  processingSection.hidden = state !== 'processing';
-  resultsSection.hidden = state !== 'results';
-
-  const optionsPanel = document.getElementById('options-panel');
-
-  if (state === 'idle') {
-    // Move options panel back to idle slot
-    optionsPanel.hidden = false;
-    optionsIdleSlot.appendChild(optionsPanel);
-  } else if (state === 'processing') {
-    optionsPanel.hidden = true;
-  } else if (state === 'results') {
-    // Move options panel into settings bar body
-    optionsPanel.hidden = false;
-    const adv = optionsPanel.querySelector('.advanced');
-    if (adv) adv.open = false;
-    resultsSettingsBody.appendChild(optionsPanel);
-    resultsSettingsBody.hidden = true;
-    btnToggleSettings.textContent = 'Change settings';
-    settingsPresetLabel.textContent = getCurrentPresetLabel();
-  }
-
-  // Animate the entering section
-  const active = state === 'idle' ? dropZone : state === 'processing' ? processingSection : resultsSection;
-  active.classList.remove('state--entering');
-  void active.offsetWidth;
-  active.classList.add('state--entering');
+// --- Simple state management (no more showState) ---
+function setProcessing(active) {
+  processingSection.hidden = !active;
+  dropZone.classList.toggle('state--dimmed', active);
+  statusLeft.textContent = active
+    ? 'Optimizing\u2026'
+    : 'Ready \u2014 files never leave your device';
 }
 
 function revokeBlobUrls() {
@@ -173,35 +337,83 @@ function processFileWithProgress(file, options, progressCb) {
   });
 }
 
-// --- Render results ---
+// --- Render results into palettes ---
 function renderResults(results, options) {
-  resultsSummary.innerHTML = '';
-  resultsFiles.innerHTML = '';
-
-  if (results.length === 1) {
-    // Single file: one full result card
-    const r = results[0];
-    const blob = new Blob([r.result], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    blobUrls.push(url);
-
-    const card = buildSingleFileCard(r, blob, url, options, animateCountUp, checkStaleResults);
-    resultsSummary.appendChild(card);
+  // Update status bar with savings summary
+  const totalOriginal = results.reduce((s, r) => s + r.original, 0);
+  const totalOptimized = results.reduce((s, r) => s + r.result.byteLength, 0);
+  const totalSaved = totalOriginal - totalOptimized;
+  const totalPct = totalOriginal > 0 ? ((totalSaved / totalOriginal) * 100).toFixed(1) : '0.0';
+  if (totalSaved > 0) {
+    statusLeft.textContent = `Saved ${totalPct}% \u2014 ${formatSize(totalOriginal)} \u2192 ${formatSize(totalOptimized)}`;
   } else {
-    // Multi-file: summary card + per-file cards
-    const summaryCard = buildSummaryCard(results, animateCountUp);
-    resultsSummary.appendChild(summaryCard);
+    statusLeft.textContent = 'Done \u2014 already well-optimized';
+  }
 
-    for (const r of results) {
-      const blob = new Blob([r.result], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      blobUrls.push(url);
+  // Results palette
+  const resultsContent = buildResultsPaletteContent(results, blobUrls, options, {
+    animateCountUp,
+    onStaleCheck: checkStaleResults,
+  });
+  resultsPalette.setContent(resultsContent);
 
-      const card = buildFileCard(r, blob, url, options, checkStaleResults);
-      resultsFiles.appendChild(card);
+  // Inspector palette (use first result for single-file, or first for multi — user sees summary in results)
+  const firstResult = results[0];
+  const inspectorContent = buildInspectorPaletteContent(firstResult, options);
+  if (inspectorContent) {
+    inspectorPalette.setContent(inspectorContent);
+  } else {
+    inspectorPalette.showEmpty('No optimization data available');
+  }
+
+  // Debug Console palette
+  if (debugPalette) {
+    const debugHtml = buildDebugPanel(firstResult.stats);
+    if (debugHtml) {
+      const body = document.createElement('div');
+      body.innerHTML = debugHtml;
+      debugPalette.setContent(body);
     }
   }
+
+  // Preview palette (single-file: auto-load, multi-file: first file)
+  const previewResult = results[0];
+  const blob = new Blob([previewResult.result], { type: 'application/pdf' });
+  const previewContent = buildPreviewContent(previewResult.originalFile, blob);
+  previewPalette.setContent(previewContent);
+
+  // Show action buttons
+  mainActions.hidden = false;
+  settingsActions.hidden = false;
+
+  // Easter egg hooks
+  const savingsPct = totalOriginal > 0 ? (totalSaved / totalOriginal) * 100 : 0;
+  const savingsInfo = { pct: totalPct, original: formatSize(totalOriginal), optimized: formatSize(totalOptimized), saved: formatSize(totalSaved), savedBytes: totalSaved };
+  if (savingsPct >= 30) showHappyMac(savingsInfo);
+  if (savingsPct <= 0) showSadMac(savingsInfo);
 }
+
+// --- Start over ---
+function startOver() {
+  revokeBlobUrls();
+  destroyAllComparisons();
+  lastFiles = null;
+  lastRunOptions = null;
+  fileInput.value = '';
+
+  resultsPalette.showEmpty('Nothing to report yet');
+  inspectorPalette.showEmpty('Waiting for a PDF to dissect');
+  previewPalette.showEmpty('No document loaded');
+  if (debugPalette) debugPalette.showEmpty('Run optimization to see diagnostics');
+
+  mainActions.hidden = true;
+  settingsActions.hidden = true;
+  btnReoptimize.classList.remove('btn--stale');
+  statusLeft.textContent = 'Ready \u2014 files never leave your device';
+}
+
+btnStartOver.addEventListener('click', startOver);
+btnReoptimize.addEventListener('click', () => { if (lastFiles) handleFiles(lastFiles); });
 
 // --- Main flow ---
 async function handleFiles(files) {
@@ -218,22 +430,29 @@ async function handleFiles(files) {
   lastFiles = pdfFiles;
   cancelled = false;
 
+  // Easter egg: one-shot startup chime on first file drop
+  if (!hasPlayedChime) {
+    hasPlayedChime = true;
+    playStartupChime();
+  }
+
   const options = collectOptions();
   lastRunOptions = JSON.stringify(options);
 
-  showState('processing');
+  setProcessing(true);
   const processingStart = Date.now();
   fileList.innerHTML = '';
 
   const results = [];
 
-  for (const file of pdfFiles) {
+  for (let fileIdx = 0; fileIdx < pdfFiles.length; fileIdx++) {
+    const file = pdfFiles[fileIdx];
     if (cancelled) break;
 
     const li = document.createElement('li');
     li.className = 'file-item';
     li.innerHTML = `
-      <span class="file-item__name">${file.name}</span>
+      <span class="file-item__name">${escapeHtml(file.name)}</span>
       <span class="file-item__pass">Starting&hellip;</span>
       <div class="file-item__bar"><div class="file-item__fill file-item__fill--active" style="width:0%"></div></div>
     `;
@@ -241,11 +460,15 @@ async function handleFiles(files) {
 
     const passEl = li.querySelector('.file-item__pass');
     const fillEl = li.querySelector('.file-item__fill');
+    const fileCounter = pdfFiles.length > 1 ? ` (${fileIdx + 1}/${pdfFiles.length})` : '';
+    statusLeft.textContent = `Optimizing ${file.name}${fileCounter}\u2026`;
 
     try {
       const { result, stats } = await processFileWithProgress(file, options, (progress, pass) => {
         fillEl.style.width = `${Math.round(progress * 100)}%`;
-        passEl.textContent = PASS_LABELS[pass] || pass || 'Processing\u2026';
+        const passLabel = PASS_LABELS[pass] || pass || 'Processing\u2026';
+        passEl.textContent = passLabel;
+        statusLeft.textContent = `Optimizing ${file.name}${fileCounter} \u2014 ${passLabel}`;
       });
 
       fillEl.style.width = '100%';
@@ -277,7 +500,7 @@ async function handleFiles(files) {
   }
 
   if (cancelled) {
-    showState('idle');
+    setProcessing(false);
     return;
   }
 
@@ -288,18 +511,14 @@ async function handleFiles(files) {
   }
 
   // Show results
-  showState('results');
+  setProcessing(false);
   revokeBlobUrls();
   destroyAllComparisons();
-
-  btnReoptimize.classList.remove('btn--stale');
-  resultsSettingsBar.classList.remove('results-settings--stale');
 
   renderResults(results, options);
 }
 
-// --- Example PDF ---
-const EXAMPLE_PDF_URL = 'https://raw.githubusercontent.com/mozilla/pdf.js/master/test/pdfs/tracemonkey.pdf';
+// --- Example PDF (inline "try an example" button) ---
 const btnTryExample = document.getElementById('btn-try-example');
 
 btnTryExample.addEventListener('click', async (e) => {
@@ -307,14 +526,13 @@ btnTryExample.addEventListener('click', async (e) => {
   btnTryExample.disabled = true;
   btnTryExample.textContent = 'loading\u2026';
   try {
-    const res = await fetch(EXAMPLE_PDF_URL);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const file = new File([blob], 'tracemonkey.pdf', { type: 'application/pdf' });
-    handleFiles([file]);
+    const file = await fetchPdfAsFile(SAMPLE_PDFS[0].url, SAMPLE_PDFS[0].name);
+    await handleFiles([file]);
   } catch (err) {
-    btnTryExample.textContent = 'failed to load';
     console.error('Example PDF fetch failed:', err);
+  } finally {
+    btnTryExample.disabled = false;
+    btnTryExample.textContent = 'try an example PDF';
   }
 });
 
@@ -344,9 +562,20 @@ dropArea.addEventListener('dragleave', () => {
   dropArea.classList.remove('drop-area--active');
 });
 
-dropArea.addEventListener('drop', (e) => {
+dropArea.addEventListener('drop', async (e) => {
   e.preventDefault();
   dropArea.classList.remove('drop-area--active');
+  const sampleData = e.dataTransfer.getData(SAMPLE_TYPE);
+  if (sampleData) {
+    try {
+      const { name, url } = JSON.parse(sampleData);
+      const file = await fetchPdfAsFile(url, name);
+      await handleFiles([file]);
+    } catch (err) {
+      console.error('Sample PDF drop failed:', err);
+    }
+    return;
+  }
   if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
 });
 
@@ -354,7 +583,7 @@ dropArea.addEventListener('drop', (e) => {
 let dragCounter = 0;
 
 document.addEventListener('dragenter', (e) => {
-  if (!e.dataTransfer.types.includes('Files')) return;
+  if (!e.dataTransfer.types.includes('Files') && !e.dataTransfer.types.includes(SAMPLE_TYPE)) return;
   // Only show overlay when not processing
   if (!processingSection.hidden) return;
   dragCounter++;
@@ -375,11 +604,22 @@ document.addEventListener('dragover', (e) => {
   e.preventDefault();
 });
 
-document.addEventListener('drop', (e) => {
+document.addEventListener('drop', async (e) => {
   e.preventDefault();
   dragCounter = 0;
   dropOverlay.hidden = true;
   if (!processingSection.hidden) return;
+  const sampleData = e.dataTransfer.getData(SAMPLE_TYPE);
+  if (sampleData) {
+    try {
+      const { name, url } = JSON.parse(sampleData);
+      const file = await fetchPdfAsFile(url, name);
+      await handleFiles([file]);
+    } catch (err) {
+      console.error('Sample PDF drop failed:', err);
+    }
+    return;
+  }
   if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
 });
 
@@ -390,30 +630,52 @@ btnCancel.addEventListener('click', () => {
     activeWorker.terminate();
     activeWorker = null;
   }
-  showState('idle');
+  setProcessing(false);
 });
 
-btnReoptimize.addEventListener('click', () => {
-  if (lastFiles) handleFiles(lastFiles);
-});
+// --- About dialog ---
+function showAboutDialog() {
+  const overlay = document.createElement('div');
+  overlay.className = 'about-overlay';
+  overlay.innerHTML = `
+    <div class="about-dialog">
+      <div class="about-dialog__title-bar">
+        <div class="about-dialog__close-box" data-action="close"></div>
+        <div class="about-dialog__stripes"></div>
+        <span class="about-dialog__title">About</span>
+        <div class="about-dialog__stripes"></div>
+      </div>
+      <div class="about-dialog__body">
+        <div class="about-dialog__name">PDF-A-go-slim</div>
+        <p>Reduce PDF file size entirely in your browser. No uploads, no server.</p>
+        <p>Built with pdf-lib, fflate, harfbuzzjs, and jpeg-js.</p>
+        <p><a href="https://github.com/khawkins98/PDF-A-go-slim" target="_blank" rel="noopener">github.com/khawkins98/PDF-A-go-slim</a></p>
+      </div>
+      <div class="about-dialog__footer">
+        <button class="btn btn--default" data-action="close">OK</button>
+      </div>
+    </div>`;
 
-btnStartOver.addEventListener('click', () => {
-  revokeBlobUrls();
-  destroyAllComparisons();
-  lastFiles = null;
-  lastRunOptions = null;
-  fileInput.value = '';
-  btnReoptimize.classList.remove('btn--stale');
-  resultsSettingsBar.classList.remove('results-settings--stale');
-  showState('idle');
-});
+  function close() { overlay.remove(); }
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay || e.target.closest('[data-action="close"]')) close();
+  });
+  document.addEventListener('keydown', function onKey(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+  });
+  document.body.appendChild(overlay);
+}
+
+document.getElementById('btn-about').addEventListener('click', showAboutDialog);
 
 // --- Debug mode indicator ---
 if (new URLSearchParams(window.location.search).has('debug')) {
   const banner = document.createElement('div');
   banner.className = 'debug-banner';
-  banner.innerHTML = 'Debug mode active — extra diagnostics will appear in results';
-  document.body.insertBefore(banner, document.body.firstChild);
+  banner.innerHTML = 'Debug mode active \u2014 extra diagnostics will appear in results';
+  const appWindow = document.querySelector('.app-window');
+  appWindow.insertBefore(banner, appWindow.firstChild);
 }
 
-showState('idle');
+// --- Initial state ---
+statusLeft.textContent = 'Ready \u2014 files never leave your device';

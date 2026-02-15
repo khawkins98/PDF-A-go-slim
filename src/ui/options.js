@@ -5,8 +5,15 @@ export const PRESETS = {
   print:    { lossy: true,  imageQuality: 0.92, unembedStandardFonts: true, subsetFonts: true, maxImageDpi: 300 },
 };
 
+const PRESET_HINTS = {
+  lossless: 'No quality loss \u2014 recompress, deduplicate, subset fonts',
+  web:      'Lossy JPEG at 75% quality, 150 DPI cap \u2014 best for screens',
+  print:    'Lossy JPEG at 92% quality, 300 DPI cap \u2014 best for print',
+  custom:   'Custom settings',
+};
+
 // --- DOM refs (private to this module) ---
-const presetBtns = document.querySelectorAll('.preset-btn');
+const presetBtns = document.querySelectorAll('.tab-control__tab');
 const modeBtns = document.querySelectorAll('.mode-btn');
 const qualityRow = document.querySelector('.control-row--quality');
 const qualitySlider = document.getElementById('quality-slider');
@@ -15,13 +22,15 @@ const dpiRow = document.querySelector('.control-row--dpi');
 const dpiInput = document.getElementById('max-dpi');
 const unembedCheckbox = document.getElementById('unembed-fonts');
 const subsetCheckbox = document.getElementById('subset-fonts');
+const presetHint = document.getElementById('preset-hint');
 
 export function applyPreset(name) {
   const p = PRESETS[name];
   if (!p) return;
 
   presetBtns.forEach((btn) => {
-    btn.classList.toggle('preset-btn--active', btn.dataset.preset === name);
+    btn.classList.toggle('tab-control__tab--active', btn.dataset.preset === name);
+    btn.setAttribute('aria-selected', btn.dataset.preset === name ? 'true' : 'false');
   });
 
   modeBtns.forEach((btn) => {
@@ -37,6 +46,8 @@ export function applyPreset(name) {
 
   unembedCheckbox.checked = p.unembedStandardFonts;
   subsetCheckbox.checked = p.subsetFonts;
+
+  if (presetHint) presetHint.textContent = PRESET_HINTS[name] || PRESET_HINTS.custom;
 }
 
 export function syncPresetIndicator() {
@@ -48,12 +59,18 @@ export function syncPresetIndicator() {
         (!current.lossy || (current.imageQuality === p.imageQuality &&
                             current.maxImageDpi === p.maxImageDpi))) {
       presetBtns.forEach((btn) => {
-        btn.classList.toggle('preset-btn--active', btn.dataset.preset === name);
+        btn.classList.toggle('tab-control__tab--active', btn.dataset.preset === name);
+        btn.setAttribute('aria-selected', btn.dataset.preset === name ? 'true' : 'false');
       });
+      if (presetHint) presetHint.textContent = PRESET_HINTS[name] || PRESET_HINTS.custom;
       return;
     }
   }
-  presetBtns.forEach((btn) => btn.classList.remove('preset-btn--active'));
+  presetBtns.forEach((btn) => {
+    btn.classList.remove('tab-control__tab--active');
+    btn.setAttribute('aria-selected', 'false');
+  });
+  if (presetHint) presetHint.textContent = PRESET_HINTS.custom;
 }
 
 /** Return the human-readable label for the currently active preset. */
@@ -118,7 +135,7 @@ export function initOptionsListeners({ onOptionsChanged }) {
   optionsPanel.addEventListener('input', onOptionsChanged);
   optionsPanel.addEventListener('change', onOptionsChanged);
   optionsPanel.addEventListener('click', (e) => {
-    if (e.target.closest('.preset-btn') || e.target.closest('.mode-btn')) {
+    if (e.target.closest('.tab-control__tab') || e.target.closest('.mode-btn')) {
       requestAnimationFrame(onOptionsChanged);
     }
   });

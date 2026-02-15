@@ -131,7 +131,7 @@ function buildCategoryRow(catBefore, catAfter, totalBeforeSize, passes) {
 
   const annotation = buildAnnotation(catBefore.label, passes);
 
-  return `<details class="inspect-category" style="--cat-accent: ${info.color}; --pct: ${pct}%">
+  return `<details class="inspect-category" open style="--cat-accent: ${info.color}; --pct: ${pct}%">
     <summary class="inspect-category__header">
       <span class="inspect-category__label">${info.label}<span class="inspect-category__desc-text">${info.description}</span></span>
       <span class="inspect-category__before">${formatSize(bSize)} <small>(${catBefore.count})</small></span>
@@ -143,6 +143,24 @@ function buildCategoryRow(catBefore, catAfter, totalBeforeSize, passes) {
       ${itemsHtml}
     </div>
   </details>`;
+}
+
+/**
+ * Set up delegated click handler for "Show more..." toggles inside a container.
+ * @param {HTMLElement} containerEl
+ */
+export function initInspectorInteractions(containerEl) {
+  containerEl.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.inspect-show-more');
+    if (!btn) return;
+    const collapsed = btn.previousElementSibling;
+    if (collapsed && collapsed.classList.contains('inspect-collapse')) {
+      collapsed.hidden = !collapsed.hidden;
+      btn.textContent = collapsed.hidden
+        ? `Show ${btn.dataset.count} more\u2026`
+        : 'Show less';
+    }
+  });
 }
 
 export function buildInspectPanel(stats) {

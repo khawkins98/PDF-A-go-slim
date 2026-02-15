@@ -16,7 +16,7 @@
  * - Fonts without ToUnicode or recognizable encoding
  */
 import { PDFName, PDFDict, PDFRef, PDFRawStream, PDFArray } from 'pdf-lib';
-import { deflateSync } from 'fflate';
+import { zlibSync } from 'fflate';
 import { extractUsedCharCodes } from '../utils/content-stream-parser.js';
 import { charCodesToUnicode, isIdentityHFont } from '../utils/unicode-mapper.js';
 import { subsetFont } from '../utils/harfbuzz-subsetter.js';
@@ -213,7 +213,7 @@ async function processFont(context, info) {
   if (subsetBytes.length >= originalSize) return false;
 
   // Recompress with deflate level 9
-  const compressed = deflateSync(subsetBytes, { level: 9 });
+  const compressed = zlibSync(subsetBytes, { level: 9 });
 
   // Replace the font stream
   const newStream = PDFRawStream.of(fontFileStream.dict, compressed);

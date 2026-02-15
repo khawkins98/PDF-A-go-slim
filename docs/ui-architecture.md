@@ -1,15 +1,18 @@
 # UI Architecture & Information Architecture
 
-Reference diagram for the PDF-A-go-slim interface. Documents the state machine, screen layouts, component hierarchy, and data flow.
+Reference diagram for the PDF-A-go-slim interface. Documents the state model, screen layouts, component hierarchy, and data flow.
+
+**Visual style:** Classic desktop utility aesthetic with window chrome, floating palettes, and status bar. See `docs/UI.md` for design decisions.
 
 ---
 
-## State Machine
+## State Model
 
-The app has three mutually exclusive states managed by `showState()` in `main.js`. The `#options-panel` DOM node physically relocates between states.
+The app uses a simplified two-phase model: **idle/results** vs **processing**. There is no `showState()` function — instead, the drop zone is always visible (dimmed during processing), and four floating palettes hold all content. Palettes show empty placeholders until optimization completes.
 
 ```
-                         drop / click / "try example"
+                   drop / click / "try example" / sample icon drag
+
                     +------------------------------------+
                     |                                    |
                     v                                    |
@@ -32,13 +35,23 @@ The app has three mutually exclusive states managed by `showState()` in `main.js
 
 ### State visibility rules
 
-| Element              | IDLE    | PROCESSING | RESULTS                  |
-|----------------------|---------|------------|--------------------------|
-| `#drop-zone`         | visible | hidden     | hidden                   |
-| `#options-panel`     | visible (in `#options-idle-slot`) | hidden | visible (in `#results-settings-body`) |
-| `#processing`        | hidden  | visible    | hidden                   |
-| `#results`           | hidden  | hidden     | visible                  |
-| `#drop-overlay`      | on drag | blocked    | on drag                  |
+| Element              | IDLE    | PROCESSING        | RESULTS                |
+|----------------------|---------|-------------------|------------------------|
+| `#drop-zone`         | visible | dimmed (`.state--dimmed`) | visible              |
+| `#processing`        | hidden  | visible           | hidden                 |
+| `#main-actions`      | hidden  | hidden            | visible (Start Over)   |
+| `#settings-actions`  | hidden  | hidden            | visible (Re-optimize)  |
+| Settings palette     | options panel | options panel | options panel + Re-optimize |
+| Results palette      | empty placeholder | empty | hero card + download     |
+| Inspector palette    | empty placeholder | empty | stats + object breakdown |
+| Preview palette      | empty placeholder | empty | PDF-A-go-go viewer       |
+| `#drop-overlay`      | on drag | blocked           | on drag                |
+| `.status-bar` left   | tagline | "Optimizing {file}..." | "Saved {pct}% — {sizes}" |
+
+**Key difference from a traditional state machine:** There is no DOM-relocating `showState()` function. Instead:
+- `setProcessing(true/false)` toggles the processing section and dims/undims the drop zone
+- `renderResults()` populates palette content via `setContent()`
+- `startOver()` resets palettes to empty placeholders
 
 ---
 
@@ -47,226 +60,186 @@ The app has three mutually exclusive states managed by `showState()` in `main.js
 ### IDLE
 
 ```
-+========================================================+
-|                    PDF-A-go-slim                        |
-|       Optimize PDFs in your browser. Files never       |
-|       leave your device.                               |
-+========================================================+
+.desktop (relative positioning context, full viewport)
+┌─── #main-window (.app-window) ──────────────┐
+│ title-bar: PDF-A-go-slim  [collapse]         │
+│──────────────────────────────────────────────│
+│ #app                                         │
+│ ┌── .drop-area ────────────────────────────┐ │
+│ │          [PDF icon]                      │ │
+│ │        Drop PDFs here                    │ │
+│ │     or click to select files             │ │
+│ │   or [try an example PDF]               │ │
+│ └──────────────────────────────────────────┘ │
+│──────────────────────────────────────────────│
+│ status-bar: tagline          GitHub · Debug  │
+└──────────────────────────────────────────────┘
 
-+--------------------------------------------------------+
-|                                                        |
-|                    [PDF icon]                           |
-|                                                        |
-|                  Drop PDFs here                        |
-|               or click to select files                 |
-|           or [try an example PDF]                      |
-|                                                        |
-+--------------------------------------------------------+
+┌── Settings palette ──────────┐   (always on screen)
+│ [Lossless*][Web][Print]      │
+│ No quality loss — recompress,│ ← preset hint (updates per tab)
+│ deduplicate, subset fonts    │
+│ ⚙ Advanced Settings          │ ← gear icon
+│   Mode: [Lossless|Lossy]     │
+│   [x] Unembed std fonts      │
+│   [x] Subset fonts           │
+└──────────────────────────────┘
 
-+-- #options-idle-slot ----------------------------------+
-| #options-panel                                         |
-|                                                        |
-| Preset: [Lossless*] [Web] [Print]                     |
-|                                                        |
-| > Advanced Settings                                    |
-|   +--------------------------------------------------+ |
-|   | Mode: [Lossless*|Lossy]                          | |
-|   | Image quality: [===|=====] 85  (lossy only)      | |
-|   | Max image DPI: [150]           (lossy only)      | |
-|   | [x] Unembed standard fonts                       | |
-|   | [x] Subset embedded fonts                        | |
-|   +--------------------------------------------------+ |
-+--------------------------------------------------------+
+┌── Results palette ───┐   ┌── Inspector palette ─┐
+│ Drop a PDF to see    │   │ Drop a PDF to see    │
+│ results              │   │ object breakdown     │
+└──────────────────────┘   └──────────────────────┘
 
-+-- footer ----------------------------------------------+
-|  Built with pdf-lib ... | Debug mode                   |
-+--------------------------------------------------------+
+┌── Preview palette ───┐
+│ Drop a PDF to see    │
+│ preview              │
+└──────────────────────┘
 ```
 
 **Interactions:**
-- Click drop area / keyboard Enter/Space -> file picker
-- Drag files onto page -> `#drop-overlay` appears
-- Click "try an example PDF" -> fetches tracemonkey.pdf from GitHub
-- Preset buttons -> `applyPreset()`, updates all advanced controls
-- Any option change -> `syncPresetIndicator()` highlights matching preset
+- Click drop area / keyboard Enter/Space → file picker
+- Drag files onto page → `#drop-overlay` appears
+- Click "try an example PDF" → fetches tracemonkey.pdf from GitHub
+- Drag a sample PDF icon onto drop zone → full-page overlay appears, fetch + optimize on drop
+- Click a sample PDF icon → fetch + optimize directly (loading state on icon)
+- Preset buttons → `applyPreset()`, updates all advanced controls + hint text
+- Any option change → `syncPresetIndicator()` highlights matching preset + updates hint
 
 ---
 
 ### PROCESSING
 
 ```
-+========================================================+
-|                    PDF-A-go-slim                        |
-+========================================================+
-
-+-- #processing -----------------------------------------+
-|                                                        |
-|  Optimizing...                                         |
-|                                                        |
-|  +-- file-item -------------------------------------+  |
-|  | report.pdf                                       |  |
-|  | Optimizing images...                             |  |
-|  | [========|============] (shimmer animation)      |  |
-|  +--------------------------------------------------+  |
-|                                                        |
-|  +-- file-item (error) -----------------------------+  |
-|  | secret.pdf                                       |  |
-|  | This PDF is password-protected  [Retry]          |  |
-|  | [######################################] (red)   |  |
-|  +--------------------------------------------------+  |
-|                                                        |
-|                     Cancel                             |
-|                                                        |
-+--------------------------------------------------------+
+┌─── #main-window ─────────────────────────────┐
+│ title-bar                                    │
+│──────────────────────────────────────────────│
+│ #drop-zone (dimmed, pointer-events: none)    │
+│ ┌── .drop-area ────────────────────────────┐ │
+│ │        (dimmed)                          │ │
+│ └──────────────────────────────────────────┘ │
+│                                              │
+│ #processing                                  │
+│ Optimizing…                                  │
+│ ┌── file-item ─────────────────────────────┐ │
+│ │ report.pdf                               │ │
+│ │ Optimizing images…                       │ │
+│ │ [========|============] (shimmer fill)   │ │
+│ └──────────────────────────────────────────┘ │
+│                                    Cancel    │
+│──────────────────────────────────────────────│
+│ status-bar: Optimizing report.pdf…           │
+└──────────────────────────────────────────────┘
 ```
 
 **Interactions:**
 - Progress bar animates per-pass (`PASS_LABELS` maps internal names to friendly labels)
-- Cancel -> terminates worker, returns to IDLE
-- Error -> shows friendly message + Retry button per file
-- Minimum 800ms display time before transitioning to RESULTS
+- Status bar shows current filename + pass label
+- Cancel → terminates worker, returns to idle
+- Error → shows friendly message + Retry button per file
+- Minimum 800ms display time before showing results
 
 ---
 
-### RESULTS: Single File (90% case)
+### RESULTS
+
+After optimization, the main window shows "Start Over" and palettes are populated:
 
 ```
-+========================================================+
-|                    PDF-A-go-slim                        |
-+========================================================+
+┌─── #main-window ─────────────────────────────┐
+│ title-bar                                    │
+│──────────────────────────────────────────────│
+│ #drop-zone (still visible)                   │
+│ ┌── .drop-area ────────────────────────────┐ │
+│ │        Drop PDFs here (ready for more)   │ │
+│ └──────────────────────────────────────────┘ │
+│                                              │
+│                          [ Start Over ]      │
+│──────────────────────────────────────────────│
+│ status-bar: Saved 32.4% — 1.2MB → 840KB     │
+└──────────────────────────────────────────────┘
 
-+-- .result-card ----------------------------------------+
-|                                                        |
-|  .result-card__hero (grid: metrics left, download right)|
-|  report.pdf                                            |
-|  -32.4%                          [ Download ]          |
-|  1.2 MB -> 840 KB                                      |
-|  [========        ] (animated bar)                     |
-|                                                        |
-|  +-- .hint-banner (conditional) --------------------+  |
-|  | Images make up 73% of this file.                 |  |
-|  | Try the [Web preset] for better compression.     |  |
-|  +--------------------------------------------------+  |
-|                                                        |
-|  > What was optimized           <details/summary>      |
-|    +------------------------------------------------+  |
-|    | 14 streams recompressed, 3 images recompressed |  |
-|    | 2 fonts subsetted, 1 standard font unembedded  |  |
-|    |                                                |  |
-|    |        Before   After   Saved                  |  |
-|    | Fonts  240 KB   80 KB   -160 KB                |  |
-|    | Images 800 KB   600 KB  -200 KB                |  |
-|    | ...                                            |  |
-|    +------------------------------------------------+  |
-|                                                        |
-|  > Preview                      <details/summary>      |
-|    +------------------------------------------------+  |
-|    | Optimized -- 840 KB    Powered by PDF-A-go-go  |  |
-|    | +--------------------------------------------+ |  |
-|    | |                                            | |  |
-|    | |          [PDF viewer iframe]               | |  |
-|    | |                                            | |  |
-|    | +--------------------------------------------+ |  |
-|    +------------------------------------------------+  |
-|                                                        |
-|  > Debug info        (?debug only) <details/summary>   |
-|    +------------------------------------------------+  |
-|    | Pass timings, skip reasons, converted images   |  |
-|    +------------------------------------------------+  |
-|                                                        |
-+--------------------------------------------------------+
+┌── Settings palette ───────────┐
+│ [Lossless*][Web][Print]       │
+│ No quality loss — recompress… │ ← preset hint
+│ ⚙ Advanced Settings           │
+│ ───────────────────────       │
+│               [Re-optimize]   │  ← appears after results
+└───────────────────────────────┘
 
-+-- .results-settings -----------------------------------+
-|  Settings: **Lossless**         [Change settings]      |
-|  +-- .results-settings__body (hidden by default) ----+ |
-|  | #options-panel (relocated from idle slot)         | |
-|  | Preset: [Lossless*] [Web] [Print]                 | |
-|  | > Advanced Settings                               | |
-|  +---------------------------------------------------+ |
-+--------------------------------------------------------+
+┌── Results palette ────────┐
+│ report.pdf                │
+│ -32.4%     [Download]     │
+│ 1.2MB → 840KB             │
+│ [========        ]        │
+│                           │
+│ Images make up 73%…       │
+│ Try the [Web preset]      │
+└───────────────────────────┘
 
-         [ Re-optimize ]    [ Start Over ]
+┌── Inspector palette ─────────────────────────┐
+│          Before    After     Saved            │
+│ ┃ Fonts   120KB    45KB    −75KB             │
+│ ┃ Images  800KB   600KB   −200KB             │
+│ ┃ …                                          │
+│ Total    1.2MB   840KB    −360KB             │
+└──────────────────────────────────────────────┘
+
+┌── Preview palette ────────┐
+│ Optimized — 840KB         │
+│ ┌────────────────────────┐│
+│ │  PDF-A-go-go viewer    ││
+│ │                        ││
+│ └────────────────────────┘│
+└───────────────────────────┘
 ```
 
-**Information hierarchy (top to bottom):**
-1. "Did it work?" -- savings percentage + sizes (always visible, prominent)
-2. "Get my file" -- download button (one clear location)
-3. "What happened?" -- hint banner + pass summary + object breakdown (visible but secondary)
-4. "Deep dive" -- preview (auto-open for single file, collapsed for batch), debug (collapsed by default)
-5. "What next?" -- settings bar + action buttons
+**Information hierarchy:**
+1. "Did it work?" — savings % + sizes in Results palette (always prominent)
+2. "Get my file" — Download button in Results palette
+3. "What happened?" — hint banner + Inspector palette (stats + object breakdown)
+4. "Deep dive" — Preview palette (PDF-A-go-go viewer), Debug panel (`?debug` only)
+5. "What next?" — Re-optimize in Settings palette, Start Over in main window
+6. Status bar — persistent savings summary
 
 **Interactions:**
-- Download link -> browser downloads optimized PDF
-- Hint banner "Web preset" -> applies Web preset, triggers stale detection
-- Each `<details>` section -> native open/close toggle
-- Preview -> auto-opens for single-file results; lazy-loads PDF-A-go-go viewer on first expand, destroys on collapse
-- "Change settings" -> expands relocated `#options-panel` inline
-- Changing any option -> settings bar highlights with `.results-settings--stale`
-- Re-optimize -> re-runs `handleFiles(lastFiles)` with current options
-- Start Over -> cleans up blob URLs, destroys viewers, returns to IDLE
+- Download link → browser downloads optimized PDF
+- Hint banner "Web preset" → applies Web preset, triggers stale detection
+- Inspector categories → native `<details>` open/close, "Show N more…" toggle
+- Preview → auto-loads PDF-A-go-go viewer, resizable via grip
+- Changing any option → `checkStaleResults()` adds `.btn--stale` to Re-optimize
+- Re-optimize → re-runs `handleFiles(lastFiles)` with current options
+- Start Over → cleans up blob URLs, destroys viewers, resets palettes to empty
 
 ---
 
 ### RESULTS: Multiple Files
 
+Multi-file results use summary card + table rows in the Results palette:
+
 ```
-+========================================================+
-|                    PDF-A-go-slim                        |
-+========================================================+
-
-+-- .result-card.result-card--summary -------------------+
-|                                                        |
-|                   -28.7%        (count-up animation)   |
-|         4.1 MB -> 2.9 MB across 3 files               |
-|         [==========          ] (animated bar)          |
-|                                                        |
-|              [ Download All ]                          |
-|                                                        |
-+--------------------------------------------------------+
-
-+-- .result-file-card -----------------------------------+
-| report.pdf              1.2 MB -> 840 KB  -32.4%      |
-| [ Download ]                                           |
-|                                                        |
-|  > What was optimized                                  |
-|  > Preview                                             |
-+--------------------------------------------------------+
-
-+-- .result-file-card -----------------------------------+
-| slides.pdf              1.8 MB -> 1.3 MB  -27.8%      |
-| [ Download ]                                           |
-|                                                        |
-|  > What was optimized                                  |
-|  > Preview                                             |
-+--------------------------------------------------------+
-
-+-- .result-file-card -----------------------------------+
-| brochure.pdf            1.1 MB -> 810 KB  -26.2%      |
-| [ Download ]                                           |
-| [hint banner, if applicable]                           |
-|                                                        |
-|  > What was optimized                                  |
-|  > Preview                                             |
-+--------------------------------------------------------+
-
-+-- .results-settings -----------------------------------+
-|  Settings: **Lossless**         [Change settings]      |
-+--------------------------------------------------------+
-
-         [ Re-optimize ]    [ Start Over ]
+┌── Results palette ────────────────────────────────────┐
+│              -28.7%         (count-up animation)       │
+│     4.1MB → 2.9MB across 3 files                     │
+│     [==========          ]                            │
+│              [Download All]                            │
+│                                                       │
+│ Filename      Original  Optimized  Saved              │
+│ report.pdf    1.2MB     840KB      -32.4%  [Download] │
+│ slides.pdf    2.0MB     1.5MB      -25.0%  [Download] │
+│ form.pdf      900KB     560KB      -37.8%  [Download] │
+└───────────────────────────────────────────────────────┘
 ```
 
 **Differences from single-file:**
 - Summary card shows aggregate stats + "Download All" button
-- Per-file cards are compact: filename + sizes in header row
-- No hero animation on individual file cards
-- Each file card still has its own disclosure sections + download
+- Per-file results shown as table rows (Explorer details view style)
+- Inspector/Preview palettes show first file's data
 
 ---
 
 ## Overlay: Drop Target
 
-Shown over any state (except PROCESSING) when files are dragged onto the page.
+Shown over any state (except processing) when files are dragged onto the page.
 
 ```
 +============================================================+
@@ -279,7 +252,7 @@ Shown over any state (except PROCESSING) when files are dragged onto the page.
 +============================================================+
 ```
 
-Managed by `dragenter`/`dragleave` counter on `document`. Pointer-events: none (files fall through to the drop handler).
+Managed by `dragenter`/`dragleave` counter on `document`. Accepts both native `Files` drags and the custom `application/x-pdf-sample` type from sample PDF desktop icons. `pointer-events: none` — files fall through to the drop handler.
 
 ---
 
@@ -287,90 +260,126 @@ Managed by `dragenter`/`dragleave` counter on `document`. Pointer-events: none (
 
 ```
 index.html
-  |
-  +-- header (static)
-  +-- #drop-overlay (conditional, z-index: 999)
-  |
-  +-- #app
-  |     |
-  |     +-- #drop-zone  [IDLE state]
-  |     |     +-- .drop-area (click/drop target)
-  |     |           +-- .drop-area__content (icon, text, example button)
-  |     |           +-- #file-input (hidden)
-  |     |
-  |     +-- #options-idle-slot  [IDLE state]
-  |     |     +-- #options-panel  <-- physically moves between here and results
-  |     |           +-- .presets (Lossless / Web / Print buttons)
-  |     |           +-- .advanced (<details>)
-  |     |                 +-- .advanced__body (mode, quality, DPI, checkboxes)
-  |     |
-  |     +-- #processing  [PROCESSING state]
-  |     |     +-- h2 "Optimizing..."
-  |     |     +-- #file-list (dynamic <li> per file)
-  |     |     |     +-- .file-item
-  |     |     |           +-- .file-item__name
-  |     |     |           +-- .file-item__pass (or __error + __retry)
-  |     |     |           +-- .file-item__bar > .file-item__fill
-  |     |     +-- .processing-actions > #btn-cancel
-  |     |
-  |     +-- #results  [RESULTS state]
-  |           +-- #results-summary
-  |           |     +-- .result-card  (single file)
-  |           |     |     +-- .result-card__hero (grid: metrics | download)
-  |           |     |     |     +-- .results-hero__metrics (filename, pct, sizes, bar)
-  |           |     |     |     +-- .result-card__download (<a>)
-  |           |     |     +-- .hint-banner (conditional)
-  |           |     |     +-- <details> "What was optimized" (pass stats + inspector)
-  |           |     |     +-- <details> "Preview" (lazy PDF viewer)
-  |           |     |     +-- <details> "Debug info" (?debug only)
-  |           |     |
-  |           |     +-- .result-card--summary  (multi-file, instead of above)
-  |           |           +-- .result-card__hero (aggregate pct, sizes)
-  |           |           +-- "Download All" button
-  |           |
-  |           +-- #results-files  (multi-file only)
-  |           |     +-- .result-file-card  (per file)
-  |           |           +-- .result-file-card__header (name + sizes + pct)
-  |           |           +-- .result-file-card__download (<a>)
-  |           |           +-- .hint-banner (conditional)
-  |           |           +-- <details> "What was optimized" (pass stats + inspector)
-  |           |           +-- <details> "Preview"
-  |           |           +-- <details> "Debug info" (?debug only)
-  |           |
-  |           +-- #results-settings
-  |           |     +-- .results-settings__summary
-  |           |     |     +-- "Settings: **Lossless**"
-  |           |     |     +-- [Change settings] button
-  |           |     +-- .results-settings__body (hidden, expandable)
-  |           |           +-- #options-panel  <-- relocated here from idle slot
-  |           |
-  |           +-- .results-actions
-  |                 +-- #btn-reoptimize
-  |                 +-- #btn-start-over
-  |
-  +-- footer (static)
+  │
+  ├── #drop-overlay (conditional, z-index: 999)
+  │
+  └── .desktop (relative positioning context)
+        │
+        ├── #main-window (.app-window, draggable)
+        │     │
+        │     ├── .title-bar
+        │     │     ├── .title-bar__ridges (decorative, hidden on mobile)
+        │     │     ├── .title-bar__title ("PDF-A-go-slim")
+        │     │     ├── .title-bar__ridges
+        │     │     └── .title-bar__widgets > .title-bar__collapse-box
+        │     │
+        │     ├── .debug-banner (conditional, ?debug param)
+        │     │
+        │     ├── #app (main content area)
+        │     │     │
+        │     │     ├── #drop-zone (ALWAYS visible, dimmed during processing)
+        │     │     │     └── .drop-area (click/drop target)
+        │     │     │           ├── .drop-area__content (icon, text, example button)
+        │     │     │           └── #file-input (hidden)
+        │     │     │
+        │     │     ├── #processing (hidden by default, shown during optimization)
+        │     │     │     ├── h2 "Optimizing…"
+        │     │     │     ├── #file-list (dynamic <li> per file)
+        │     │     │     │     └── .file-item
+        │     │     │     │           ├── .file-item__name
+        │     │     │     │           ├── .file-item__pass (or __error + __retry)
+        │     │     │     │           └── .file-item__bar > .file-item__fill
+        │     │     │     └── .processing-actions > #btn-cancel
+        │     │     │
+        │     │     └── #main-actions (hidden until results, contains Start Over)
+        │     │           └── #btn-start-over
+        │     │
+        │     └── .status-bar
+        │           ├── #status-left (state-dependent text)
+        │           └── #status-right (GitHub + Debug links)
+        │
+        ├── #palette-settings (created by createPalette())
+        │     └── .palette__body
+        │           └── #options-panel (moved here from HTML on init)
+        │                 ├── .tab-control (Lossless / Web / Print, title tooltips)
+        │                 ├── #preset-hint (.tab-control__hint, updates per preset)
+        │                 ├── .advanced (<details open>)
+        │                 │     └── .advanced__toggle (⚙ gear icon + "Advanced Settings")
+        │                 │     └── .advanced__body (mode, quality, DPI, checkboxes)
+        │                 └── #settings-actions (Re-optimize button, hidden until results)
+        │
+        ├── #palette-results (created by createPalette())
+        │     └── .palette__body
+        │           └── (populated by buildResultsPaletteContent)
+        │                 ├── .result-card (single file: hero + download)
+        │                 │     ├── .result-card__hero (grid: metrics | download)
+        │                 │     │     ├── .results-hero__metrics (filename, pct, sizes, bar)
+        │                 │     │     └── .result-card__download (btn)
+        │                 │     └── .hint-banner (conditional)
+        │                 │
+        │                 └── (multi-file: summary card + table)
+        │                       ├── .result-card--summary (aggregate pct, Download All)
+        │                       └── .result-table
+        │                             ├── .result-table__header
+        │                             └── .result-table__row (per file)
+        │
+        ├── #palette-inspector (created by createPalette())
+        │     └── .palette__body
+        │           └── (populated by buildInspectorPaletteContent)
+        │                 ├── .pass-stats (pass-level stats list)
+        │                 ├── .inspect-panel (object breakdown grid)
+        │                 │     ├── .inspect-panel__header (Before / After / Saved columns)
+        │                 │     ├── .inspect-category (<details>) × N
+        │                 │     │     ├── <summary> (label, before size, after size, diff)
+        │                 │     │     └── .inspect-category__items
+        │                 │     │           ├── .inspect-annotation (what optimizer did)
+        │                 │     │           └── .inspect-item × N (with Show more toggle)
+        │                 │     └── .inspect-panel__total
+        │                 └── .debug-panel (<details>, ?debug only)
+        │
+        ├── #palette-preview (created by createPalette())
+        │     └── .palette__body
+        │           └── (populated by buildPreviewContent)
+        │                 └── .compare-viewer-wrap
+        │                       ├── .compare-side__label (size + Powered by link)
+        │                       └── .compare-side__viewer (PDF-A-go-go container)
+        │
+        └── #desktop-icons
+              ├── .desktop-icon #icon-readme (static, in HTML)
+              ├── .desktop-icon #icon-github (static, in HTML)
+              ├── .desktop-icon #icon-appearance (static, in HTML)
+              └── .desktop-icon--sample × 3 (dynamic, draggable)
+                    ├── svg.desktop-icon__img (PDF document icon)
+                    └── .desktop-icon__label (Research Paper / TAM Review / Color Graphics)
 ```
 
 ---
 
-## Options Panel Relocation
+## Options Panel Lifecycle
 
-The `#options-panel` is a single DOM node that moves between two slots:
+The `#options-panel` is defined in HTML (so `options.js` module-level `querySelectorAll` finds elements on import), then physically moved into the Settings palette body on init:
 
-```
-IDLE / START OVER:
-  #options-idle-slot
-    +-- #options-panel    <-- lives here, visible
-
-PROCESSING:
-  (stays in last slot, hidden)
-
-RESULTS:
-  #results-settings-body
-    +-- #options-panel    <-- moved here by showState('results')
+```js
+settingsPalette.setContent(optionsPanel);  // moves the DOM node
 ```
 
-Event listeners survive DOM relocation. CSS override `.results-settings__body .options-panel` removes default margins/borders when inside the settings bar.
+The `#settings-actions` div (containing Re-optimize button) lives inside `#options-panel` in HTML and moves with it. It's shown/hidden via `settingsActions.hidden`.
+
+Event listeners survive DOM relocation because they're attached to elements, not positions.
+
+---
+
+## Status Bar
+
+The `.status-bar` sits at the bottom of `#main-window` with two sunken fields:
+
+| State      | Left field (`#status-left`)              | Right field (`#status-right`) |
+|------------|------------------------------------------|-------------------------------|
+| IDLE       | "Reduce PDF file size — files never leave your device" | GitHub · Debug links |
+| PROCESSING | "Optimizing {filename} — {pass label}…"  | GitHub · Debug links          |
+| RESULTS    | "Saved {pct}% — {before} → {after}"      | GitHub · Debug links          |
+
+Updated by `setProcessing()` (idle/processing) and `renderResults()` (savings summary).
 
 ---
 
@@ -378,41 +387,56 @@ Event listeners survive DOM relocation. CSS override `.results-settings__body .o
 
 ```
 main.js
-  +-- showState()              State machine, DOM visibility, options relocation
-  +-- handleFiles()            Main flow: filter PDFs, run workers, render results
-  +-- renderResults()          Delegates to result-card.js builders
-  +-- checkStaleResults()      Compares current options vs last-run options
-  +-- animateCountUp()         Count-up animation (passed to card builders)
-  |
-  +-- ui/result-card.js
-  |     +-- buildSingleFileCard()   Single-file result card (hero + disclosures)
-  |     +-- buildSummaryCard()      Multi-file aggregate card
-  |     +-- buildFileCard()         Multi-file per-file compact card
-  |     +-- buildHeroContent()      Shared hero section (pct, sizes, bar)
-  |     +-- buildHintBanner()       Conditional "try Web preset" banner
-  |     +-- buildDisclosureSections()  Combined stats+inspector, preview, debug
-  |
-  +-- ui/compare.js
-  |     +-- buildCompareSection()   <details> with lazy PDF-A-go-go viewer
-  |     +-- destroyAllComparisons() Cleanup viewers + blob URLs
-  |
-  +-- ui/stats.js
-  |     +-- buildStatsDetail()      Pass-level stats list
-  |     +-- buildDebugPanel()       Debug tables (timings, skip reasons)
-  |
-  +-- ui/inspector.js
-  |     +-- buildInspectPanel()     Object breakdown grid (before/after/saved)
-  |
-  +-- ui/options.js
-  |     +-- collectOptions()        Read UI state -> options object
-  |     +-- applyPreset()           Apply a named preset to all controls
-  |     +-- syncPresetIndicator()   Highlight matching preset button
-  |     +-- getCurrentPresetLabel() "Lossless" / "Web" / "Print" / "Custom"
-  |     +-- initOptionsListeners()  Wire up event handlers
-  |
-  +-- ui/helpers.js
-        +-- formatSize()            Bytes -> human-readable string
-        +-- escapeHtml()            Sanitize for innerHTML
+  ├── SAMPLE_PDFS[]             Sample PDF definitions (name, url, label)
+  ├── fetchPdfAsFile()          Fetch remote PDF → File object (shared by sample icons + "try example")
+  ├── setProcessing()           Toggle processing section + drop zone dimming
+  ├── handleFiles()             Main flow: filter PDFs, run workers, render results
+  ├── renderResults()           Delegates to UI builders, populates palettes
+  ├── checkStaleResults()       Compares current options vs last-run options
+  ├── startOver()               Reset palettes, revoke blob URLs, destroy viewers
+  ├── animateCountUp()          Count-up animation (passed to card builders)
+  │
+  ├── ui/palette.js              Window manager (~200 lines)
+  │     ├── initWindowManager()    Set up .desktop container reference
+  │     ├── createPalette()        Create floating palette with title bar + body
+  │     ├── initDrag()             Make any element draggable by handle
+  │     ├── bringToFront()         Increment z-index counter on element
+  │     └── isMobile()             Viewport < 768px check
+  │
+  ├── ui/result-card.js          Result card builders
+  │     ├── buildResultsPaletteContent()   Full Results palette content (single or multi)
+  │     ├── buildInspectorPaletteContent() Full Inspector palette content (stats + breakdown)
+  │     ├── buildSingleFileCard()          Hero card with download button
+  │     ├── buildSummaryCard()             Multi-file aggregate card
+  │     ├── buildFileTableHeader()         Column headers for multi-file table
+  │     ├── buildFileCard()                Per-file table row
+  │     ├── buildHeroContent()             Shared hero section (pct, sizes, bar)
+  │     └── buildHintBanner()              Conditional "try Web preset" banner
+  │
+  ├── ui/compare.js              PDF preview viewers
+  │     ├── buildCompareSection()     <details> with lazy PDF-A-go-go viewer
+  │     ├── buildPreviewContent()     Immediate-load viewer for Preview palette
+  │     └── destroyAllComparisons()   Cleanup viewers + blob URLs
+  │
+  ├── ui/stats.js                Pass-level statistics
+  │     ├── buildStatsDetail()        Pass stats list (active passes only)
+  │     ├── buildDebugPanel()         Debug tables (timings, skip reasons, conversions)
+  │     └── formatPassStats()         Single pass → human-readable summary
+  │
+  ├── ui/inspector.js            Object breakdown grid
+  │     ├── buildInspectPanel()       Before/after category grid with item rows
+  │     └── initInspectorInteractions()  Delegated "Show more" click handler
+  │
+  ├── ui/options.js              Options panel logic
+  │     ├── collectOptions()          Read UI state → options object
+  │     ├── applyPreset()             Apply a named preset to all controls
+  │     ├── syncPresetIndicator()     Highlight matching preset button
+  │     ├── getCurrentPresetLabel()   "Lossless" / "Web" / "Print" / "Custom"
+  │     └── initOptionsListeners()    Wire up event handlers + stale detection
+  │
+  └── ui/helpers.js              Shared utilities
+        ├── formatSize()             Bytes → human-readable string
+        └── escapeHtml()             Sanitize for innerHTML
 ```
 
 ---
@@ -422,9 +446,8 @@ main.js
 | Element | Trigger | Duration | Notes |
 |---------|---------|----------|-------|
 | `.toast` | Non-PDF files dropped | 4s + 300ms fade | Fixed bottom-center |
-| `.debug-banner` | `?debug` URL param | Persistent | Top of `<body>` |
+| `.debug-banner` | `?debug` URL param | Persistent | Top of `#main-window` |
 | `.drop-overlay` | Files dragged over page | While dragging | Full-page, pointer-events: none |
-| `.stale-pulse` animation | Settings changed after results | 1x 2s pulse | On Re-optimize button |
-| `.results-settings--stale` | Settings changed after results | Until re-optimize | Blue border on settings bar |
+| `.btn--stale` animation | Settings changed after results | 1x 2s pulse | On Re-optimize button |
 | Count-up animation | Results displayed | 600ms ease-out | On savings percentage |
 | Bar fill animation | Results displayed | 400ms ease | CSS transition on width |

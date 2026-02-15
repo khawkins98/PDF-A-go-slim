@@ -4,7 +4,8 @@ A browser-based PDF optimization tool that reduces file size entirely client-sid
 
 ## Features
 
-- **Drag-and-drop** — drop one or more PDFs, or use the file picker
+- **Drag-and-drop** — drop one or more PDFs, use the file picker, or drag a sample PDF icon from the desktop
+- **Sample PDFs on the desktop** — three draggable sample PDF icons (Research Paper, TAM Review, Color Graphics) let you try the tool without your own files
 - **8 optimization passes** — stream recompression, image recompression, standard font unembedding, font subsetting, object deduplication, font deduplication, metadata stripping, unreferenced object removal
 - **Optimization presets** — Lossless (default), Web (lossy, 75% quality), Print (lossy, 92% quality)
 - **Advanced controls** — lossy/lossless toggle, image quality slider, font unembedding and subsetting checkboxes
@@ -15,6 +16,12 @@ A browser-based PDF optimization tool that reduces file size entirely client-sid
 - **Batch capable** — optimize multiple PDFs at once with individual or bulk download
 - **Debug mode** — add `?debug` to the URL to see per-pass timing, image skip reason breakdowns, and per-image conversion details
 - **Benchmark tested** — 46 benchmark tests verify compression quality, asset stripping, and accessibility preservation against 6 reference PDFs simulating real-world bloat patterns ([results](docs/benchmark-results.md))
+
+## Why it looks like that
+
+The tool borrows its visual structure from Mac OS 8 — floating palettes, striped title bars, WindowShade collapse, warm cream surfaces. This is an experiment in whether late-90s desktop paradigms (persistent tool palettes, dense layouts, always-visible information) suit single-purpose browser utilities better than modern minimal convention.
+
+The retro is a thin veneer. Underneath it's a standard Vite app with system fonts, responsive layout, and semantic HTML.
 
 ## Quick Start
 
