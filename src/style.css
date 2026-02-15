@@ -1362,47 +1362,59 @@ body {
   color: var(--color-primary-hover);
 }
 
-/* --- Debug panel --- */
-.debug-panel {
-  border-left: 3px solid var(--color-text-muted);
-  background: rgba(0, 0, 0, 0.03);
-  padding: 0;
+/* --- Debug palette (terminal style) --- */
+#palette-debug .palette__title-bar {
+  background: #1a1a1a;
+  border-bottom-color: #333;
 }
 
-.debug-panel__toggle {
-  cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  padding: 0.35rem 0.5rem;
-  list-style: none;
+#palette-debug .palette__title {
+  background: #1a1a1a;
+  color: #33ff33;
 }
 
-.debug-panel__toggle::-webkit-details-marker {
-  display: none;
+#palette-debug .palette__stripes {
+  background: repeating-linear-gradient(
+    to bottom,
+    #333 0px, #333 1px,
+    #1a1a1a 1px, #1a1a1a 2px,
+    transparent 2px, transparent 3px
+  );
 }
 
-.debug-panel__toggle::before {
-  content: '\25B6';
-  display: inline-block;
-  margin-right: 0.3rem;
-  font-size: 0.55rem;
-  transition: transform 0.15s;
+#palette-debug .palette__close-box,
+#palette-debug .palette__collapse-box {
+  border-color: #444;
+  background: #1a1a1a;
 }
 
-.debug-panel[open] > .debug-panel__toggle::before {
-  transform: rotate(90deg);
-}
-
-.debug-panel__body {
-  padding: 0.35rem 0.5rem 0.5rem;
+#palette-debug .palette__body {
+  background: #0a0a0a;
+  color: #33ff33;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
   font-size: 0.72rem;
 }
 
-.debug-panel__body h4 {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
+#palette-debug .palette__empty {
+  color: #33ff33;
+  opacity: 0.5;
+}
+
+#palette-debug .debug-table {
+  color: #33ff33;
+}
+
+#palette-debug .debug-table th {
+  color: #88ff88;
+}
+
+#palette-debug .debug-table td,
+#palette-debug .debug-table th {
+  border-bottom-color: #222;
+}
+
+#palette-debug h4 {
+  color: #88ff88;
 }
 
 .debug-table {

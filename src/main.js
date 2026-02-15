@@ -2,6 +2,7 @@ import './style.css';
 import { formatSize, escapeHtml, renderMarkdown } from './ui/helpers.js';
 import { collectOptions, initOptionsListeners } from './ui/options.js';
 import { buildResultsPaletteContent, buildInspectorPaletteContent } from './ui/result-card.js';
+import { buildDebugPanel } from './ui/stats.js';
 import { buildPreviewContent, destroyAllComparisons } from './ui/compare.js';
 import { initWindowManager, createPalette, initDrag, bringToFront } from './ui/palette.js';
 import { createControlStrip } from './ui/control-strip.js';
@@ -185,6 +186,20 @@ const appearancePalette = createPalette({
 appearancePalette.setContent(buildAppearanceContent());
 appearancePalette.hide();
 
+// --- Debug Console palette (only when ?debug) ---
+const isDebug = new URLSearchParams(window.location.search).has('debug');
+let debugPalette;
+if (isDebug) {
+  debugPalette = createPalette({
+    id: 'debug',
+    title: 'Debug Console',
+    defaultPosition: { top: 440, left: 520 },
+    width: 480,
+    closable: true,
+  });
+  debugPalette.showEmpty('Run optimization to see diagnostics');
+}
+
 // Establish initial z-order: Read Me behind work palettes
 bringToFront(readmePalette.element);
 bringToFront(settingsPalette.element);
@@ -351,6 +366,16 @@ function renderResults(results, options) {
     inspectorPalette.showEmpty('No optimization data available');
   }
 
+  // Debug Console palette
+  if (debugPalette) {
+    const debugHtml = buildDebugPanel(firstResult.stats);
+    if (debugHtml) {
+      const body = document.createElement('div');
+      body.innerHTML = debugHtml;
+      debugPalette.setContent(body);
+    }
+  }
+
   // Preview palette (single-file: auto-load, multi-file: first file)
   const previewResult = results[0];
   const blob = new Blob([previewResult.result], { type: 'application/pdf' });
@@ -379,6 +404,7 @@ function startOver() {
   resultsPalette.showEmpty('Nothing to report yet');
   inspectorPalette.showEmpty('Waiting for a PDF to dissect');
   previewPalette.showEmpty('No document loaded');
+  if (debugPalette) debugPalette.showEmpty('Run optimization to see diagnostics');
 
   mainActions.hidden = true;
   settingsActions.hidden = true;

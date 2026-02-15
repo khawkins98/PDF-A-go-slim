@@ -1,5 +1,5 @@
 import { formatSize, escapeHtml } from './helpers.js';
-import { buildStatsDetail, buildDebugPanel } from './stats.js';
+import { buildStatsDetail } from './stats.js';
 import { buildInspectPanel, initInspectorInteractions } from './inspector.js';
 import { applyPreset } from './options.js';
 
@@ -336,24 +336,6 @@ export function buildInspectorPaletteContent(result, options) {
 
   // Wire up "Show more" interactions
   initInspectorInteractions(container);
-
-  // Debug panel (only when ?debug URL param is present)
-  if (options.debug) {
-    const debugHtml = buildDebugPanel(result.stats);
-    if (debugHtml) {
-      const details = document.createElement('details');
-      details.className = 'debug-panel';
-      const summary = document.createElement('summary');
-      summary.className = 'debug-panel__toggle';
-      summary.textContent = 'Debug info';
-      details.appendChild(summary);
-      const body = document.createElement('div');
-      body.className = 'debug-panel__body';
-      body.innerHTML = debugHtml;
-      details.appendChild(body);
-      container.appendChild(details);
-    }
-  }
 
   return container;
 }
