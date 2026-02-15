@@ -2,6 +2,8 @@
 
 Technical knowledge accumulated during development. Updated as we go.
 
+This project grew out of [PDF-A-go-go](https://github.com/khawkins98/PDF-A-go-go), a lightweight embeddable PDF viewer built on PDF.js. While creating a demo PDF for that project's showcase page, a clean 32 KB file ballooned to 198 KB after a minor Illustrator edit — redundant font embeddings, metadata bloat, duplicate objects. The existing tools (Ghostscript, qpdf, online services) each solved part of the problem but none solved all of it in the browser. PDF-A-go-slim applies every optimization technique we could find, entirely client-side. The two projects share a philosophy: no server, no framework, pure browser.
+
 ---
 
 ## PDF Internals
@@ -41,6 +43,21 @@ The strings are **not Unicode** — they're character codes whose meaning depend
 - Form XObjects (`/Subtype /Form`) referenced by the `Do` operator have their own `/Resources` and content stream — must recurse into them
 - Inline images (`BI`/`ID`/`EI`) must be skipped — the `ID` marker is followed by raw binary data terminated by `EI`
 - Font names in content streams (e.g., `/F1` in `Tf`) must be resolved through the page's `/Resources/Font` dict to find the actual font object ref
+- **Inline font dicts** (rare): some PDFs define font dictionaries inline rather than as indirect refs. The parser creates synthetic ref keys (`inline:{fontName}`) to track these without crashing. See `content-stream-parser.js`.
+
+### Building a Content Stream Parser
+
+The content stream parser (`content-stream-parser.js`) is a ~500-line stack-based tokenizer that processes PDF postfix notation. It handles:
+
+- **Literal strings** with nested parentheses (balanced `(` `)` pairs) and all PDF escape sequences (`\n`, `\r`, `\t`, `\\`, octal `\ddd`)
+- **Hex strings** (`<48656C6C6F>`)
+- **Names** (`/FontName`) with `#XX` hex escape sequences
+- **Numbers** (integers and floats, including negative)
+- **Arrays** (`[...]`) via recursive descent
+- **Comments** (`%` to end of line)
+- **Inline images** (`BI ... ID <binary> EI`) — the trickiest part because `ID` is followed by arbitrary binary data; the parser scans forward for `\nEI` or ` EI` to find the end marker
+
+The operator dispatch table maps PDF text operators (`Tf`, `Tj`, `TJ`, `'`, `"`) to handler functions that extract character codes from the operand stack. The `Do` operator triggers recursive parsing into Form XObjects with resource dictionary fallback to the parent page.
 
 ---
 
@@ -54,6 +71,7 @@ The strings are **not Unicode** — they're character codes whose meaning depend
 - No built-in content stream parser (would need to write one for glyph extraction).
 - `PDFNumber` value access is inconsistent — use `Number(val.toString())` for reliable extraction, not `.numberValue()` or `.value()` which behave differently depending on how the number was created (original parse vs `context.obj()`).
 - `page.getSize()` is the clean way to get page dimensions; don't try to parse `/MediaBox` manually.
+- **Cannot read metadata streams.** pdf-lib only reads the `/Info` dictionary for metadata (`getTitle()`, `getAuthor()`, etc.). PDFs that store metadata exclusively in XMP metadata streams (common in modern tools) return `undefined` from these accessors. This is why we read XMP directly from raw stream bytes in `metadata.js` rather than using pdf-lib's metadata API.
 
 ### jpeg-js
 
@@ -65,7 +83,14 @@ Pure JS JPEG encoder/decoder (~15 KB). Chosen over `OffscreenCanvas` because Off
 
 Pure JS zlib, faster and smaller than pako. Used for `zlibSync`/`inflateSync`/`decompressSync`. Level 9 recompression of existing streams is a reliable win — many PDFs use low compression levels or no compression at all.
 
-**Critical:** Always use `zlibSync` (not `deflateSync`) when writing FlateDecode streams. `deflateSync` produces raw DEFLATE without the zlib header, which causes blank pages in macOS Preview and other viewers. See "fflate `deflateSync` vs `zlibSync`" in the debugging section above.
+**The three fflate functions and when to use each:**
+- `zlibSync(data, { level })` — **compression**. Always use this for PDF FlateDecode streams. Produces zlib-wrapped DEFLATE (RFC 1950, 2-byte header starting `0x78`, 4-byte Adler-32 checksum). 6 bytes overhead vs raw DEFLATE, but macOS Preview and other viewers silently render blank pages without the zlib wrapper.
+- `inflateSync(data)` — **decompression of raw DEFLATE only** (RFC 1951, no wrapper). Fast path for most streams. Correctly rejects zlib-wrapped data — this is by design, not a bug.
+- `decompressSync(data)` — **decompression with auto-format detection** (GZIP, Zlib, or raw DEFLATE). Used as fallback when `inflateSync` fails on pako-produced zlib streams (pdf-lib uses pako internally).
+
+**`mem` option for `zlibSync`:** fflate supports `mem: 0-12` (memory level) — higher values increase speed and compression ratio at exponential memory cost (level 4 = 64 KB, level 8 = 1 MB, level 12 = 16 MB). Default is auto-sized per input. Values above 8 rarely help. Not worth tuning for our use case, but good to know for future profiling.
+
+**Never use `deflateSync` for PDF streams.** See the CalRGB bug story below — this was our most insidious bug.
 
 ---
 
@@ -108,6 +133,8 @@ Area-average (box filter) resampling before JPEG encoding. For each destination 
 
 DPI estimation uses a page map built by walking all pages' `Resources → XObject` dicts to find which ref appears on which page size. Conservative approach: uses `Math.min(dpiX, dpiY)` so we never over-downsample.
 
+**How the box filter handles fractional boundaries:** Each destination pixel maps to a rectangular region of source pixels. When that region doesn't align to pixel boundaries, the overlapping source pixels are weighted by their fractional coverage area (`wx * wy`). This produces smooth, artifact-free downscaling without the blocky artifacts of nearest-neighbor or the blur of naive bilinear. The algorithm is ~40 lines of JavaScript with no dependencies — a weighted average over a variable-size kernel. See `images.js` `downsampleArea()`.
+
 ### Font Subsetting
 
 Strips unused glyph outlines from embedded font programs. Typical savings: 50–98% per font. Lossless — only removes glyphs the document doesn't reference.
@@ -116,7 +143,11 @@ Strips unused glyph outlines from embedded font programs. Typical savings: 50–
 - Simple fonts (Type1/TrueType): charCode → `/Encoding` (WinAnsi, MacRoman, or `/Differences` array) → glyph name → Adobe Glyph List → Unicode codepoint
 - Composite fonts (Type0/Identity-H): 2-byte charCode → `/ToUnicode` CMap → Unicode codepoint
 
-**retain-gids flag:** For Type0/Identity-H fonts, harfbuzzjs must be called with `HB_SUBSET_FLAGS_RETAIN_GIDS` (0x2). Without it, the subsetter would renumber glyph IDs, breaking the CID=GID identity mapping. With retain-gids, GID slots for removed glyphs are zeroed out but keep their positions, so no updates to `/CIDToGIDMap` or `/W` (widths) are needed.
+**retain-gids flag:** For Type0/Identity-H fonts, harfbuzzjs must be called with `HB_SUBSET_FLAGS_RETAIN_GIDS` (0x2). Without it, the subsetter would renumber glyph IDs, breaking the CID=GID identity mapping. With retain-gids, GID slots for removed glyphs are zeroed out but keep their positions, so no updates to `/CIDToGIDMap` or `/W` (widths) are needed. **Trade-off:** zeroed-out GID slots waste a small amount of space (empty glyph outlines), but the alternative — rewriting every `/W` width array and `/CIDToGIDMap` in the document — is fragile and error-prone. The wasted space is negligible compared to the removed glyph outlines.
+
+**Unicode mapping fallback hierarchy:** When mapping character codes to Unicode for subsetting, the pipeline tries sources in priority order: (1) `/ToUnicode` CMap if present (most reliable, handles arbitrary mappings), (2) `/Encoding` dictionary (WinAnsi, MacRoman, or custom `/Differences` array) → glyph name → Adobe Glyph List, (3) `uniXXXX` glyph name convention (e.g., `uni0041` → U+0041), (4) ASCII range guess (char code 0x20–0x7E → same Unicode). If none of these resolve, the font is skipped entirely. See `unicode-mapper.js`.
+
+**Surrogate pair handling in ToUnicode:** CMap values longer than 4 hex characters are split into 4-char chunks and checked for UTF-16 surrogate pairs (high 0xD800–0xDBFF followed by low 0xDC00–0xDFFF). Surrogate pairs are decoded to their full Unicode codepoint via `0x10000 + ((hi - 0xD800) << 10) + (lo - 0xDC00)`. This handles CJK characters and emoji in the Supplementary Multilingual Plane. See `unicode-mapper.js` `parseUnicodeHex()`.
 
 **V1 scope:** Only Type1/TrueType (simple) and Type0 with Identity-H + Identity CIDToGIDMap are supported. Type0 with non-Identity CMaps, Type3 fonts, fonts < 10 KB, and fonts without `/ToUnicode` or recognizable encoding are skipped.
 
@@ -277,6 +308,18 @@ During initial development, `getFilterNames()` ended up in `streams.js` (an opti
 
 `hashBytes()` (djb2 hash) and `FONT_FILE_KEYS` (`['FontFile', 'FontFile2', 'FontFile3']`) were independently duplicated across `dedup.js`, `fonts.js`, and `font-subset.js`. Extracted into `utils/hash.js`. When adding new passes that need hashing or font-file traversal, import from there rather than copying.
 
+### Custom LZW Decoder
+
+We had to write our own LZW decoder because PDF's variant has non-standard behavior: **early code size change**. Standard LZW (GIF, TIFF) waits until code `N` is emitted before widening the code size, but PDF's variant widens one code earlier. Getting this wrong produces garbage output from otherwise-valid streams. No off-the-shelf JS LZW library handles this correctly.
+
+The decoder (`stream-decode.js` `decodeLZW()`, ~65 lines) also differs from GIF's LZW in bit ordering — PDF uses MSB-first (big-endian) within bytes, while GIF is LSB-first. Encountering LZW in the wild is rare (mostly older PDF producers), but when it appears, there's no fallback — the stream is unreadable without a correct decoder.
+
+### PNG Row Prediction in PDF Streams
+
+Some PDF producers apply PNG row prediction (Predictor 10–15) before Flate compression to improve compression ratios on image-like data. After Flate decompression, this prediction must be reversed to recover the original bytes. We encountered this in real-world PDFs with embedded raster images using FlateDecode + DecodeParms.
+
+The reversal handles five filter types (None, Sub, Up, Average, Paeth). The Paeth predictor is the most interesting — it approximates linear interpolation in 2D using only the left, above, and upper-left neighbors. Six lines of code, but the math is non-obvious. See `stream-decode.js` `undoPngPrediction()` and `paethPredictor()`.
+
 ### ASCII85 Encoding Gotcha
 
 ASCII85 encodes 4 bytes into 5 ASCII characters. A 5-character group always decodes to 4 bytes — there's no 3-byte output from a full 5-char group. Short final groups (fewer than 5 chars) produce fewer bytes (count - 1), but a complete group like `9jqo^` decodes to 4 bytes (`Man ` with trailing space), not 3.
@@ -329,10 +372,6 @@ harfbuzzjs's `index.js` does `module.exports = new Promise(...)`. When Vitest tr
 
 pdf-lib creates font dict objects lazily — after `embedFont()` + `drawText()`, the actual PDF objects (FontDescriptor, FontFile2, CIDFont, etc.) don't exist in `context` until `save()` is called. Testing font subsetting requires a save/reload cycle: `doc.save({ useObjectStreams: false })` then `PDFDocument.load(saved)`.
 
-### pdf-lib Uses pako Internally
-
-pdf-lib uses pako for internal compression. fflate's `inflateSync` can fail with "unexpected EOF" on some pako-produced zlib streams, but `decompressSync` (full zlib-wrapper handling) succeeds. The `decodeFlateDecode` function should try `inflateSync` first and fall back to `decompressSync`.
-
 ### fflate `deflateSync` vs `zlibSync` — the CalRGB blank-page bug
 
 fflate provides two compression functions:
@@ -353,7 +392,19 @@ PDF's FlateDecode (ISO 32000, section 7.4.4) references both RFC 1950 (zlib) and
 
 The BFS traversal in `pdf-traversal.js` should use `instanceof PDFStream` (the base class), not `instanceof PDFRawStream`. pdf-lib has multiple stream subclasses (`PDFRawStream`, `PDFFlateStream`, `PDFContentStream`). Using the base class is defensive against edge cases where streams aren't `PDFRawStream` instances.
 
-**Defense in depth:** A `checkContentIntegrity()` function in `pipeline.js` runs after all passes and before `save()`. It checks each page's `/Contents` ref to ensure it resolves to an actual object. If any page has a dangling content stream ref, the pipeline falls back to original bytes (like the size guard).
+**Defense in depth:** A `checkContentIntegrity()` function in `pipeline.js` runs after all passes and before `save()`. It checks each page's `/Contents` ref to ensure it resolves to an actual object — a dangling ref means an optimization pass incorrectly deleted a live content stream. If any page has a dangling ref, the pipeline falls back to original bytes (like the size guard). This catches bugs that would otherwise produce silently blank pages.
+
+### Pipeline Safety: Two-Layer Guard + Per-Pass Error Isolation
+
+The pipeline has three safety mechanisms:
+
+1. **Per-pass error isolation.** Each of the 8 optimization passes runs inside a try/catch. If one pass throws (e.g., a font with an unusual encoding causes the subsetter to fail), the pipeline continues with the remaining passes. The error is logged in stats but doesn't abort the entire optimization. This is critical because real-world PDFs contain surprising structures — a pass that works on 99% of PDFs shouldn't block the other passes when it encounters the 1%.
+
+2. **Content integrity check.** After all passes complete but before `save()`, `checkContentIntegrity()` walks every page and verifies each `/Contents` ref (or array of refs) still resolves to a live object. Dangling refs → fallback to original bytes.
+
+3. **Size guard.** After `save()`, the pipeline compares output bytes against input bytes. If output >= input, it returns the original bytes unchanged. This prevents the edge case where optimization overhead (e.g., pdf-lib rewriting cross-references) makes the file larger.
+
+The guards are ordered intentionally: integrity check catches corruption, size guard catches bloat regression. Both are invisible to the user — the optimized file is simply returned unchanged, with `stats.sizeGuard: true` or `stats.contentWarnings` flagging what happened.
 
 ### Node.js fetch() Detection
 
