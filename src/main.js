@@ -1,8 +1,9 @@
 import './style.css';
 import { formatSize } from './ui/helpers.js';
-import { collectOptions, applyPreset, initOptionsListeners, getCurrentPresetLabel } from './ui/options.js';
-import { buildSingleFileCard, buildSummaryCard, buildFileCard } from './ui/result-card.js';
-import { destroyAllComparisons } from './ui/compare.js';
+import { collectOptions, initOptionsListeners, getCurrentPresetLabel } from './ui/options.js';
+import { buildResultsPaletteContent, buildInspectorPaletteContent } from './ui/result-card.js';
+import { buildPreviewContent, destroyAllComparisons } from './ui/compare.js';
+import { initWindowManager, createPalette, initDrag } from './ui/palette.js';
 
 // --- Friendly pass name labels (pipeline names stay unchanged for test compat) ---
 const PASS_LABELS = {
@@ -63,72 +64,88 @@ const dropArea = dropZone.querySelector('.drop-area');
 const fileInput = document.getElementById('file-input');
 const processingSection = document.getElementById('processing');
 const fileList = document.getElementById('file-list');
-const resultsSection = document.getElementById('results');
-const resultsSummary = document.getElementById('results-summary');
-const resultsFiles = document.getElementById('results-files');
-const resultsSettingsBar = document.getElementById('results-settings');
-const settingsPresetLabel = document.getElementById('settings-preset-label');
-const btnToggleSettings = document.getElementById('btn-toggle-settings');
-const resultsSettingsBody = document.getElementById('results-settings-body');
-const optionsIdleSlot = document.getElementById('options-idle-slot');
-const btnReoptimize = document.getElementById('btn-reoptimize');
-const btnStartOver = document.getElementById('btn-start-over');
 const dropOverlay = document.getElementById('drop-overlay');
 const btnCancel = document.getElementById('btn-cancel');
+const statusLeft = document.getElementById('status-left');
 
-// --- Settings bar toggle ---
-btnToggleSettings.addEventListener('click', () => {
-  const isOpen = !resultsSettingsBody.hidden;
-  resultsSettingsBody.hidden = isOpen;
-  btnToggleSettings.textContent = isOpen ? 'Change settings' : 'Hide settings';
+// --- Initialize window manager ---
+initWindowManager();
+
+// Make main window draggable + shadable
+const mainWindow = document.getElementById('main-window');
+const mainTitleBar = mainWindow.querySelector('.title-bar');
+initDrag(mainWindow, mainTitleBar);
+
+const mainCollapseBox = mainTitleBar.querySelector('.title-bar__collapse-box');
+function toggleMainShade() {
+  mainWindow.classList.toggle('app-window--shaded');
+}
+mainTitleBar.addEventListener('dblclick', toggleMainShade);
+if (mainCollapseBox) {
+  mainCollapseBox.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleMainShade();
+  });
+}
+
+// --- Create palettes ---
+const settingsPalette = createPalette({
+  id: 'settings',
+  title: 'Settings',
+  defaultPosition: { top: 20, left: 520 },
+  width: 260,
 });
+
+const resultsPalette = createPalette({
+  id: 'results',
+  title: 'Results',
+  defaultPosition: { top: 110, left: 520 },
+  width: 260,
+});
+
+const inspectorPalette = createPalette({
+  id: 'inspector',
+  title: 'Inspector',
+  defaultPosition: { top: 320, left: 20 },
+  width: 480,
+});
+
+const previewPalette = createPalette({
+  id: 'preview',
+  title: 'Preview',
+  defaultPosition: { top: 280, left: 520 },
+  width: 400,
+});
+
+// Move #options-panel into Settings palette
+const optionsPanel = document.getElementById('options-panel');
+optionsPanel.hidden = false;
+settingsPalette.setContent(optionsPanel);
+
+// Set empty states for result palettes
+resultsPalette.showEmpty('Drop a PDF to see results');
+inspectorPalette.showEmpty('Drop a PDF to see object breakdown');
+previewPalette.showEmpty('Drop a PDF to see preview');
 
 // --- Stale results detection ---
 function checkStaleResults() {
-  if (!lastRunOptions || resultsSection.hidden) return;
+  if (!lastRunOptions) return;
   const current = JSON.stringify(collectOptions());
   const isStale = current !== lastRunOptions;
-
-  btnReoptimize.classList.toggle('btn--stale', isStale);
-  resultsSettingsBar.classList.toggle('results-settings--stale', isStale);
-
-  // Update the preset label
-  settingsPresetLabel.textContent = getCurrentPresetLabel();
+  const btn = document.getElementById('btn-reoptimize');
+  if (btn) btn.classList.toggle('btn--stale', isStale);
 }
 
 // --- Initialize options panel listeners ---
 initOptionsListeners({ onOptionsChanged: checkStaleResults });
 
-// --- Helpers ---
-function showState(state) {
-  dropZone.hidden = state !== 'idle';
-  processingSection.hidden = state !== 'processing';
-  resultsSection.hidden = state !== 'results';
-
-  const optionsPanel = document.getElementById('options-panel');
-
-  if (state === 'idle') {
-    // Move options panel back to idle slot
-    optionsPanel.hidden = false;
-    optionsIdleSlot.appendChild(optionsPanel);
-  } else if (state === 'processing') {
-    optionsPanel.hidden = true;
-  } else if (state === 'results') {
-    // Move options panel into settings bar body
-    optionsPanel.hidden = false;
-    const adv = optionsPanel.querySelector('.advanced');
-    if (adv) adv.open = false;
-    resultsSettingsBody.appendChild(optionsPanel);
-    resultsSettingsBody.hidden = true;
-    btnToggleSettings.textContent = 'Change settings';
-    settingsPresetLabel.textContent = getCurrentPresetLabel();
-  }
-
-  // Animate the entering section
-  const active = state === 'idle' ? dropZone : state === 'processing' ? processingSection : resultsSection;
-  active.classList.remove('state--entering');
-  void active.offsetWidth;
-  active.classList.add('state--entering');
+// --- Simple state management (no more showState) ---
+function setProcessing(active) {
+  processingSection.hidden = !active;
+  dropZone.classList.toggle('state--dimmed', active);
+  statusLeft.textContent = active
+    ? 'Optimizing\u2026'
+    : 'Reduce PDF file size \u2014 files never leave your device';
 }
 
 function revokeBlobUrls() {
@@ -173,34 +190,57 @@ function processFileWithProgress(file, options, progressCb) {
   });
 }
 
-// --- Render results ---
+// --- Render results into palettes ---
 function renderResults(results, options) {
-  resultsSummary.innerHTML = '';
-  resultsFiles.innerHTML = '';
-
-  if (results.length === 1) {
-    // Single file: one full result card
-    const r = results[0];
-    const blob = new Blob([r.result], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    blobUrls.push(url);
-
-    const card = buildSingleFileCard(r, blob, url, options, animateCountUp, checkStaleResults);
-    resultsSummary.appendChild(card);
+  // Update status bar with savings summary
+  const totalOriginal = results.reduce((s, r) => s + r.original, 0);
+  const totalOptimized = results.reduce((s, r) => s + r.result.byteLength, 0);
+  const totalSaved = totalOriginal - totalOptimized;
+  const totalPct = totalOriginal > 0 ? ((totalSaved / totalOriginal) * 100).toFixed(1) : '0.0';
+  if (totalSaved > 0) {
+    statusLeft.textContent = `Saved ${totalPct}% \u2014 ${formatSize(totalOriginal)} \u2192 ${formatSize(totalOptimized)}`;
   } else {
-    // Multi-file: summary card + per-file cards
-    const summaryCard = buildSummaryCard(results, animateCountUp);
-    resultsSummary.appendChild(summaryCard);
-
-    for (const r of results) {
-      const blob = new Blob([r.result], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      blobUrls.push(url);
-
-      const card = buildFileCard(r, blob, url, options, checkStaleResults);
-      resultsFiles.appendChild(card);
-    }
+    statusLeft.textContent = 'Done \u2014 no size reduction';
   }
+
+  // Results palette
+  const resultsContent = buildResultsPaletteContent(results, blobUrls, options, {
+    animateCountUp,
+    onStaleCheck: checkStaleResults,
+    onReoptimize: () => { if (lastFiles) handleFiles(lastFiles); },
+    onStartOver: startOver,
+  });
+  resultsPalette.setContent(resultsContent);
+
+  // Inspector palette (use first result for single-file, or first for multi — user sees summary in results)
+  const firstResult = results[0];
+  const inspectorContent = buildInspectorPaletteContent(firstResult, options);
+  if (inspectorContent) {
+    inspectorPalette.setContent(inspectorContent);
+  } else {
+    inspectorPalette.showEmpty('No optimization data available');
+  }
+
+  // Preview palette (single-file: auto-load, multi-file: first file)
+  const previewResult = results[0];
+  const blob = new Blob([previewResult.result], { type: 'application/pdf' });
+  const previewContent = buildPreviewContent(previewResult.originalFile, blob);
+  previewPalette.setContent(previewContent);
+}
+
+// --- Start over ---
+function startOver() {
+  revokeBlobUrls();
+  destroyAllComparisons();
+  lastFiles = null;
+  lastRunOptions = null;
+  fileInput.value = '';
+
+  resultsPalette.showEmpty('Drop a PDF to see results');
+  inspectorPalette.showEmpty('Drop a PDF to see object breakdown');
+  previewPalette.showEmpty('Drop a PDF to see preview');
+
+  statusLeft.textContent = 'Reduce PDF file size \u2014 files never leave your device';
 }
 
 // --- Main flow ---
@@ -221,13 +261,14 @@ async function handleFiles(files) {
   const options = collectOptions();
   lastRunOptions = JSON.stringify(options);
 
-  showState('processing');
+  setProcessing(true);
   const processingStart = Date.now();
   fileList.innerHTML = '';
 
   const results = [];
 
-  for (const file of pdfFiles) {
+  for (let fileIdx = 0; fileIdx < pdfFiles.length; fileIdx++) {
+    const file = pdfFiles[fileIdx];
     if (cancelled) break;
 
     const li = document.createElement('li');
@@ -241,11 +282,15 @@ async function handleFiles(files) {
 
     const passEl = li.querySelector('.file-item__pass');
     const fillEl = li.querySelector('.file-item__fill');
+    const fileCounter = pdfFiles.length > 1 ? ` (${fileIdx + 1}/${pdfFiles.length})` : '';
+    statusLeft.textContent = `Optimizing ${file.name}${fileCounter}\u2026`;
 
     try {
       const { result, stats } = await processFileWithProgress(file, options, (progress, pass) => {
         fillEl.style.width = `${Math.round(progress * 100)}%`;
-        passEl.textContent = PASS_LABELS[pass] || pass || 'Processing\u2026';
+        const passLabel = PASS_LABELS[pass] || pass || 'Processing\u2026';
+        passEl.textContent = passLabel;
+        statusLeft.textContent = `Optimizing ${file.name}${fileCounter} \u2014 ${passLabel}`;
       });
 
       fillEl.style.width = '100%';
@@ -277,7 +322,7 @@ async function handleFiles(files) {
   }
 
   if (cancelled) {
-    showState('idle');
+    setProcessing(false);
     return;
   }
 
@@ -288,12 +333,9 @@ async function handleFiles(files) {
   }
 
   // Show results
-  showState('results');
+  setProcessing(false);
   revokeBlobUrls();
   destroyAllComparisons();
-
-  btnReoptimize.classList.remove('btn--stale');
-  resultsSettingsBar.classList.remove('results-settings--stale');
 
   renderResults(results, options);
 }
@@ -390,30 +432,17 @@ btnCancel.addEventListener('click', () => {
     activeWorker.terminate();
     activeWorker = null;
   }
-  showState('idle');
-});
-
-btnReoptimize.addEventListener('click', () => {
-  if (lastFiles) handleFiles(lastFiles);
-});
-
-btnStartOver.addEventListener('click', () => {
-  revokeBlobUrls();
-  destroyAllComparisons();
-  lastFiles = null;
-  lastRunOptions = null;
-  fileInput.value = '';
-  btnReoptimize.classList.remove('btn--stale');
-  resultsSettingsBar.classList.remove('results-settings--stale');
-  showState('idle');
+  setProcessing(false);
 });
 
 // --- Debug mode indicator ---
 if (new URLSearchParams(window.location.search).has('debug')) {
   const banner = document.createElement('div');
   banner.className = 'debug-banner';
-  banner.innerHTML = 'Debug mode active — extra diagnostics will appear in results';
-  document.body.insertBefore(banner, document.body.firstChild);
+  banner.innerHTML = 'Debug mode active \u2014 extra diagnostics will appear in results';
+  const appWindow = document.querySelector('.app-window');
+  appWindow.insertBefore(banner, appWindow.firstChild);
 }
 
-showState('idle');
+// --- Initial state ---
+statusLeft.textContent = 'Reduce PDF file size \u2014 files never leave your device';

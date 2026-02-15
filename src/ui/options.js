@@ -6,7 +6,7 @@ export const PRESETS = {
 };
 
 // --- DOM refs (private to this module) ---
-const presetBtns = document.querySelectorAll('.preset-btn');
+const presetBtns = document.querySelectorAll('.tab-control__tab');
 const modeBtns = document.querySelectorAll('.mode-btn');
 const qualityRow = document.querySelector('.control-row--quality');
 const qualitySlider = document.getElementById('quality-slider');
@@ -21,7 +21,8 @@ export function applyPreset(name) {
   if (!p) return;
 
   presetBtns.forEach((btn) => {
-    btn.classList.toggle('preset-btn--active', btn.dataset.preset === name);
+    btn.classList.toggle('tab-control__tab--active', btn.dataset.preset === name);
+    btn.setAttribute('aria-selected', btn.dataset.preset === name ? 'true' : 'false');
   });
 
   modeBtns.forEach((btn) => {
@@ -48,12 +49,16 @@ export function syncPresetIndicator() {
         (!current.lossy || (current.imageQuality === p.imageQuality &&
                             current.maxImageDpi === p.maxImageDpi))) {
       presetBtns.forEach((btn) => {
-        btn.classList.toggle('preset-btn--active', btn.dataset.preset === name);
+        btn.classList.toggle('tab-control__tab--active', btn.dataset.preset === name);
+        btn.setAttribute('aria-selected', btn.dataset.preset === name ? 'true' : 'false');
       });
       return;
     }
   }
-  presetBtns.forEach((btn) => btn.classList.remove('preset-btn--active'));
+  presetBtns.forEach((btn) => {
+    btn.classList.remove('tab-control__tab--active');
+    btn.setAttribute('aria-selected', 'false');
+  });
 }
 
 /** Return the human-readable label for the currently active preset. */
@@ -118,7 +123,7 @@ export function initOptionsListeners({ onOptionsChanged }) {
   optionsPanel.addEventListener('input', onOptionsChanged);
   optionsPanel.addEventListener('change', onOptionsChanged);
   optionsPanel.addEventListener('click', (e) => {
-    if (e.target.closest('.preset-btn') || e.target.closest('.mode-btn')) {
+    if (e.target.closest('.tab-control__tab') || e.target.closest('.mode-btn')) {
       requestAnimationFrame(onOptionsChanged);
     }
   });

@@ -2,11 +2,13 @@
 
 Reference diagram for the PDF-A-go-slim interface. Documents the state machine, screen layouts, component hierarchy, and data flow.
 
+**Visual style:** Classic desktop utility aesthetic with window chrome, beveled panels, and status bar. See `docs/UI.md` for design decisions.
+
 ---
 
 ## State Machine
 
-The app has three mutually exclusive states managed by `showState()` in `main.js`. The `#options-panel` DOM node physically relocates between states.
+The app has three mutually exclusive states managed by `showState()` in `main.js`. The `#options-panel` DOM node physically relocates between states. The status bar text updates with each state transition.
 
 ```
                          drop / click / "try example"
@@ -39,6 +41,7 @@ The app has three mutually exclusive states managed by `showState()` in `main.js
 | `#processing`        | hidden  | visible    | hidden                   |
 | `#results`           | hidden  | hidden     | visible                  |
 | `#drop-overlay`      | on drag | blocked    | on drag                  |
+| `.status-bar` left   | "Ready" | "Optimizing {file}..." | "Saved {pct}% — {sizes}" |
 
 ---
 
@@ -47,40 +50,41 @@ The app has three mutually exclusive states managed by `showState()` in `main.js
 ### IDLE
 
 ```
-+========================================================+
-|                    PDF-A-go-slim                        |
-|       Optimize PDFs in your browser. Files never       |
-|       leave your device.                               |
-+========================================================+
-
-+--------------------------------------------------------+
-|                                                        |
-|                    [PDF icon]                           |
-|                                                        |
-|                  Drop PDFs here                        |
-|               or click to select files                 |
-|           or [try an example PDF]                      |
-|                                                        |
-+--------------------------------------------------------+
-
-+-- #options-idle-slot ----------------------------------+
-| #options-panel                                         |
-|                                                        |
-| Preset: [Lossless*] [Web] [Print]                     |
-|                                                        |
-| > Advanced Settings                                    |
-|   +--------------------------------------------------+ |
-|   | Mode: [Lossless*|Lossy]                          | |
-|   | Image quality: [===|=====] 85  (lossy only)      | |
-|   | Max image DPI: [150]           (lossy only)      | |
-|   | [x] Unembed standard fonts                       | |
-|   | [x] Subset embedded fonts                        | |
-|   +--------------------------------------------------+ |
-+--------------------------------------------------------+
-
-+-- footer ----------------------------------------------+
-|  Built with pdf-lib ... | Debug mode                   |
-+--------------------------------------------------------+
++== .app-window ============================================+
+| .title-bar                                                |
+| PDF-A-go-slim   Reduce PDF file size — files never...     |
++===========================================================+
+|                                                           |
+| #app                                                      |
+|                                                           |
+| +-- .drop-area (sunken panel) -------------------------+  |
+| |                                                      |  |
+| |                   [PDF icon]                         |  |
+| |                                                      |  |
+| |                 Drop PDFs here                       |  |
+| |              or click to select files                |  |
+| |          or [try an example PDF]                     |  |
+| |                                                      |  |
+| +------------------------------------------------------+  |
+|                                                           |
+| +-- #options-idle-slot ---------------------------------+  |
+| | #options-panel                                       |  |
+| |                                                      |  |
+| | Preset: [Lossless*] [Web] [Print]  (raised buttons)  |  |
+| |                                                      |  |
+| | +-- .advanced (etched group box) -----------------+  |  |
+| | | > Advanced Settings                             |  |  |
+| | |   Mode: [Lossless*|Lossy]                      |  |  |
+| | |   Image quality: [===|=====] 85  (lossy only)  |  |  |
+| | |   Max image DPI: [150]           (lossy only)  |  |  |
+| | |   [x] Unembed standard fonts                   |  |  |
+| | |   [x] Subset embedded fonts                    |  |  |
+| | +------------------------------------------------+  |  |
+| +------------------------------------------------------+  |
+|                                                           |
++== .status-bar ============================================+
+| Ready                              GitHub · Debug         |
++===========================================================+
 ```
 
 **Interactions:**
@@ -95,33 +99,37 @@ The app has three mutually exclusive states managed by `showState()` in `main.js
 ### PROCESSING
 
 ```
-+========================================================+
-|                    PDF-A-go-slim                        |
-+========================================================+
-
-+-- #processing -----------------------------------------+
-|                                                        |
-|  Optimizing...                                         |
-|                                                        |
-|  +-- file-item -------------------------------------+  |
-|  | report.pdf                                       |  |
-|  | Optimizing images...                             |  |
-|  | [========|============] (shimmer animation)      |  |
-|  +--------------------------------------------------+  |
-|                                                        |
-|  +-- file-item (error) -----------------------------+  |
-|  | secret.pdf                                       |  |
-|  | This PDF is password-protected  [Retry]          |  |
-|  | [######################################] (red)   |  |
-|  +--------------------------------------------------+  |
-|                                                        |
-|                     Cancel                             |
-|                                                        |
-+--------------------------------------------------------+
++== .app-window ============================================+
+| .title-bar                                                |
+| PDF-A-go-slim   Reduce PDF file size — files never...     |
++===========================================================+
+|                                                           |
+| #app                                                      |
+|                                                           |
+| Optimizing...                                             |
+|                                                           |
+| +-- file-item (etched panel) --------------------------+  |
+| | report.pdf                                           |  |
+| | Optimizing images...                                 |  |
+| | [========|============] (sunken track, shimmer fill)  |  |
+| +------------------------------------------------------+  |
+|                                                           |
+| +-- file-item (error) ---------------------------------+  |
+| | secret.pdf                                           |  |
+| | This PDF is password-protected  [Retry]              |  |
+| | [######################################] (red fill)   |  |
+| +------------------------------------------------------+  |
+|                                                           |
+|                        Cancel                             |
+|                                                           |
++== .status-bar ============================================+
+| Optimizing report.pdf...                GitHub · Debug     |
++===========================================================+
 ```
 
 **Interactions:**
 - Progress bar animates per-pass (`PASS_LABELS` maps internal names to friendly labels)
+- Status bar shows current filename being processed
 - Cancel -> terminates worker, returns to IDLE
 - Error -> shows friendly message + Retry button per file
 - Minimum 800ms display time before transitioning to RESULTS
@@ -131,61 +139,41 @@ The app has three mutually exclusive states managed by `showState()` in `main.js
 ### RESULTS: Single File (90% case)
 
 ```
-+========================================================+
-|                    PDF-A-go-slim                        |
-+========================================================+
-
-+-- .result-card ----------------------------------------+
-|                                                        |
-|  .result-card__hero (grid: metrics left, download right)|
-|  report.pdf                                            |
-|  -32.4%                          [ Download ]          |
-|  1.2 MB -> 840 KB                                      |
-|  [========        ] (animated bar)                     |
-|                                                        |
-|  +-- .hint-banner (conditional) --------------------+  |
-|  | Images make up 73% of this file.                 |  |
-|  | Try the [Web preset] for better compression.     |  |
-|  +--------------------------------------------------+  |
-|                                                        |
-|  > What was optimized           <details/summary>      |
-|    +------------------------------------------------+  |
-|    | 14 streams recompressed, 3 images recompressed |  |
-|    | 2 fonts subsetted, 1 standard font unembedded  |  |
-|    |                                                |  |
-|    |        Before   After   Saved                  |  |
-|    | Fonts  240 KB   80 KB   -160 KB                |  |
-|    | Images 800 KB   600 KB  -200 KB                |  |
-|    | ...                                            |  |
-|    +------------------------------------------------+  |
-|                                                        |
-|  > Preview                      <details/summary>      |
-|    +------------------------------------------------+  |
-|    | Optimized -- 840 KB    Powered by PDF-A-go-go  |  |
-|    | +--------------------------------------------+ |  |
-|    | |                                            | |  |
-|    | |          [PDF viewer iframe]               | |  |
-|    | |                                            | |  |
-|    | +--------------------------------------------+ |  |
-|    +------------------------------------------------+  |
-|                                                        |
-|  > Debug info        (?debug only) <details/summary>   |
-|    +------------------------------------------------+  |
-|    | Pass timings, skip reasons, converted images   |  |
-|    +------------------------------------------------+  |
-|                                                        |
-+--------------------------------------------------------+
-
-+-- .results-settings -----------------------------------+
-|  Settings: **Lossless**         [Change settings]      |
-|  +-- .results-settings__body (hidden by default) ----+ |
-|  | #options-panel (relocated from idle slot)         | |
-|  | Preset: [Lossless*] [Web] [Print]                 | |
-|  | > Advanced Settings                               | |
-|  +---------------------------------------------------+ |
-+--------------------------------------------------------+
-
-         [ Re-optimize ]    [ Start Over ]
++== .app-window ============================================+
+| .title-bar                                                |
+| PDF-A-go-slim   Reduce PDF file size — files never...     |
++===========================================================+
+|                                                           |
+| #app                                                      |
+|                                                           |
+| +-- .result-card (etched panel) -----------------------+  |
+| |                                                      |  |
+| |  .result-card__hero (grid: metrics left, download)   |  |
+| |  report.pdf                                          |  |
+| |  -32.4%                        [ Download ]          |  |
+| |  1.2 MB -> 840 KB                                    |  |
+| |  [========        ] (sunken track, animated bar)      |  |
+| |                                                      |  |
+| |  +-- .hint-banner (conditional) -----------------+   |  |
+| |  | Images make up 73% of this file.              |   |  |
+| |  | Try the [Web preset] for better compression.  |   |  |
+| |  +-----------------------------------------------+   |  |
+| |                                                      |  |
+| |  > What was optimized          <details/summary>     |  |
+| |  > Preview                     <details/summary>     |  |
+| |  > Debug info   (?debug only)  <details/summary>     |  |
+| |                                                      |  |
+| +------------------------------------------------------+  |
+|                                                           |
+| +-- .results-settings (etched panel) ------------------+  |
+| |  Settings: **Lossless**      [Change settings]       |  |
+| +------------------------------------------------------+  |
+|                                                           |
+|            [ Re-optimize ]    [ Start Over ]              |
+|                                                           |
++== .status-bar ============================================+
+| Saved 32.4% — 1.2 MB -> 840 KB        GitHub · Debug     |
++===========================================================+
 ```
 
 **Information hierarchy (top to bottom):**
@@ -194,6 +182,7 @@ The app has three mutually exclusive states managed by `showState()` in `main.js
 3. "What happened?" -- hint banner + pass summary + object breakdown (visible but secondary)
 4. "Deep dive" -- preview (auto-open for single file, collapsed for batch), debug (collapsed by default)
 5. "What next?" -- settings bar + action buttons
+6. Status bar -- persistent savings summary
 
 **Interactions:**
 - Download link -> browser downloads optimized PDF
@@ -210,50 +199,33 @@ The app has three mutually exclusive states managed by `showState()` in `main.js
 ### RESULTS: Multiple Files
 
 ```
-+========================================================+
-|                    PDF-A-go-slim                        |
-+========================================================+
-
-+-- .result-card.result-card--summary -------------------+
-|                                                        |
-|                   -28.7%        (count-up animation)   |
-|         4.1 MB -> 2.9 MB across 3 files               |
-|         [==========          ] (animated bar)          |
-|                                                        |
-|              [ Download All ]                          |
-|                                                        |
-+--------------------------------------------------------+
-
-+-- .result-file-card -----------------------------------+
-| report.pdf              1.2 MB -> 840 KB  -32.4%      |
-| [ Download ]                                           |
-|                                                        |
-|  > What was optimized                                  |
-|  > Preview                                             |
-+--------------------------------------------------------+
-
-+-- .result-file-card -----------------------------------+
-| slides.pdf              1.8 MB -> 1.3 MB  -27.8%      |
-| [ Download ]                                           |
-|                                                        |
-|  > What was optimized                                  |
-|  > Preview                                             |
-+--------------------------------------------------------+
-
-+-- .result-file-card -----------------------------------+
-| brochure.pdf            1.1 MB -> 810 KB  -26.2%      |
-| [ Download ]                                           |
-| [hint banner, if applicable]                           |
-|                                                        |
-|  > What was optimized                                  |
-|  > Preview                                             |
-+--------------------------------------------------------+
-
-+-- .results-settings -----------------------------------+
-|  Settings: **Lossless**         [Change settings]      |
-+--------------------------------------------------------+
-
-         [ Re-optimize ]    [ Start Over ]
++== .app-window ============================================+
+| .title-bar                                                |
++===========================================================+
+|                                                           |
+| +-- .result-card--summary (etched panel) --------------+  |
+| |                   -28.7%        (count-up animation)  |  |
+| |         4.1 MB -> 2.9 MB across 3 files              |  |
+| |         [==========          ] (animated bar)         |  |
+| |              [ Download All ]                         |  |
+| +------------------------------------------------------+  |
+|                                                           |
+| +-- .result-file-card (etched panel) ------------------+  |
+| | report.pdf              1.2 MB -> 840 KB  -32.4%     |  |
+| | [ Download ]                                         |  |
+| |  > What was optimized                                |  |
+| |  > Preview                                           |  |
+| +------------------------------------------------------+  |
+|                                                           |
+| +-- .results-settings ----------------------------------+  |
+| |  Settings: **Lossless**      [Change settings]       |  |
+| +------------------------------------------------------+  |
+|                                                           |
+|            [ Re-optimize ]    [ Start Over ]              |
+|                                                           |
++== .status-bar ============================================+
+| Saved 28.7% — 4.1 MB -> 2.9 MB        GitHub · Debug     |
++===========================================================+
 ```
 
 **Differences from single-file:**
@@ -288,67 +260,76 @@ Managed by `dragenter`/`dragleave` counter on `document`. Pointer-events: none (
 ```
 index.html
   |
-  +-- header (static)
   +-- #drop-overlay (conditional, z-index: 999)
   |
-  +-- #app
-  |     |
-  |     +-- #drop-zone  [IDLE state]
-  |     |     +-- .drop-area (click/drop target)
-  |     |           +-- .drop-area__content (icon, text, example button)
-  |     |           +-- #file-input (hidden)
-  |     |
-  |     +-- #options-idle-slot  [IDLE state]
-  |     |     +-- #options-panel  <-- physically moves between here and results
-  |     |           +-- .presets (Lossless / Web / Print buttons)
-  |     |           +-- .advanced (<details>)
-  |     |                 +-- .advanced__body (mode, quality, DPI, checkboxes)
-  |     |
-  |     +-- #processing  [PROCESSING state]
-  |     |     +-- h2 "Optimizing..."
-  |     |     +-- #file-list (dynamic <li> per file)
-  |     |     |     +-- .file-item
-  |     |     |           +-- .file-item__name
-  |     |     |           +-- .file-item__pass (or __error + __retry)
-  |     |     |           +-- .file-item__bar > .file-item__fill
-  |     |     +-- .processing-actions > #btn-cancel
-  |     |
-  |     +-- #results  [RESULTS state]
-  |           +-- #results-summary
-  |           |     +-- .result-card  (single file)
-  |           |     |     +-- .result-card__hero (grid: metrics | download)
-  |           |     |     |     +-- .results-hero__metrics (filename, pct, sizes, bar)
-  |           |     |     |     +-- .result-card__download (<a>)
-  |           |     |     +-- .hint-banner (conditional)
-  |           |     |     +-- <details> "What was optimized" (pass stats + inspector)
-  |           |     |     +-- <details> "Preview" (lazy PDF viewer)
-  |           |     |     +-- <details> "Debug info" (?debug only)
-  |           |     |
-  |           |     +-- .result-card--summary  (multi-file, instead of above)
-  |           |           +-- .result-card__hero (aggregate pct, sizes)
-  |           |           +-- "Download All" button
-  |           |
-  |           +-- #results-files  (multi-file only)
-  |           |     +-- .result-file-card  (per file)
-  |           |           +-- .result-file-card__header (name + sizes + pct)
-  |           |           +-- .result-file-card__download (<a>)
-  |           |           +-- .hint-banner (conditional)
-  |           |           +-- <details> "What was optimized" (pass stats + inspector)
-  |           |           +-- <details> "Preview"
-  |           |           +-- <details> "Debug info" (?debug only)
-  |           |
-  |           +-- #results-settings
-  |           |     +-- .results-settings__summary
-  |           |     |     +-- "Settings: **Lossless**"
-  |           |     |     +-- [Change settings] button
-  |           |     +-- .results-settings__body (hidden, expandable)
-  |           |           +-- #options-panel  <-- relocated here from idle slot
-  |           |
-  |           +-- .results-actions
-  |                 +-- #btn-reoptimize
-  |                 +-- #btn-start-over
-  |
-  +-- footer (static)
+  +-- .app-window
+        |
+        +-- .title-bar
+        |     +-- .title-bar__title ("PDF-A-go-slim")
+        |     +-- .title-bar__subtitle ("Reduce PDF file size...")
+        |
+        +-- .debug-banner (conditional, ?debug param)
+        |
+        +-- #app (main content area)
+        |     |
+        |     +-- #drop-zone  [IDLE state]
+        |     |     +-- .drop-area (click/drop target, sunken panel)
+        |     |           +-- .drop-area__content (icon, text, example button)
+        |     |           +-- #file-input (hidden)
+        |     |
+        |     +-- #options-idle-slot  [IDLE state]
+        |     |     +-- #options-panel  <-- physically moves between here and results
+        |     |           +-- .presets (Lossless / Web / Print raised buttons)
+        |     |           +-- .advanced (<details>, etched group box)
+        |     |                 +-- .advanced__body (mode, quality, DPI, checkboxes)
+        |     |
+        |     +-- #processing  [PROCESSING state]
+        |     |     +-- h2 "Optimizing..."
+        |     |     +-- #file-list (dynamic <li> per file)
+        |     |     |     +-- .file-item (etched panel)
+        |     |     |           +-- .file-item__name
+        |     |     |           +-- .file-item__pass (or __error + __retry)
+        |     |     |           +-- .file-item__bar > .file-item__fill (sunken track)
+        |     |     +-- .processing-actions > #btn-cancel
+        |     |
+        |     +-- #results  [RESULTS state]
+        |           +-- #results-summary
+        |           |     +-- .result-card  (single file, etched panel)
+        |           |     |     +-- .result-card__hero (grid: metrics | download)
+        |           |     |     |     +-- .results-hero__metrics (filename, pct, sizes, bar)
+        |           |     |     |     +-- .result-card__download (raised button)
+        |           |     |     +-- .hint-banner (conditional)
+        |           |     |     +-- <details> "What was optimized" (pass stats + inspector)
+        |           |     |     +-- <details> "Preview" (lazy PDF viewer)
+        |           |     |     +-- <details> "Debug info" (?debug only)
+        |           |     |
+        |           |     +-- .result-card--summary  (multi-file, instead of above)
+        |           |           +-- .result-card__hero (aggregate pct, sizes)
+        |           |           +-- "Download All" button
+        |           |
+        |           +-- #results-files  (multi-file only)
+        |           |     +-- .result-file-card  (per file, etched panel)
+        |           |           +-- .result-file-card__header (name + sizes + pct)
+        |           |           +-- .result-file-card__download (raised button)
+        |           |           +-- .hint-banner (conditional)
+        |           |           +-- <details> "What was optimized"
+        |           |           +-- <details> "Preview"
+        |           |           +-- <details> "Debug info" (?debug only)
+        |           |
+        |           +-- #results-settings (etched panel)
+        |           |     +-- .results-settings__summary
+        |           |     |     +-- "Settings: **Lossless**"
+        |           |     |     +-- [Change settings] button
+        |           |     +-- .results-settings__body (hidden, expandable)
+        |           |           +-- #options-panel  <-- relocated here from idle slot
+        |           |
+        |           +-- .results-actions
+        |                 +-- #btn-reoptimize (raised button)
+        |                 +-- #btn-start-over (raised button)
+        |
+        +-- .status-bar
+              +-- .status-bar__left (#status-left — state text)
+              +-- .status-bar__right (#status-right — GitHub + Debug links)
 ```
 
 ---
@@ -374,13 +355,27 @@ Event listeners survive DOM relocation. CSS override `.results-settings__body .o
 
 ---
 
+## Status Bar
+
+The `.status-bar` sits at the bottom of `.app-window` with two sunken fields:
+
+| State | Left field (`#status-left`) | Right field (`#status-right`) |
+|-------|---------------------------|------------------------------|
+| IDLE | "Ready" | GitHub · Debug links |
+| PROCESSING | "Optimizing {filename}..." | GitHub · Debug links |
+| RESULTS | "Saved {pct}% — {before} → {after}" | GitHub · Debug links |
+
+Updated by `showState()` (idle/processing defaults) and `renderResults()` (savings summary).
+
+---
+
 ## Module Map
 
 ```
 main.js
-  +-- showState()              State machine, DOM visibility, options relocation
+  +-- showState()              State machine, DOM visibility, options relocation, status bar
   +-- handleFiles()            Main flow: filter PDFs, run workers, render results
-  +-- renderResults()          Delegates to result-card.js builders
+  +-- renderResults()          Delegates to result-card.js builders, updates status bar
   +-- checkStaleResults()      Compares current options vs last-run options
   +-- animateCountUp()         Count-up animation (passed to card builders)
   |
@@ -422,9 +417,9 @@ main.js
 | Element | Trigger | Duration | Notes |
 |---------|---------|----------|-------|
 | `.toast` | Non-PDF files dropped | 4s + 300ms fade | Fixed bottom-center |
-| `.debug-banner` | `?debug` URL param | Persistent | Top of `<body>` |
+| `.debug-banner` | `?debug` URL param | Persistent | Top of `.app-window` |
 | `.drop-overlay` | Files dragged over page | While dragging | Full-page, pointer-events: none |
 | `.stale-pulse` animation | Settings changed after results | 1x 2s pulse | On Re-optimize button |
-| `.results-settings--stale` | Settings changed after results | Until re-optimize | Blue border on settings bar |
+| `.results-settings--stale` | Settings changed after results | Until re-optimize | Etched border + primary outline on settings bar |
 | Count-up animation | Results displayed | 600ms ease-out | On savings percentage |
 | Bar fill animation | Results displayed | 400ms ease | CSS transition on width |

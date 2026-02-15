@@ -1,6 +1,6 @@
 # Benchmark Results
 
-Generated: 2026-02-14 22:54:09 UTC  
+Generated: 2026-02-15 10:32:11 UTC  
 Node: v22.14.0  
 Platform: darwin arm64
 
@@ -9,13 +9,13 @@ Platform: darwin arm64
 | Benchmark | Input | Output | Saved | Time |
 |-----------|-------|--------|-------|------|
 | Illustrator-style bloat | 13.4 KB | 1.2 KB | 90.9% | 12ms |
-| Photo-heavy (lossless) | 380.0 KB | 378.1 KB | 0.5% | 18ms |
-| Photo-heavy (lossy q=75) | 380.0 KB | 30.9 KB | 91.9% | 84ms |
-| Photo-heavy (lossy q=75, 150dpi) | 380.0 KB | 23.0 KB | 93.9% | 66ms |
-| Tagged accessible PDF | 5.8 KB | 1.2 KB | 80.0% | 4ms |
+| Photo-heavy (lossless) | 380.0 KB | 378.1 KB | 0.5% | 19ms |
+| Photo-heavy (lossy q=75) | 380.0 KB | 30.9 KB | 91.9% | 73ms |
+| Photo-heavy (lossy q=75, 150dpi) | 380.0 KB | 23.0 KB | 93.9% | 52ms |
+| Tagged accessible PDF | 5.8 KB | 1.2 KB | 80.0% | 2ms |
 | PDF/A-1b document | 10.2 KB | 3.1 KB | 69.6% | 1ms |
-| Multi-font duplicates | 8.2 KB | 1.6 KB | 80.2% | 4ms |
-| Kitchen sink (lossless) | 156.0 KB | 139.7 KB | 10.4% | 10ms |
+| Multi-font duplicates | 8.2 KB | 1.6 KB | 80.2% | 5ms |
+| Kitchen sink (lossless) | 156.0 KB | 139.7 KB | 10.4% | 7ms |
 | Kitchen sink (lossy q=75) | 156.0 KB | 20.0 KB | 87.2% | 39ms |
 
 ## Illustrator-style bloat
@@ -28,8 +28,8 @@ Platform: darwin arm64
 | Pass | Result | Time |
 |------|--------|------|
 | Recompressing streams | 9 recompressed, 18 skipped | 4ms |
-| Recompressing images | 0 converted | 0ms |
-| Unembedding standard fonts | 2 unembedded | 1ms |
+| Recompressing images | 0 converted | 1ms |
+| Unembedding standard fonts | 2 unembedded | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
 | Deduplicating objects | 3 deduplicated | 0ms |
 | Deduplicating fonts | 0 deduplicated | 0ms |
@@ -49,7 +49,7 @@ Platform: darwin arm64
 
 ## Photo-heavy (lossless)
 
-**Input:** 380.0 KB | **Output:** 378.1 KB | **Saved:** 0.5% (1.8 KB) | **Time:** 18ms
+**Input:** 380.0 KB | **Output:** 378.1 KB | **Saved:** 0.5% (1.8 KB) | **Time:** 19ms
 **Detected traits:** None
 
 ### Pass results
@@ -61,7 +61,7 @@ Platform: darwin arm64
 | Unembedding standard fonts | 0 unembedded | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
 | Deduplicating objects | 0 deduplicated | 1ms |
-| Deduplicating fonts | 0 deduplicated | 0ms |
+| Deduplicating fonts | 0 deduplicated | 1ms |
 | Stripping metadata | 0 stripped | 0ms |
 | Removing unreferenced objects | 0 removed | 0ms |
 
@@ -77,7 +77,7 @@ Platform: darwin arm64
 
 ## Photo-heavy (lossy q=75)
 
-**Input:** 380.0 KB | **Output:** 30.9 KB | **Saved:** 91.9% (349.1 KB) | **Time:** 84ms
+**Input:** 380.0 KB | **Output:** 30.9 KB | **Saved:** 91.9% (349.1 KB) | **Time:** 73ms
 **Detected traits:** None
 
 ### Pass results
@@ -85,7 +85,7 @@ Platform: darwin arm64
 | Pass | Result | Time |
 |------|--------|------|
 | Recompressing streams | 3 recompressed, 8 skipped | 8ms |
-| Recompressing images | 4 converted | 72ms |
+| Recompressing images | 4 converted | 64ms |
 | Unembedding standard fonts | 0 unembedded | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
 | Deduplicating objects | 0 deduplicated | 0ms |
@@ -105,18 +105,18 @@ Platform: darwin arm64
 
 ## Photo-heavy (lossy q=75, 150dpi)
 
-**Input:** 380.0 KB | **Output:** 23.0 KB | **Saved:** 93.9% (356.9 KB) | **Time:** 66ms
+**Input:** 380.0 KB | **Output:** 23.0 KB | **Saved:** 93.9% (356.9 KB) | **Time:** 52ms
 **Detected traits:** None
 
 ### Pass results
 
 | Pass | Result | Time |
 |------|--------|------|
-| Recompressing streams | 3 recompressed, 8 skipped | 9ms |
-| Recompressing images | 4 converted, 1 downsampled | 55ms |
+| Recompressing streams | 3 recompressed, 8 skipped | 8ms |
+| Recompressing images | 4 converted, 1 downsampled | 42ms |
 | Unembedding standard fonts | 0 unembedded | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
-| Deduplicating objects | 0 deduplicated | 1ms |
+| Deduplicating objects | 0 deduplicated | 0ms |
 | Deduplicating fonts | 0 deduplicated | 0ms |
 | Stripping metadata | 0 stripped | 0ms |
 | Removing unreferenced objects | 0 removed | 0ms |
@@ -133,14 +133,14 @@ Platform: darwin arm64
 
 ## Tagged accessible PDF
 
-**Input:** 5.8 KB | **Output:** 1.2 KB | **Saved:** 80.0% (4.7 KB) | **Time:** 4ms
+**Input:** 5.8 KB | **Output:** 1.2 KB | **Saved:** 80.0% (4.7 KB) | **Time:** 2ms
 **Detected traits:** Tagged, StructTree, Lang=en-US
 
 ### Pass results
 
 | Pass | Result | Time |
 |------|--------|------|
-| Recompressing streams | 3 recompressed, 13 skipped | 2ms |
+| Recompressing streams | 3 recompressed, 13 skipped | 0ms |
 | Recompressing images | 0 converted | 0ms |
 | Unembedding standard fonts | 1 unembedded | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
@@ -173,7 +173,7 @@ Platform: darwin arm64
 | Unembedding standard fonts | 0 unembedded, PDF/A skipped | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
 | Deduplicating objects | 1 deduplicated | 0ms |
-| Deduplicating fonts | 0 deduplicated | 0ms |
+| Deduplicating fonts | 0 deduplicated | 1ms |
 | Stripping metadata | 1 stripped, XMP preserved | 0ms |
 | Removing unreferenced objects | 1 removed | 0ms |
 
@@ -190,7 +190,7 @@ Platform: darwin arm64
 
 ## Multi-font duplicates
 
-**Input:** 8.2 KB | **Output:** 1.6 KB | **Saved:** 80.2% (6.6 KB) | **Time:** 4ms
+**Input:** 8.2 KB | **Output:** 1.6 KB | **Saved:** 80.2% (6.6 KB) | **Time:** 5ms
 **Detected traits:** None
 
 ### Pass results
@@ -219,16 +219,16 @@ Platform: darwin arm64
 
 ## Kitchen sink (lossless)
 
-**Input:** 156.0 KB | **Output:** 139.7 KB | **Saved:** 10.4% (16.3 KB) | **Time:** 10ms
+**Input:** 156.0 KB | **Output:** 139.7 KB | **Saved:** 10.4% (16.3 KB) | **Time:** 7ms
 **Detected traits:** Tagged, StructTree, Lang=en-US
 
 ### Pass results
 
 | Pass | Result | Time |
 |------|--------|------|
-| Recompressing streams | 15 recompressed, 34 skipped | 7ms |
+| Recompressing streams | 15 recompressed, 34 skipped | 5ms |
 | Recompressing images | 0 converted | 0ms |
-| Unembedding standard fonts | 4 unembedded | 1ms |
+| Unembedding standard fonts | 4 unembedded | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
 | Deduplicating objects | 8 deduplicated | 0ms |
 | Deduplicating fonts | 0 deduplicated | 0ms |

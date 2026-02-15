@@ -1,7 +1,7 @@
 import { formatSize } from './helpers.js';
 import { buildStatsDetail, buildDebugPanel } from './stats.js';
-import { buildInspectPanel } from './inspector.js';
-import { buildCompareSection } from './compare.js';
+import { buildInspectPanel, initInspectorInteractions } from './inspector.js';
+import { buildPreviewContent } from './compare.js';
 import { applyPreset } from './options.js';
 
 /**
@@ -79,67 +79,8 @@ function buildHintBanner(result, saved, options, onStaleCheck) {
 }
 
 /**
- * Build disclosure sections (details/summary) for stats, inspector, preview, debug.
- */
-function buildDisclosureSections(result, blob, options, { autoOpenPreview = false } = {}) {
-  const sections = [];
-
-  // Combined stats + inspector disclosure
-  const statsHtml = buildStatsDetail(result.stats);
-  const inspectHtml = buildInspectPanel(result.stats);
-  if (statsHtml || inspectHtml) {
-    const details = document.createElement('details');
-    details.className = 'result-card__disclosure';
-    const summary = document.createElement('summary');
-    summary.textContent = 'What was optimized';
-    details.appendChild(summary);
-    const content = document.createElement('div');
-    content.className = 'result-card__disclosure-content';
-    content.innerHTML = (statsHtml || '') + (inspectHtml || '');
-    details.appendChild(content);
-
-    // Delegated handler for "Show more..." toggles inside inspector
-    content.addEventListener('click', (ev) => {
-      const btn = ev.target.closest('.inspect-show-more');
-      if (!btn) return;
-      const collapsed = btn.previousElementSibling;
-      if (collapsed && collapsed.classList.contains('inspect-collapse')) {
-        collapsed.hidden = !collapsed.hidden;
-        btn.textContent = collapsed.hidden
-          ? `Show ${btn.dataset.count} more\u2026`
-          : 'Show less';
-      }
-    });
-
-    sections.push(details);
-  }
-
-  // Preview disclosure
-  const compareSection = buildCompareSection(result.originalFile, blob, { autoOpen: autoOpenPreview });
-  sections.push(compareSection);
-
-  // Debug disclosure (only when ?debug URL param is present)
-  if (options.debug) {
-    const debugHtml = buildDebugPanel(result.stats);
-    if (debugHtml) {
-      const details = document.createElement('details');
-      details.className = 'result-card__disclosure';
-      const content = document.createElement('div');
-      content.className = 'result-card__disclosure-content';
-      content.innerHTML = debugHtml;
-      const summary = document.createElement('summary');
-      summary.textContent = 'Debug info';
-      details.appendChild(summary);
-      details.appendChild(content);
-      sections.push(details);
-    }
-  }
-
-  return sections;
-}
-
-/**
- * Build a single-file result card (the 90% case).
+ * Build a single-file result card (hero section only — no disclosure sections).
+ * Disclosure content (stats, inspector, preview) goes into separate palettes.
  * @param {Object} result - { name, originalFile, original, result, stats }
  * @param {Blob} blob - The optimized PDF blob
  * @param {string} blobUrl - Blob URL for download
@@ -174,7 +115,7 @@ export function buildSingleFileCard(result, blob, blobUrl, options, animateCount
   const downloadLink = document.createElement('a');
   downloadLink.href = blobUrl;
   downloadLink.download = result.name;
-  downloadLink.className = 'btn btn--primary result-card__download';
+  downloadLink.className = 'btn btn--primary btn--default result-card__download';
   downloadLink.textContent = 'Download';
   heroEl.appendChild(downloadLink);
 
@@ -183,10 +124,6 @@ export function buildSingleFileCard(result, blob, blobUrl, options, animateCount
   // Hint banner
   const hintBanner = buildHintBanner(result, saved, options, onStaleCheck);
   if (hintBanner) card.appendChild(hintBanner);
-
-  // Disclosure sections (auto-open preview for single-file results)
-  const sections = buildDisclosureSections(result, blob, options, { autoOpenPreview: true });
-  for (const section of sections) card.appendChild(section);
 
   // Trigger animation after card is in DOM
   requestAnimationFrame(() => animateHero(animateCountUp));
@@ -218,7 +155,7 @@ export function buildSummaryCard(results, animateCountUp) {
 
   // Download All button
   const downloadAllBtn = document.createElement('button');
-  downloadAllBtn.className = 'btn btn--primary result-card__download';
+  downloadAllBtn.className = 'btn btn--primary btn--default result-card__download';
   downloadAllBtn.textContent = 'Download All';
   downloadAllBtn.addEventListener('click', () => {
     for (const r of results) {
@@ -240,7 +177,23 @@ export function buildSummaryCard(results, animateCountUp) {
 }
 
 /**
- * Build a compact per-file card for multi-file results.
+ * Build the table header row for multi-file results.
+ * @returns {HTMLElement}
+ */
+export function buildFileTableHeader() {
+  const header = document.createElement('div');
+  header.className = 'result-table__header';
+  header.innerHTML = `
+    <span class="result-table__col-label">Filename</span>
+    <span class="result-table__col-label result-table__col-label--num">Original</span>
+    <span class="result-table__col-label result-table__col-label--num">Optimized</span>
+    <span class="result-table__col-label result-table__col-label--num">Saved</span>
+    <span class="result-table__col-label"></span>`;
+  return header;
+}
+
+/**
+ * Build a table row for multi-file results.
  * @param {Object} result - { name, originalFile, original, result, stats }
  * @param {Blob} blob - The optimized PDF blob
  * @param {string} blobUrl - Blob URL for download
@@ -249,43 +202,144 @@ export function buildSummaryCard(results, animateCountUp) {
  * @returns {HTMLElement}
  */
 export function buildFileCard(result, blob, blobUrl, options, onStaleCheck) {
-  const card = document.createElement('div');
-  card.className = 'result-file-card';
+  const row = document.createElement('div');
+  row.className = 'result-table__row';
 
   const saved = result.original - result.result.byteLength;
   const pct = result.original > 0 ? ((saved / result.original) * 100).toFixed(1) : '0.0';
 
-  // Header: filename + sizes + percentage
-  const header = document.createElement('div');
-  header.className = 'result-file-card__header';
+  // Data row
+  const dataRow = document.createElement('div');
+  dataRow.className = 'result-table__row-data';
 
   const nameEl = document.createElement('span');
-  nameEl.className = 'result-file-card__name';
+  nameEl.className = 'result-table__cell result-table__cell--name';
   nameEl.textContent = result.name;
-  header.appendChild(nameEl);
+  nameEl.title = result.name;
+  dataRow.appendChild(nameEl);
 
-  const metaEl = document.createElement('span');
-  metaEl.className = 'result-file-card__meta';
-  metaEl.innerHTML = `${formatSize(result.original)} \u2192 ${formatSize(result.result.byteLength)} <span class="${saved > 0 ? 'saved--positive' : 'saved--zero'}">${saved > 0 ? `-${pct}%` : `${pct}%`}</span>`;
-  header.appendChild(metaEl);
+  const origEl = document.createElement('span');
+  origEl.className = 'result-table__cell result-table__cell--num';
+  origEl.textContent = formatSize(result.original);
+  dataRow.appendChild(origEl);
 
-  card.appendChild(header);
+  const optEl = document.createElement('span');
+  optEl.className = 'result-table__cell result-table__cell--num';
+  optEl.textContent = formatSize(result.result.byteLength);
+  dataRow.appendChild(optEl);
 
-  // Download button
+  const savedEl = document.createElement('span');
+  savedEl.className = `result-table__cell result-table__cell--num ${saved > 0 ? 'saved--positive' : 'saved--zero'}`;
+  savedEl.textContent = saved > 0 ? `-${pct}%` : `${pct}%`;
+  dataRow.appendChild(savedEl);
+
   const downloadLink = document.createElement('a');
   downloadLink.href = blobUrl;
   downloadLink.download = result.name;
-  downloadLink.className = 'btn btn--primary btn--small result-file-card__download';
+  downloadLink.className = 'btn btn--primary btn--small result-table__cell--dl';
   downloadLink.textContent = 'Download';
-  card.appendChild(downloadLink);
+  downloadLink.addEventListener('click', (e) => e.stopPropagation());
+  dataRow.appendChild(downloadLink);
 
-  // Hint banner
-  const hintBanner = buildHintBanner(result, saved, options, onStaleCheck);
-  if (hintBanner) card.appendChild(hintBanner);
+  row.appendChild(dataRow);
 
-  // Disclosure sections
-  const sections = buildDisclosureSections(result, blob, options);
-  for (const section of sections) card.appendChild(section);
+  return row;
+}
 
-  return card;
+/**
+ * Build the full Results palette content for a single-file result.
+ * Includes hero card + action buttons.
+ * @returns {HTMLElement}
+ */
+export function buildResultsPaletteContent(results, blobUrls, options, { animateCountUp, onStaleCheck, onReoptimize, onStartOver }) {
+  const container = document.createElement('div');
+
+  if (results.length === 1) {
+    const r = results[0];
+    const blob = new Blob([r.result], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    blobUrls.push(url);
+    const card = buildSingleFileCard(r, blob, url, options, animateCountUp, onStaleCheck);
+    container.appendChild(card);
+  } else {
+    const summaryCard = buildSummaryCard(results, animateCountUp);
+    container.appendChild(summaryCard);
+
+    const table = document.createElement('div');
+    table.className = 'result-table';
+    table.appendChild(buildFileTableHeader());
+
+    for (const r of results) {
+      const blob = new Blob([r.result], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      blobUrls.push(url);
+      const row = buildFileCard(r, blob, url, options, onStaleCheck);
+      table.appendChild(row);
+    }
+    container.appendChild(table);
+  }
+
+  // Action buttons
+  const actions = document.createElement('div');
+  actions.className = 'results-actions';
+
+  const btnReoptimize = document.createElement('button');
+  btnReoptimize.className = 'btn btn--secondary';
+  btnReoptimize.id = 'btn-reoptimize';
+  btnReoptimize.textContent = 'Re-optimize';
+  btnReoptimize.addEventListener('click', onReoptimize);
+
+  const btnStartOver = document.createElement('button');
+  btnStartOver.className = 'btn btn--secondary';
+  btnStartOver.id = 'btn-start-over';
+  btnStartOver.textContent = 'Start Over';
+  btnStartOver.addEventListener('click', onStartOver);
+
+  actions.appendChild(btnReoptimize);
+  actions.appendChild(btnStartOver);
+  container.appendChild(actions);
+
+  return container;
+}
+
+/**
+ * Build the Inspector palette content (stats + object breakdown).
+ * @param {Object} result - Single result object with stats
+ * @param {Object} options - Current optimization options
+ * @returns {HTMLElement|null}
+ */
+export function buildInspectorPaletteContent(result, options) {
+  const container = document.createElement('div');
+
+  const statsHtml = buildStatsDetail(result.stats);
+  const inspectHtml = buildInspectPanel(result.stats);
+
+  if (!statsHtml && !inspectHtml) return null;
+
+  const content = document.createElement('div');
+  content.innerHTML = (statsHtml || '') + (inspectHtml || '');
+  container.appendChild(content);
+
+  // Wire up "Show more" interactions
+  initInspectorInteractions(container);
+
+  // Debug panel (only when ?debug URL param is present)
+  if (options.debug) {
+    const debugHtml = buildDebugPanel(result.stats);
+    if (debugHtml) {
+      const details = document.createElement('details');
+      details.className = 'debug-panel';
+      const summary = document.createElement('summary');
+      summary.className = 'debug-panel__toggle';
+      summary.textContent = 'Debug info';
+      details.appendChild(summary);
+      const body = document.createElement('div');
+      body.className = 'debug-panel__body';
+      body.innerHTML = debugHtml;
+      details.appendChild(body);
+      container.appendChild(details);
+    }
+  }
+
+  return container;
 }

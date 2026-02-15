@@ -47,10 +47,11 @@ index.html → src/main.js (UI state machine, drag-and-drop, worker orchestratio
                hash.js                   — shared djb2 hash + FONT_FILE_KEYS constant
 
              src/ui/  (UI modules, imported by main.js):
-               result-card.js  — buildSingleFileCard(), buildSummaryCard(), buildFileCard()
-               compare.js      — buildCompareSection() (lazy PDF-A-go-go viewer, auto-open for single file), destroyAllComparisons()
+               palette.js      — createPalette(), initWindowManager(), initDrag(), bringToFront() (floating window manager)
+               result-card.js  — buildSingleFileCard(), buildSummaryCard(), buildFileCard(), buildResultsPaletteContent(), buildInspectorPaletteContent()
+               compare.js      — buildCompareSection(), buildPreviewContent() (direct-render for Preview palette), destroyAllComparisons()
                stats.js        — buildStatsDetail(), buildDebugPanel()
-               inspector.js    — buildInspectPanel() (object breakdown grid)
+               inspector.js    — buildInspectPanel() (object breakdown grid), initInspectorInteractions() ("Show more" delegation)
                options.js      — collectOptions(), applyPreset(), syncPresetIndicator()
                helpers.js      — formatSize(), escapeHtml()
 
@@ -71,15 +72,15 @@ test/
 ### Key design decisions
 
 - **Web Worker boundary:** `main.js` sends an `ArrayBuffer` to `worker.js` (transferred, not copied); the worker calls the pipeline and posts progress/results back. UI never touches pdf-lib directly. Worker message protocol: inbound `{ type: 'optimize', buffer, options }`, outbound `{ type: 'progress' | 'result' | 'error', ... }`.
-- **UI state machine:** Three states — `idle` (drop zone with "try an example" button), `processing` (progress bars), `results` (hero card + table). Managed by `showState()` which toggles `hidden` attributes.
+- **Floating palette desktop:** Main window has persistent drop zone (always visible, dimmed during processing). Four floating palettes (Settings, Results, Inspector, Preview) are always on screen — empty state placeholder until optimization completes. Palettes are draggable by title bar, shadable (double-click title bar collapses to title bar only), and have z-index management via `bringToFront()`. Mobile (<768px) stacks palettes vertically with no dragging.
 - **Example PDF:** The "try an example" button fetches Mozilla's tracemonkey.pdf (~1MB) from `raw.githubusercontent.com` and feeds it through `handleFiles`. Shows loading/error states.
 - **Size guard:** The pipeline never returns an optimized PDF larger than the input — it falls back to the original bytes.
 - **Image filters preserved:** JPEG, JPEG2000, CCITT, and JBIG2 streams are intentionally skipped (already optimal).
 - **All optimization passes** receive the same `(pdfDoc, options)` signature and mutate the PDFDocument in place. The pipeline `await`s each pass (font-subset is async due to WASM).
 - **Options/presets:** `collectOptions()` reads UI state → options object. Three presets (lossless/web/print) map to option combinations. `syncPresetIndicator()` highlights the matching preset when manual settings change.
 - **Utils layer discipline:** If more than one optimization pass needs a function, it belongs in `utils/`. Passes should not import from each other.
-- **Options panel relocation:** `#options-panel` is a single DOM node that physically moves between `#options-idle-slot` (idle state) and `#results-settings-body` (results state) via `showState()`. Event listeners survive DOM relocation. CSS override `.results-settings__body .options-panel` adjusts styling when inside the settings bar.
-- **Stale results detection:** After results render, changing any option triggers `checkStaleResults()` which compares current options JSON vs last-run options. Adds `.btn--stale` to Re-optimize button and `.results-settings--stale` to settings bar. Re-optimize re-runs `handleFiles(lastFiles)` with current options.
+- **Options panel:** `#options-panel` lives in HTML (so `options.js` module-level querySelectorAll finds elements on import), then physically moved into the Settings palette body on init. Event listeners survive DOM relocation.
+- **Stale results detection:** After results render, changing any option triggers `checkStaleResults()` which compares current options JSON vs last-run options. Adds `.btn--stale` to Re-optimize button inside the Results palette. Re-optimize re-runs `handleFiles(lastFiles)` with current options.
 - **Debug mode:** Add `?debug` to the URL. Shows a persistent banner, per-pass timing, image skip reason breakdowns, and per-image conversion details in a collapsible "Debug info" section. Pass stats objects can include a `_debug` field with additional diagnostics.
 - **Minimum processing display time:** 800ms before transitioning to results, preventing jarring flashes on fast files.
 

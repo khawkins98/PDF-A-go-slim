@@ -7,11 +7,6 @@
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-  <header>
-    <h1>PDF-A-go-slim</h1>
-    <p class="tagline">Reduce PDF file size in your browser. Files never leave your device.</p>
-  </header>
-
   <!-- Full-page drop overlay -->
   <div id="drop-overlay" class="drop-overlay" hidden>
     <div class="drop-overlay__content">
@@ -25,34 +20,62 @@
     </div>
   </div>
 
-  <main id="app">
-    <!-- Idle state: drop zone -->
-    <section id="drop-zone" class="state state--idle">
-      <div class="drop-area" tabindex="0" role="button" aria-label="Drop PDFs here or click to select files">
-        <div class="drop-area__content">
-          <svg class="drop-area__icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="12" y1="18" x2="12" y2="12"/>
-            <polyline points="9 15 12 12 15 15"/>
-          </svg>
-          <p class="drop-area__text">Drop PDFs here</p>
-          <p class="drop-area__subtext">or click to select files</p>
-          <p class="drop-area__example">or <button type="button" id="btn-try-example" class="try-example-link">try an example PDF</button></p>
+  <div class="desktop">
+    <div class="app-window" id="main-window">
+      <div class="title-bar">
+        <div class="title-bar__ridges" aria-hidden="true"></div>
+        <span class="title-bar__title">PDF-A-go-slim</span>
+        <div class="title-bar__ridges" aria-hidden="true"></div>
+        <div class="title-bar__widgets" aria-hidden="true">
+          <div class="title-bar__collapse-box"></div>
         </div>
-        <input type="file" id="file-input" accept=".pdf,application/pdf" multiple hidden />
       </div>
 
-    </section>
+      <main id="app">
+        <!-- Drop zone (always visible) -->
+        <section id="drop-zone">
+          <div class="drop-area" tabindex="0" role="button" aria-label="Drop PDFs here or click to select files">
+            <div class="drop-area__content">
+              <svg class="drop-area__icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/>
+                <polyline points="9 15 12 12 15 15"/>
+              </svg>
+              <p class="drop-area__text">Drop PDFs here</p>
+              <p class="drop-area__subtext">or click to select files</p>
+              <p class="drop-area__example">or <button type="button" id="btn-try-example" class="try-example-link">try an example PDF</button></p>
+            </div>
+            <input type="file" id="file-input" accept=".pdf,application/pdf" multiple hidden />
+          </div>
+        </section>
 
-    <!-- Optimization options (shared between idle and results states) -->
-    <div id="options-idle-slot">
-    <div id="options-panel" class="options-panel">
-      <div class="presets">
-        <span class="presets__label">Preset:</span>
-        <button class="preset-btn preset-btn--active" data-preset="lossless">Lossless<span class="preset-btn__desc">No quality loss</span></button>
-        <button class="preset-btn" data-preset="web">Web<span class="preset-btn__desc">Smaller files for screens</span></button>
-        <button class="preset-btn" data-preset="print">Print<span class="preset-btn__desc">High quality for printing</span></button>
+        <!-- Processing state (shown below drop zone during optimization) -->
+        <section id="processing" class="state state--processing" hidden>
+          <h2>Optimizing&hellip;</h2>
+          <ul id="file-list" class="file-list"></ul>
+          <div class="processing-actions">
+            <button id="btn-cancel" class="btn-cancel">Cancel</button>
+          </div>
+        </section>
+      </main>
+
+      <div class="status-bar">
+        <span class="status-bar__field status-bar__left" id="status-left">Ready</span>
+        <span class="status-bar__field status-bar__right" id="status-right">
+          <a href="https://github.com/khawkins98/PDF-A-go-slim" target="_blank" rel="noopener">GitHub</a>
+          &middot;
+          <a href="?debug" class="debug-link">Debug</a>
+        </span>
+      </div>
+    </div>
+
+    <!-- Options panel (kept in HTML so options.js module-level querySelectorAll finds elements on import) -->
+    <div id="options-panel" class="options-panel" hidden>
+      <div class="tab-control" role="tablist">
+        <button class="tab-control__tab tab-control__tab--active" data-preset="lossless" role="tab" aria-selected="true">Lossless</button>
+        <button class="tab-control__tab" data-preset="web" role="tab" aria-selected="false">Web</button>
+        <button class="tab-control__tab" data-preset="print" role="tab" aria-selected="false">Print</button>
       </div>
 
       <details class="advanced">
@@ -97,38 +120,7 @@
         </div>
       </details>
     </div>
-    </div>
-
-    <!-- Processing state -->
-    <section id="processing" class="state state--processing" hidden>
-      <h2>Optimizing&hellip;</h2>
-      <ul id="file-list" class="file-list"></ul>
-      <div class="processing-actions">
-        <button id="btn-cancel" class="btn-cancel">Cancel</button>
-      </div>
-    </section>
-
-    <!-- Results state -->
-    <section id="results" class="state state--results" hidden>
-      <div id="results-summary"></div>
-      <div id="results-files"></div>
-      <div id="results-settings" class="results-settings">
-        <div class="results-settings__summary">
-          <span class="results-settings__label">Settings: <strong id="settings-preset-label">Lossless</strong></span>
-          <button class="results-settings__toggle" id="btn-toggle-settings">Change settings</button>
-        </div>
-        <div id="results-settings-body" class="results-settings__body" hidden></div>
-      </div>
-      <div class="results-actions">
-        <button id="btn-reoptimize" class="btn btn--secondary">Re-optimize</button>
-        <button id="btn-start-over" class="btn btn--secondary">Start Over</button>
-      </div>
-    </section>
-  </main>
-
-  <footer class="site-footer">
-    Built with <a href="https://github.com/Hopding/pdf-lib" target="_blank" rel="noopener">pdf-lib</a> · <a href="https://github.com/101arrowz/fflate" target="_blank" rel="noopener">fflate</a> · <a href="https://github.com/eugeneware/jpeg-js" target="_blank" rel="noopener">jpeg-js</a> | Sibling project: <a href="https://github.com/khawkins98/PDF-A-go-go" target="_blank" rel="noopener">PDF-A-go-go</a> | <a href="https://github.com/khawkins98/PDF-A-go-slim" target="_blank" rel="noopener">GitHub</a> | <a href="?debug" class="debug-link">Debug mode</a>
-  </footer>
+  </div>
 
   <script type="module" src="/src/main.js"></script>
 </body>

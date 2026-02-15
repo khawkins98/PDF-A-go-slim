@@ -167,25 +167,30 @@ npx pdf-a-go-slim ./input.pdf   # CLI usage
 
 ## UI Design
 
+Classic desktop utility aesthetic — the app lives inside a single "utility window" with title bar, content area, and status bar. Borrows structural patterns from classic desktop applications (beveled panels, toolbar buttons, dense layouts) without recreating any specific OS. See `docs/UI.md` for detailed design decisions.
+
 ### Layout
 
-Single-page app. Three states:
+Single-page app framed as a desktop utility window:
 
-1. **Empty** — Large drop zone with "Drop PDFs here" message + file picker button
-2. **Processing** — File list with progress bars per file, overall progress
-3. **Results** — File list showing original size → optimized size (% saved), download buttons
+- **Title bar** — App name left-aligned, compact
+- **Content area** — Three mutually exclusive states:
+  1. **Idle** — Sunken drop zone panel + toolbar-style preset buttons + advanced settings group box
+  2. **Processing** — File list with progress bars (taller, sunken track, solid fill)
+  3. **Results** — Dense result panels with beveled borders, disclosure sections, download buttons
+- **Status bar** — Bottom bar with sunken fields: state text (left), file/preset info (right)
 
 ### Controls
 
-- **Optimization level**: Simple toggle — "Lossless" (default) vs "Lossy"
-- **Lossy settings** (expandable): Image quality slider (1-100), target DPI dropdown
-- **Advanced** (expandable): Individual toggle switches for each optimization type
-- **Presets** (future): Named profiles ("Web", "Print", "Archive") that set all options at once, with the ability to customize individual settings within a preset
-- **Batch actions**: "Download All" (zip), "Download All" (individual)
+- **Presets**: Toolbar-style raised buttons — "Lossless" (default), "Web", "Print"
+- **Mode toggle**: Lossless vs Lossy, compact inline toggle
+- **Lossy settings** (expandable): Image quality slider, max DPI input
+- **Advanced** (expandable): Fieldset-style group box with individual toggles
+- **Batch actions**: "Download All" (individual sequential downloads)
 
 ### Responsive
 
-Works on mobile for quick single-file optimization. Batch features are desktop-focused.
+Works on mobile for quick single-file optimization. Window chrome stacks/shrinks gracefully. Batch features are desktop-focused.
 
 ## Success Metrics
 
