@@ -1,11 +1,11 @@
-import { applyPreset, getCurrentPresetLabel } from './options.js';
+import { cycleTheme, toggleCRT, toggleFilter, getThemeLabel } from './appearance.js';
 
 /**
  * Create the Mac OS 8 Control Strip — a collapsible toolbar at the bottom-left.
- * @param {{ onPresetChange: () => void, onAboutClick: () => void }} callbacks
- * @returns {{ element: HTMLElement, updatePresetIndicator: () => void }}
+ * Display-oriented quick toggles: CRT, theme, B&W, grayscale, plus GitHub/About/Appearance.
+ * @returns {{ element: HTMLElement }}
  */
-export function createControlStrip({ onPresetChange, onAboutClick, onAppearanceClick }) {
+export function createControlStrip({ onAboutClick, onAppearanceClick }) {
   const el = document.createElement('div');
   el.className = 'control-strip';
   el.setAttribute('role', 'toolbar');
@@ -14,21 +14,75 @@ export function createControlStrip({ onPresetChange, onAboutClick, onAppearanceC
   const modules = document.createElement('div');
   modules.className = 'control-strip__modules';
 
-  // Preset buttons
-  const presetNames = ['lossless', 'web', 'print'];
-  const presetBtns = presetNames.map((name) => {
-    const btn = document.createElement('button');
-    btn.className = 'control-strip__btn';
-    btn.textContent = name.charAt(0).toUpperCase() + name.slice(1);
-    btn.dataset.preset = name;
-    btn.type = 'button';
-    btn.addEventListener('click', () => {
-      applyPreset(name);
-      onPresetChange();
-    });
-    modules.appendChild(btn);
-    return btn;
+  // --- CRT toggle ---
+  const crtBtn = document.createElement('button');
+  crtBtn.className = 'control-strip__icon-btn';
+  crtBtn.type = 'button';
+  crtBtn.title = 'CRT scanlines';
+  // Monitor icon
+  crtBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
+  if (document.body.classList.contains('crt-overlay')) {
+    crtBtn.classList.add('control-strip__icon-btn--active');
+  }
+  crtBtn.addEventListener('click', () => {
+    const on = toggleCRT();
+    crtBtn.classList.toggle('control-strip__icon-btn--active', on);
   });
+  modules.appendChild(crtBtn);
+
+  // --- Theme cycle ---
+  const themeBtn = document.createElement('button');
+  themeBtn.className = 'control-strip__icon-btn';
+  themeBtn.type = 'button';
+  themeBtn.title = `Theme: ${getThemeLabel()}`;
+  // Palette/swatch icon
+  themeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2"/><circle cx="17.5" cy="10.5" r="2"/><circle cx="8.5" cy="7.5" r="2"/><circle cx="6.5" cy="12" r="2"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.5-.7 1.5-1.5 0-.4-.1-.7-.4-1-.3-.3-.4-.6-.4-1 0-.8.7-1.5 1.5-1.5H16c3.3 0 6-2.7 6-6 0-5.5-4.5-10-10-10z"/></svg>';
+  themeBtn.addEventListener('click', () => {
+    cycleTheme();
+    themeBtn.title = `Theme: ${getThemeLabel()}`;
+  });
+  modules.appendChild(themeBtn);
+
+  // Separator
+  const sep0 = document.createElement('div');
+  sep0.className = 'control-strip__separator';
+  modules.appendChild(sep0);
+
+  // --- B&W toggle ---
+  const bwBtn = document.createElement('button');
+  bwBtn.className = 'control-strip__icon-btn';
+  bwBtn.type = 'button';
+  bwBtn.title = 'Black & white';
+  // Half-circle B&W icon
+  bwBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18" fill="currentColor"/></svg>';
+  if (document.body.classList.contains('filter-bw')) {
+    bwBtn.classList.add('control-strip__icon-btn--active');
+  }
+  bwBtn.addEventListener('click', () => {
+    const on = toggleFilter('bw');
+    bwBtn.classList.toggle('control-strip__icon-btn--active', on);
+    // B&W and grayscale are mutually exclusive
+    if (on) gsBtn.classList.remove('control-strip__icon-btn--active');
+  });
+  modules.appendChild(bwBtn);
+
+  // --- Grayscale toggle ---
+  const gsBtn = document.createElement('button');
+  gsBtn.className = 'control-strip__icon-btn';
+  gsBtn.type = 'button';
+  gsBtn.title = 'Grayscale';
+  // Droplet icon
+  gsBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7c0 0-7 6.3-7 11.3a7 7 0 0 0 14 0c0-5-7-11.3-7-11.3z"/></svg>';
+  if (document.body.classList.contains('filter-grayscale')) {
+    gsBtn.classList.add('control-strip__icon-btn--active');
+  }
+  gsBtn.addEventListener('click', () => {
+    const on = toggleFilter('grayscale');
+    gsBtn.classList.toggle('control-strip__icon-btn--active', on);
+    // B&W and grayscale are mutually exclusive
+    if (on) bwBtn.classList.remove('control-strip__icon-btn--active');
+  });
+  modules.appendChild(gsBtn);
 
   // Separator
   const sep1 = document.createElement('div');
@@ -96,14 +150,5 @@ export function createControlStrip({ onPresetChange, onAboutClick, onAppearanceC
   // Position tab after layout
   requestAnimationFrame(positionTab);
 
-  function updatePresetIndicator() {
-    const current = getCurrentPresetLabel().toLowerCase();
-    presetBtns.forEach((btn) => {
-      btn.classList.toggle('control-strip__btn--active', btn.dataset.preset === current);
-    });
-  }
-
-  updatePresetIndicator();
-
-  return { element: el, updatePresetIndicator };
+  return { element: el };
 }

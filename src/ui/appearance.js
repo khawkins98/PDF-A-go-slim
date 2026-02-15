@@ -109,6 +109,62 @@ function applyCRT(on) {
   document.body.classList.toggle('crt-overlay', on);
 }
 
+/** Toggle CRT scanlines on/off. Returns new state. */
+export function toggleCRT() {
+  const on = getLS('pdfa-crt') !== 'true';
+  setLS('pdfa-crt', on ? 'true' : 'false');
+  applyCRT(on);
+  // Sync checkbox in Appearance panel if it exists
+  const cb = document.querySelector('.appearance-panel input[type="checkbox"]');
+  // CRT checkbox is the first one in the Theme section — find by walking
+  document.querySelectorAll('.appearance-check input[type="checkbox"]').forEach((el) => {
+    if (el.parentElement.textContent.includes('CRT')) el.checked = on;
+  });
+  return on;
+}
+
+/** Cycle to the next theme. */
+export function cycleTheme() {
+  const ids = THEMES.map((t) => t.id);
+  const current = getLS('pdfa-theme') || 'platinum';
+  const idx = ids.indexOf(current);
+  const next = ids[(idx + 1) % ids.length];
+  setLS('pdfa-theme', next);
+  applyTheme(next);
+  // Sync buttons in Appearance panel if open
+  document.querySelectorAll('.theme-btn').forEach((btn) => {
+    btn.classList.toggle('theme-btn--active', btn.dataset.theme === next);
+  });
+}
+
+/** Get the human-readable label of the current theme. */
+export function getThemeLabel() {
+  const current = getLS('pdfa-theme') || 'platinum';
+  const t = THEMES.find((th) => th.id === current);
+  return t ? t.label : 'Platinum';
+}
+
+const FILTER_CLASSES = ['filter-bw', 'filter-grayscale'];
+
+/**
+ * Toggle a display filter (bw or grayscale). Mutually exclusive.
+ * @param {'bw'|'grayscale'} mode
+ * @returns {boolean} whether the filter is now active
+ */
+export function toggleFilter(mode) {
+  const cls = `filter-${mode}`;
+  const isActive = document.body.classList.contains(cls);
+  // Remove all filters first
+  FILTER_CLASSES.forEach((c) => document.body.classList.remove(c));
+  if (!isActive) {
+    document.body.classList.add(cls);
+    setLS('pdfa-filter', mode);
+    return true;
+  }
+  setLS('pdfa-filter', '');
+  return false;
+}
+
 // --- Build UI ---
 function buildSection(title) {
   const sec = document.createElement('div');
@@ -217,6 +273,11 @@ export function initAppearance() {
   applyPattern(getLS('pdfa-pattern') || 'solid');
   applyTheme(getLS('pdfa-theme') || 'platinum');
   applyCRT(getLS('pdfa-crt') === 'true');
+  // Restore display filter (B&W / grayscale)
+  const savedFilter = getLS('pdfa-filter');
+  if (savedFilter && FILTER_CLASSES.includes(`filter-${savedFilter}`)) {
+    document.body.classList.add(`filter-${savedFilter}`);
+  }
 }
 
 // --- Easter eggs ---

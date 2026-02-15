@@ -1702,6 +1702,13 @@ body {
   color: var(--color-text);
 }
 
+.control-strip__icon-btn--active {
+  color: var(--color-text);
+  background: var(--color-surface-light);
+  box-shadow: var(--shadow-sunken);
+  border-color: var(--color-border);
+}
+
 .control-strip__tab {
   position: fixed;
   bottom: 0;
@@ -2366,6 +2373,15 @@ body[data-theme="forest"] .mac-face-toast__stripes {
     var(--color-surface) 1px, var(--color-surface) 2px,
     transparent 2px, transparent 3px
   );
+}
+
+/* --- Display filter modes --- */
+body.filter-grayscale {
+  filter: grayscale(1);
+}
+
+body.filter-bw {
+  filter: grayscale(1) contrast(1.75);
 }
 
 /* --- CRT scanline overlay ---

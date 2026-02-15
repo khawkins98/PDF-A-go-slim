@@ -261,18 +261,14 @@ function checkStaleResults() {
 }
 
 // --- Control Strip ---
-const controlStrip = createControlStrip({
-  onPresetChange: checkStaleResults,
+createControlStrip({
   onAboutClick: showAboutDialog,
   onAppearanceClick: toggleAppearancePalette,
 });
 
 // --- Initialize options panel listeners ---
 initOptionsListeners({
-  onOptionsChanged: () => {
-    checkStaleResults();
-    controlStrip.updatePresetIndicator();
-  },
+  onOptionsChanged: checkStaleResults,
 });
 
 // --- Simple state management (no more showState) ---
