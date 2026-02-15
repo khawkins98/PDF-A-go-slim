@@ -360,10 +360,12 @@ btnTryExample.addEventListener('click', async (e) => {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
     const file = new File([blob], 'tracemonkey.pdf', { type: 'application/pdf' });
-    handleFiles([file]);
+    await handleFiles([file]);
   } catch (err) {
-    btnTryExample.textContent = 'failed to load';
     console.error('Example PDF fetch failed:', err);
+  } finally {
+    btnTryExample.disabled = false;
+    btnTryExample.textContent = 'try an example PDF';
   }
 });
 
