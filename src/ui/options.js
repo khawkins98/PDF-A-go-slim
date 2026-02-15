@@ -56,6 +56,21 @@ export function syncPresetIndicator() {
   presetBtns.forEach((btn) => btn.classList.remove('preset-btn--active'));
 }
 
+/** Return the human-readable label for the currently active preset. */
+export function getCurrentPresetLabel() {
+  const current = collectOptions();
+  for (const [name, p] of Object.entries(PRESETS)) {
+    if (current.lossy === p.lossy &&
+        current.unembedStandardFonts === p.unembedStandardFonts &&
+        current.subsetFonts === p.subsetFonts &&
+        (!current.lossy || (current.imageQuality === p.imageQuality &&
+                            current.maxImageDpi === p.maxImageDpi))) {
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+  }
+  return 'Custom';
+}
+
 export function collectOptions() {
   const lossy = document.querySelector('.mode-btn--active')?.dataset.mode === 'lossy';
   const dpiVal = parseInt(dpiInput.value, 10);

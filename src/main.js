@@ -1,9 +1,8 @@
 import './style.css';
 import { formatSize } from './ui/helpers.js';
-import { collectOptions, applyPreset, initOptionsListeners } from './ui/options.js';
-import { buildInspectPanel } from './ui/inspector.js';
-import { buildStatsDetail, buildDebugPanel } from './ui/stats.js';
-import { buildCompareRow, destroyAllComparisons } from './ui/compare.js';
+import { collectOptions, applyPreset, initOptionsListeners, getCurrentPresetLabel } from './ui/options.js';
+import { buildSingleFileCard, buildSummaryCard, buildFileCard } from './ui/result-card.js';
+import { destroyAllComparisons } from './ui/compare.js';
 
 // --- Friendly pass name labels (pipeline names stay unchanged for test compat) ---
 const PASS_LABELS = {
@@ -65,11 +64,24 @@ const fileInput = document.getElementById('file-input');
 const processingSection = document.getElementById('processing');
 const fileList = document.getElementById('file-list');
 const resultsSection = document.getElementById('results');
-const resultsBody = document.getElementById('results-body');
+const resultsSummary = document.getElementById('results-summary');
+const resultsFiles = document.getElementById('results-files');
+const resultsSettingsBar = document.getElementById('results-settings');
+const settingsPresetLabel = document.getElementById('settings-preset-label');
+const btnToggleSettings = document.getElementById('btn-toggle-settings');
+const resultsSettingsBody = document.getElementById('results-settings-body');
+const optionsIdleSlot = document.getElementById('options-idle-slot');
 const btnReoptimize = document.getElementById('btn-reoptimize');
 const btnStartOver = document.getElementById('btn-start-over');
 const dropOverlay = document.getElementById('drop-overlay');
 const btnCancel = document.getElementById('btn-cancel');
+
+// --- Settings bar toggle ---
+btnToggleSettings.addEventListener('click', () => {
+  const isOpen = !resultsSettingsBody.hidden;
+  resultsSettingsBody.hidden = isOpen;
+  btnToggleSettings.textContent = isOpen ? 'Change settings' : 'Hide settings';
+});
 
 // --- Stale results detection ---
 function checkStaleResults() {
@@ -78,16 +90,10 @@ function checkStaleResults() {
   const isStale = current !== lastRunOptions;
 
   btnReoptimize.classList.toggle('btn--stale', isStale);
+  resultsSettingsBar.classList.toggle('results-settings--stale', isStale);
 
-  const existing = resultsSection.querySelector('.stale-banner');
-  if (isStale && !existing) {
-    const banner = document.createElement('div');
-    banner.className = 'stale-banner';
-    banner.textContent = 'Settings changed \u2014 re-optimize to see updated results';
-    resultsSection.insertBefore(banner, resultsSection.querySelector('.results-hero') || resultsSection.querySelector('.results-table'));
-  } else if (!isStale && existing) {
-    existing.remove();
-  }
+  // Update the preset label
+  settingsPresetLabel.textContent = getCurrentPresetLabel();
 }
 
 // --- Initialize options panel listeners ---
@@ -98,13 +104,24 @@ function showState(state) {
   dropZone.hidden = state !== 'idle';
   processingSection.hidden = state !== 'processing';
   resultsSection.hidden = state !== 'results';
-  const optionsPanel = document.getElementById('options-panel');
-  optionsPanel.hidden = state === 'processing';
 
-  // Auto-collapse Advanced Settings when showing results
-  if (state === 'results') {
+  const optionsPanel = document.getElementById('options-panel');
+
+  if (state === 'idle') {
+    // Move options panel back to idle slot
+    optionsPanel.hidden = false;
+    optionsIdleSlot.appendChild(optionsPanel);
+  } else if (state === 'processing') {
+    optionsPanel.hidden = true;
+  } else if (state === 'results') {
+    // Move options panel into settings bar body
+    optionsPanel.hidden = false;
     const adv = optionsPanel.querySelector('.advanced');
     if (adv) adv.open = false;
+    resultsSettingsBody.appendChild(optionsPanel);
+    resultsSettingsBody.hidden = true;
+    btnToggleSettings.textContent = 'Change settings';
+    settingsPresetLabel.textContent = getCurrentPresetLabel();
   }
 
   // Animate the entering section
@@ -154,6 +171,36 @@ function processFileWithProgress(file, options, progressCb) {
 
     reader.readAsArrayBuffer(file);
   });
+}
+
+// --- Render results ---
+function renderResults(results, options) {
+  resultsSummary.innerHTML = '';
+  resultsFiles.innerHTML = '';
+
+  if (results.length === 1) {
+    // Single file: one full result card
+    const r = results[0];
+    const blob = new Blob([r.result], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    blobUrls.push(url);
+
+    const card = buildSingleFileCard(r, blob, url, options, animateCountUp, checkStaleResults);
+    resultsSummary.appendChild(card);
+  } else {
+    // Multi-file: summary card + per-file cards
+    const summaryCard = buildSummaryCard(results, animateCountUp);
+    resultsSummary.appendChild(summaryCard);
+
+    for (const r of results) {
+      const blob = new Blob([r.result], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      blobUrls.push(url);
+
+      const card = buildFileCard(r, blob, url, options, checkStaleResults);
+      resultsFiles.appendChild(card);
+    }
+  }
 }
 
 // --- Main flow ---
@@ -242,204 +289,13 @@ async function handleFiles(files) {
 
   // Show results
   showState('results');
-  resultsBody.innerHTML = '';
   revokeBlobUrls();
   destroyAllComparisons();
 
-  // Clear any stale banner / hero card from previous run
-  const staleBanner = resultsSection.querySelector('.stale-banner');
-  if (staleBanner) staleBanner.remove();
-  const oldHero = resultsSection.querySelector('.results-hero');
-  if (oldHero) oldHero.remove();
   btnReoptimize.classList.remove('btn--stale');
+  resultsSettingsBar.classList.remove('results-settings--stale');
 
-  for (const r of results) {
-    const blob = new Blob([r.result], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    blobUrls.push(url);
-
-    const saved = r.original - r.result.byteLength;
-    const pct = r.original > 0 ? ((saved / r.original) * 100).toFixed(1) : '0.0';
-    const savedText = saved > 0 ? `-${pct}% (${formatSize(saved)})` : `${pct}%`;
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${r.name}</td>
-      <td>${formatSize(r.original)}</td>
-      <td>${formatSize(r.result.byteLength)}</td>
-      <td class="${saved > 0 ? 'saved--positive' : 'saved--zero'}">${savedText}</td>
-      <td><a href="${url}" download="${r.name}" class="btn btn--primary btn--small">Download</a></td>
-    `;
-    resultsBody.appendChild(tr);
-
-    // Pass-level stats detail row
-    const statsHtml = buildStatsDetail(r.stats);
-    if (statsHtml) {
-      const detailTr = document.createElement('tr');
-      detailTr.className = 'pass-stats-row';
-      const detailTd = document.createElement('td');
-      detailTd.colSpan = 5;
-      detailTd.innerHTML = `
-        <button class="pass-stats-toggle">Show details</button>
-        <div class="pass-stats" hidden>${statsHtml}</div>
-      `;
-      detailTr.appendChild(detailTd);
-      resultsBody.appendChild(detailTr);
-
-      const toggleBtn = detailTd.querySelector('.pass-stats-toggle');
-      const statsDiv = detailTd.querySelector('.pass-stats');
-      toggleBtn.addEventListener('click', () => {
-        const visible = !statsDiv.hidden;
-        statsDiv.hidden = visible;
-        toggleBtn.textContent = visible ? 'Show details' : 'Hide details';
-        toggleBtn.classList.toggle('toggle--open', !visible);
-      });
-    }
-
-    // Object inspector row
-    const inspectHtml = buildInspectPanel(r.stats);
-    if (inspectHtml) {
-      const inspectTr = document.createElement('tr');
-      inspectTr.className = 'inspect-row';
-      const inspectTd = document.createElement('td');
-      inspectTd.colSpan = 5;
-      inspectTd.innerHTML = `
-        <button class="inspect-toggle">Object breakdown</button>
-        <div class="inspect-detail" hidden>${inspectHtml}</div>
-      `;
-      inspectTr.appendChild(inspectTd);
-      resultsBody.appendChild(inspectTr);
-
-      const inspectBtn = inspectTd.querySelector('.inspect-toggle');
-      const inspectDiv = inspectTd.querySelector('.inspect-detail');
-      inspectBtn.addEventListener('click', () => {
-        const visible = !inspectDiv.hidden;
-        inspectDiv.hidden = visible;
-        inspectBtn.textContent = visible ? 'Object breakdown' : 'Hide breakdown';
-        inspectBtn.classList.toggle('toggle--open', !visible);
-      });
-
-      // Delegated handler for "Show more..." toggles
-      inspectDiv.addEventListener('click', (ev) => {
-        const btn = ev.target.closest('.inspect-show-more');
-        if (!btn) return;
-        const collapsed = btn.previousElementSibling;
-        if (collapsed && collapsed.classList.contains('inspect-collapse')) {
-          collapsed.hidden = !collapsed.hidden;
-          btn.textContent = collapsed.hidden
-            ? `Show ${btn.dataset.count} more\u2026`
-            : 'Show less';
-        }
-      });
-    }
-
-    // Compare row
-    const compareTr = buildCompareRow(r.originalFile, blob);
-    resultsBody.appendChild(compareTr);
-
-    // Debug panel (only when ?debug URL param is present)
-    if (options.debug) {
-      const debugHtml = buildDebugPanel(r.stats);
-      if (debugHtml) {
-        const debugTr = document.createElement('tr');
-        debugTr.className = 'debug-row';
-        const debugTd = document.createElement('td');
-        debugTd.colSpan = 5;
-        debugTd.innerHTML = debugHtml;
-        debugTr.appendChild(debugTd);
-        resultsBody.appendChild(debugTr);
-      }
-    }
-
-    // Hint banner: suggest lossy preset when images dominate and savings are low
-    if (!options.lossy && r.stats?.inspect?.before) {
-      const cats = r.stats.inspect.before.categories;
-      const totalSize = r.stats.inspect.before.totalSize;
-      const imagesCat = cats.find((c) => c.label === 'Images');
-      const imagesPct = totalSize > 0 && imagesCat ? (imagesCat.totalSize / totalSize) * 100 : 0;
-      const savingsPct = r.original > 0 ? (saved / r.original) * 100 : 0;
-
-      if (imagesPct > 50 && savingsPct < 10) {
-        const hintTr = document.createElement('tr');
-        hintTr.className = 'hint-banner-row';
-        const hintTd = document.createElement('td');
-        hintTd.colSpan = 5;
-        hintTd.innerHTML = `<div class="hint-banner">Images make up ${Math.round(imagesPct)}% of this file. Try the <button class="hint-banner__link" data-action="apply-web">Web preset</button> for better compression.</div>`;
-        hintTr.appendChild(hintTd);
-        resultsBody.appendChild(hintTr);
-
-        hintTd.querySelector('[data-action="apply-web"]').addEventListener('click', () => {
-          applyPreset('web');
-          requestAnimationFrame(checkStaleResults);
-        });
-      }
-    }
-  }
-
-  // --- Hero summary card ---
-  const totalOriginal = results.reduce((s, r) => s + r.original, 0);
-  const totalOptimized = results.reduce((s, r) => s + r.result.byteLength, 0);
-  const totalSaved = totalOriginal - totalOptimized;
-  const totalPct = totalOriginal > 0 ? ((totalSaved / totalOriginal) * 100).toFixed(1) : '0.0';
-  const hasSavings = totalSaved > 0;
-
-  const heroDiv = document.createElement('div');
-  heroDiv.className = 'results-hero';
-
-  let heroDownloadHtml = '';
-  if (results.length === 1) {
-    const r = results[0];
-    const blob = new Blob([r.result], { type: 'application/pdf' });
-    const heroUrl = URL.createObjectURL(blob);
-    blobUrls.push(heroUrl);
-    heroDownloadHtml = `<a href="${heroUrl}" download="${r.name}" class="btn btn--primary results-hero__download">Download</a>`;
-  } else if (results.length > 1) {
-    heroDownloadHtml = `<button class="btn btn--primary results-hero__download" id="hero-download-all">Download All</button>`;
-  }
-
-  const barHtml = hasSavings
-    ? `<div class="results-hero__bar"><div class="results-hero__bar-fill" style="width: 0%"></div></div>`
-    : '';
-
-  heroDiv.innerHTML = `
-    <div class="results-hero__pct ${hasSavings ? '' : 'results-hero__pct--zero'}">${hasSavings ? '-0.0%' : '0%'}</div>
-    <div class="results-hero__sizes">${formatSize(totalOriginal)} \u2192 ${formatSize(totalOptimized)}</div>
-    ${barHtml}
-    ${heroDownloadHtml}
-  `;
-
-  const resultsTable = resultsSection.querySelector('.results-table');
-  resultsSection.insertBefore(heroDiv, resultsTable);
-
-  // Animate hero card: count-up + bar fill
-  if (hasSavings) {
-    const pctEl = heroDiv.querySelector('.results-hero__pct');
-    animateCountUp(pctEl, parseFloat(totalPct));
-
-    const barFill = heroDiv.querySelector('.results-hero__bar-fill');
-    if (barFill) {
-      requestAnimationFrame(() => {
-        barFill.style.width = `${100 - parseFloat(totalPct)}%`;
-      });
-    }
-  }
-
-  // Wire up hero "Download All" button
-  const heroDownloadAllBtn = heroDiv.querySelector('#hero-download-all');
-  if (heroDownloadAllBtn) {
-    heroDownloadAllBtn.addEventListener('click', () => {
-      for (const r of results) {
-        const blob = new Blob([r.result], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = r.name;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    });
-  }
-
+  renderResults(results, options);
 }
 
 // --- Example PDF ---
@@ -548,10 +404,7 @@ btnStartOver.addEventListener('click', () => {
   lastRunOptions = null;
   fileInput.value = '';
   btnReoptimize.classList.remove('btn--stale');
-  const staleBanner = resultsSection.querySelector('.stale-banner');
-  if (staleBanner) staleBanner.remove();
-  const heroCard = resultsSection.querySelector('.results-hero');
-  if (heroCard) heroCard.remove();
+  resultsSettingsBar.classList.remove('results-settings--stale');
   showState('idle');
 });
 
