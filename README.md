@@ -16,6 +16,12 @@ A browser-based PDF optimization tool that reduces file size entirely client-sid
 - **Debug mode** — add `?debug` to the URL to see per-pass timing, image skip reason breakdowns, and per-image conversion details
 - **Benchmark tested** — 46 benchmark tests verify compression quality, asset stripping, and accessibility preservation against 6 reference PDFs simulating real-world bloat patterns ([results](docs/benchmark-results.md))
 
+## Why it looks like that
+
+The tool borrows its visual structure from Mac OS 8 — floating palettes, striped title bars, WindowShade collapse, warm cream surfaces. This is an experiment in whether late-90s desktop paradigms (persistent tool palettes, dense layouts, always-visible information) suit single-purpose browser utilities better than modern minimal convention.
+
+The retro is a thin veneer. Underneath it's a standard Vite app with system fonts, responsive layout, and semantic HTML.
+
 ## Quick Start
 
 ```bash

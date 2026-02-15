@@ -167,7 +167,21 @@ npx pdf-a-go-slim ./input.pdf   # CLI usage
 
 ## UI Design
 
-Classic desktop utility aesthetic — the app lives inside a single "utility window" with title bar, content area, and status bar. Borrows structural patterns from classic desktop applications (beveled panels, toolbar buttons, dense layouts) without recreating any specific OS. See `docs/UI.md` for detailed design decisions.
+Platinum-inspired floating palette desktop — four always-visible palettes (Settings, Results, Inspector, Preview) over a persistent drop zone, borrowing structural patterns from Mac OS 8 (beveled title bars, WindowShade collapse, warm cream surfaces, dense layouts). See `docs/UI.md` for detailed design decisions.
+
+### Design Philosophy
+
+Three principles guide visual decisions:
+
+1. **Structure over skin.** The Mac OS 8 reference is chosen for its spatial model (floating palettes, persistent tool windows, information always on screen) rather than for decoration. If a Platinum convention makes the tool harder to use, it gets dropped.
+2. **Utility, not decoration.** Every visual element — striped title bars, sunken panels, beveled borders — is borrowed because it communicates hierarchy or state, not because it looks retro.
+3. **Modern underneath.** System fonts, CSS custom properties, semantic HTML, responsive layout. The aesthetic is a styling layer; the app works without it.
+
+The hypothesis behind the design: late-90s desktop paradigms (persistent tool palettes, dense information display, always-visible controls) may be a better fit for single-purpose browser utilities than the modern convention of progressive disclosure and minimal surfaces. Browser tools are used in focused bursts, not browsed casually — the same use pattern that floating palettes were designed for.
+
+This exploration may become a published essay.
+
+Visual references: Apple Macintosh Human Interface Guidelines (1995), [Poolsuite.net](https://poolsuite.net), PostHog (2025 redesign).
 
 ### Layout
 
@@ -280,3 +294,27 @@ Technical learnings, design decisions, and pitfalls encountered during developme
 2. **WASM Ghostscript licensing**: Ghostscript is AGPL. MuPDF is also AGPL. Best alternative: compile [QPDF](https://github.com/qpdf/qpdf) (Apache 2.0) to WASM for structural optimizations that pure JS can't handle.
 3. ~~**Standard font unembedding safety**~~ **Resolved:** Implemented for Type1/TrueType only, skipping Type0 composites and fonts with custom Differences encodings. Enabled by default (`unembedStandardFonts: true`) since all conforming PDF readers are required to provide the base-14 fonts.
 4. ~~**Configurability UX**~~ **Resolved:** Implemented preset buttons (Lossless/Web/Print), collapsible Advanced Settings panel with lossy/lossless toggle, image quality slider, and font unembedding checkbox. Presets set all controls; manual tweaks auto-detect matching preset or show "Custom". Options flow through to the worker and engine unchanged.
+
+## Easter Egg Ideas
+
+Small, discoverable surprises that reinforce the retro aesthetic without interfering with the tool's core function. Each should be under a day to implement. All animated items must respect `prefers-reduced-motion`.
+
+| Idea | Description | Trigger |
+|------|-------------|---------|
+| Startup chime | Retro Mac boot sound via Web Audio synthesis | First file drop or page load, opt-in via `?sound` |
+| "About This Mac" system info | Expand About dialog — browser, OS, memory, pdf-lib version, WASM status, session stats | "More Info..." button in About |
+| Classic bomb error dialog | Mac bomb icon, "Sorry, a system error occurred", error code, "Restart" button | Unexpected processing error |
+| Screensaver idle mode | CSS-only flying toasters, starfield, or bouncing logo | 5 min idle timeout |
+| Konami code theme | Hidden theme unlock — CRT scanlines, amber terminal, or hot-dog-stand | `up up down down left right left right b a` |
+| "Get Info" on results | Classic Mac Get Info window with detailed PDF metadata | Right-click / long-press result card |
+| Trash can for rejected files | Animated trash icon for non-PDF drops | Non-PDF file drag |
+| Spinning beach ball | Rainbow beach ball for first 300ms of processing | Processing start |
+| Happy Mac on big savings | Flash pixel-art Happy Mac in status bar | Savings > 30% |
+| System version tooltip | "PDF-A-go-slim v1.0 / Built date / pdf-lib X.X" | Click app name in title bar |
+| Sad Mac on zero savings | Brief Sad Mac when file can't be reduced | Zero improvement result |
+| "Rebuild Desktop" | Mock "rebuilding desktop" progress bar in About or as `?rebuild` param | Easter egg URL param |
+| Finder zoom-rect open | Classic Mac "zoom rectangle" animation when opening palettes | Palette show/restore |
+| Desktop pattern chooser | Let user pick a classic desktop pattern (tartan, bricks, etc.) for the background | Hidden setting or `?pattern` |
+| Extension conflict alert | Joke "extension conflict" alert on first visit: "PDF-A-go-slim would like to optimize your PDFs" with "OK" only | First visit |
+| "Not Enough Memory" | Classic Mac low-memory dialog appearance when processing files > 50MB | Large file warning |
+| Balloon Help tooltips | Classic Mac question-mark cursor + yellow balloon help on hover | `?balloons` URL param |
