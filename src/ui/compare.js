@@ -7,11 +7,25 @@ const activeBlobUrls = new Set();
 const activeContainers = [];
 const activeObservers = new Map();
 
-/** Watch a viewer element for size changes and notify the renderer. */
+/**
+ * Watch a viewer element for size changes.
+ * - Dispatches window resize so PDF-A-go-go re-renders at correct size.
+ * - When the viewer height changes (e.g. via grip drag), syncs the palette height.
+ */
 function observeResize(viewer) {
   if (activeObservers.has(viewer)) return;
+  let lastHeight = viewer.offsetHeight;
+  const palette = viewer.closest('.palette');
   const ro = new ResizeObserver(() => {
     window.dispatchEvent(new Event('resize'));
+    // Sync grip-driven height changes to the palette
+    const newHeight = viewer.offsetHeight;
+    if (palette && newHeight !== lastHeight) {
+      const delta = newHeight - lastHeight;
+      const currentPaletteHeight = palette.offsetHeight;
+      palette.style.height = `${currentPaletteHeight + delta}px`;
+      lastHeight = newHeight;
+    }
   });
   ro.observe(viewer);
   activeObservers.set(viewer, ro);
@@ -55,7 +69,7 @@ const VIEWER_CONFIG = {
   showDownload: false,
   showFullscreen: false,
   showShare: false,
-  showResizeGrip: false,
+  showResizeGrip: true,
   showAccessibilityControlsVisibly: false,
 };
 
