@@ -5,6 +5,17 @@ const CDN_BASE = 'https://khawkins98.github.io/PDF-A-go-go/';
 let loadPromise = null;
 const activeBlobUrls = new Set();
 const activeContainers = [];
+const activeObservers = new Map();
+
+/** Watch a viewer element for size changes and notify the renderer. */
+function observeResize(viewer) {
+  if (activeObservers.has(viewer)) return;
+  const ro = new ResizeObserver(() => {
+    window.dispatchEvent(new Event('resize'));
+  });
+  ro.observe(viewer);
+  activeObservers.set(viewer, ro);
+}
 
 /** Lazy-load pdf-a-go-go JS + CSS from CDN. Deduplicates concurrent calls. */
 function loadPdfAGoGo() {
@@ -111,6 +122,7 @@ export function buildCompareSection(originalFile, optimizedBlob, { autoOpen = fa
       const pdfagogo = window.flipbook?.default || window.flipbook;
       await pdfagogo.initializeContainer(viewer, { pdfUrl: blobUrl, ...VIEWER_CONFIG });
       activeContainers.push(viewer);
+      observeResize(viewer);
     } catch (err) {
       viewerContainer.innerHTML = `<div class="compare-error">Error initializing viewer: ${err.message}</div>`;
     }
@@ -161,6 +173,7 @@ export function buildPreviewContent(originalFile, optimizedBlob) {
       const pdfagogo = window.flipbook?.default || window.flipbook;
       await pdfagogo.initializeContainer(viewer, { pdfUrl: blobUrl, ...VIEWER_CONFIG });
       activeContainers.push(viewer);
+      observeResize(viewer);
     } catch (err) {
       viewerContainer.innerHTML = `<div class="compare-error">Error initializing viewer: ${err.message}</div>`;
     }
@@ -176,6 +189,8 @@ function destroyCompareViewers(container) {
     if (instance && !instance.destroyed) {
       try { instance.destroy(); } catch (_) { /* already destroyed */ }
     }
+    const ro = activeObservers.get(el);
+    if (ro) { ro.disconnect(); activeObservers.delete(el); }
     const idx = activeContainers.indexOf(el);
     if (idx !== -1) activeContainers.splice(idx, 1);
   });
@@ -188,6 +203,8 @@ export function destroyAllComparisons() {
     if (instance && !instance.destroyed) {
       try { instance.destroy(); } catch (_) { /* ignore */ }
     }
+    const ro = activeObservers.get(el);
+    if (ro) { ro.disconnect(); activeObservers.delete(el); }
   }
   activeContainers.length = 0;
 
