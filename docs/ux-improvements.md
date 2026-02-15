@@ -24,7 +24,7 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 
 - [ ] **Mobile responsiveness** — Results table (5 columns) and inspect panel (5-column grid) overflow on small screens. At `max-width: 640px`: convert results to card layout, collapse inspect grid to 2-3 columns, add `flex-wrap: wrap` to preset buttons, ensure 44px minimum tap targets.
 
-- [ ] **Dark mode** — Add `@media (prefers-color-scheme: dark)` block overriding CSS custom properties. The variable architecture is already in place. Needs WCAG AA contrast checking on every color pairing. Consider a manual sun/moon toggle in the header.
+- [x] **Dark mode** — Manual toggle in Appearance palette. Overrides all CSS custom properties. Amber, Ocean, and Forest color scheme themes also included. CRT scanline overlay option.
 
 - [ ] **Accessibility ARIA** — Add `aria-live="polite"` to processing section for screen reader progress announcements. Move focus to hero card/download button after results render. Add `aria-pressed` to preset and mode toggle buttons. Add `aria-expanded` to collapsible toggles. Add `aria-valuetext` to quality slider.
 
@@ -39,6 +39,18 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 - [x] **Credits/colophon dialog** — "About" button in status bar opens a Platinum-styled modal with app name, description, tech stack credits, and GitHub link. Closes on OK/Escape/overlay click.
 
 - [x] **Batch progress indicator** — For multi-file uploads, add a header: "Optimizing file 2 of 5..." with an overall progress bar above the per-file list.
+
+- [x] **Control Strip** — Mac OS 8-style collapsible toolbar at bottom-left with preset quick-switch, GitHub link, and About button. Collapses via grab tab. Full-width on mobile.
+
+- [x] **Desktop icons** — Read Me and GitHub icons on the desktop surface (bottom-right). Read Me opens a Stickies-style palette with the project README rendered as HTML. GitHub opens the repo in a new tab.
+
+- [x] **Sample PDF desktop icons** — Three draggable sample PDF icons (Research Paper, TAM Review, Color Graphics) on the desktop. Users can drag them onto the drop zone or click to fetch + optimize. Uses `application/x-pdf-sample` custom dataTransfer type to distinguish from native file drags. Loading state shown while fetching. Hidden on mobile (<768px) with existing desktop-icons rule.
+
+- [x] **Read Me palette (Stickies)** — Yellow Mac Stickies-style floating palette displaying the project README.md content, rendered via a minimal markdown-to-HTML function. Scrollable, draggable, shadable.
+
+## Bugs
+
+- [ ] **calrgb.pdf loses all background colors and text after optimization** — Processing `calrgb.pdf` (~322 KB, CalRGB color-space-heavy PDF from pdf.js test suite) produces a 93.4% smaller file that renders blank — no background colors, no text. This is a content-destructive bug, not just cosmetic. Likely suspects: (1) unreferenced object removal via BFS may not be traversing CalRGB/CalGray color space objects correctly if they're referenced indirectly through page `/Resources/ColorSpace` dicts; (2) stream recompression may be corrupting color space stream data; (3) metadata stripping may be removing color space definitions that share keys with bloat metadata. **To investigate:** run with `?debug`, compare the before/after Inspector breakdown, and diff the raw PDF objects to identify which pass is removing the content. A targeted benchmark test with a CalRGB fixture would prevent regression.
 
 ## Lower priority
 
@@ -58,7 +70,7 @@ Small, discoverable surprises that reinforce the retro aesthetic. Each should be
 
 ### Audio
 
-- [ ] **Startup chime** — Retro Mac boot sound via Web Audio API synthesis (no audio file needed — generate a short FM chord on `AudioContext`). Triggered on first file drop or page load. Opt-in via `?sound` URL param. Muted by default; respect `prefers-reduced-motion` by skipping entirely.
+- [x] **Startup chime** — Easter egg toggle stub in Appearance palette. Checks localStorage + prefers-reduced-motion, logs to console. Full Web Audio implementation deferred.
 
 ### Visual
 
@@ -68,15 +80,15 @@ Small, discoverable surprises that reinforce the retro aesthetic. Each should be
 
 - [ ] **Spinning beach ball** — Show a rainbow beach ball (CSS conic-gradient + rotate animation) for the first 300ms of processing. Brief enough to be a wink, not an annoyance. Replaces the progress bar only during the initial delay.
 
-- [ ] **Happy Mac on big savings** — When savings exceed 30%, flash a pixel-art Happy Mac (inline SVG, ~16x16) in the status bar for 2 seconds. CSS `@keyframes` fade-in/out.
+- [x] **Happy Mac on big savings** — Easter egg toggle stub in Appearance palette. Triggered when savings >= 30%. Full pixel-art SVG implementation deferred.
 
-- [ ] **Sad Mac on zero savings** — When a file can't be reduced, briefly show a pixel-art Sad Mac in the status bar. Same implementation as Happy Mac with different sprite.
+- [x] **Sad Mac on zero savings** — Easter egg toggle stub in Appearance palette. Triggered when savings <= 0%. Full pixel-art SVG implementation deferred.
 
 - [ ] **Finder zoom-rect open** — Classic Mac "zoom rectangle" animation when opening/restoring palettes. Four concentric rectangles scaling from source to destination over ~200ms using CSS `@keyframes`. Respect `prefers-reduced-motion`.
 
 - [ ] **Trash can for rejected files** — When a non-PDF file is dragged over the drop zone, show an animated trash can icon (CSS lid-open transform on dragenter, lid-close on dragleave). Reinforces the "PDFs only" constraint with personality.
 
-- [ ] **Desktop pattern chooser** — Hidden setting (or `?pattern` URL param) that lets the user pick a classic desktop pattern (tartan, bricks, diagonal stripes, etc.) for the page background. Patterns implemented as CSS `background-image` repeating SVG data URIs. Selection stored in `localStorage`.
+- [x] **Desktop pattern chooser** — Appearance palette with 9 pattern swatches (solid, tartan, bricks, diagonal, dots, checkerboard, weave, zigzag, denim). Selection stored in `localStorage`.
 
 ### Interactive
 

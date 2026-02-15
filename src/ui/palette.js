@@ -148,8 +148,17 @@ export function createPalette({ id, title, defaultPosition, width }) {
   if (desktopEl) desktopEl.appendChild(el);
 
   // WindowShade: double-click title bar or click collapse box
+  let savedHeight = null;
   function toggleShade() {
-    el.classList.toggle('palette--shaded');
+    const willShade = !el.classList.contains('palette--shaded');
+    if (willShade) {
+      // Store explicit height before shading so we can restore it
+      savedHeight = el.style.height || null;
+      el.style.height = '';
+    } else if (savedHeight) {
+      el.style.height = savedHeight;
+    }
+    el.classList.toggle('palette--shaded', willShade);
   }
 
   titleBar.addEventListener('dblclick', () => {

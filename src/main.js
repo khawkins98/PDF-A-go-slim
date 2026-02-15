@@ -1,9 +1,27 @@
 import './style.css';
-import { formatSize, escapeHtml } from './ui/helpers.js';
+import { formatSize, escapeHtml, renderMarkdown } from './ui/helpers.js';
 import { collectOptions, initOptionsListeners } from './ui/options.js';
 import { buildResultsPaletteContent, buildInspectorPaletteContent } from './ui/result-card.js';
 import { buildPreviewContent, destroyAllComparisons } from './ui/compare.js';
-import { initWindowManager, createPalette, initDrag } from './ui/palette.js';
+import { initWindowManager, createPalette, initDrag, bringToFront } from './ui/palette.js';
+import { createControlStrip } from './ui/control-strip.js';
+import { buildAppearanceContent, initAppearance, playStartupChime, showHappyMac, showSadMac } from './ui/appearance.js';
+import readmeText from '../README.md?raw';
+
+// --- Sample PDFs (pdf.js test suite — CORS-accessible via GitHub raw) ---
+const SAMPLE_PDF_BASE = 'https://raw.githubusercontent.com/mozilla/pdf.js/master/test/pdfs/';
+const SAMPLE_PDFS = [
+  { name: 'tracemonkey.pdf', label: 'Research Paper', url: `${SAMPLE_PDF_BASE}tracemonkey.pdf` },
+  { name: 'TAMReview.pdf', label: 'TAM Review', url: `${SAMPLE_PDF_BASE}TAMReview.pdf` },
+  { name: 'calrgb.pdf', label: 'Color Graphics', url: `${SAMPLE_PDF_BASE}calrgb.pdf` },
+];
+
+async function fetchPdfAsFile(url, name) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  return new File([blob], name, { type: 'application/pdf' });
+}
 
 // Suppress benign ResizeObserver loop error (triggered by viewer resize ↔ layout cycle)
 window.addEventListener('error', (e) => {
@@ -62,6 +80,7 @@ let lastFiles = null;
 let lastRunOptions = null;
 let activeWorker = null;
 let cancelled = false;
+let hasPlayedChime = false;
 
 // --- DOM refs ---
 const dropZone = document.getElementById('drop-zone');
@@ -79,6 +98,7 @@ const statusLeft = document.getElementById('status-left');
 
 // --- Initialize window manager ---
 initWindowManager();
+initAppearance();
 
 // Make main window draggable + shadable
 const mainWindow = document.getElementById('main-window');
@@ -139,6 +159,91 @@ resultsPalette.showEmpty('Nothing to report yet');
 inspectorPalette.showEmpty('Waiting for a PDF to dissect');
 previewPalette.showEmpty('No document loaded');
 
+// --- Read Me palette (Mac Stickies style) ---
+const readmePalette = createPalette({
+  id: 'readme',
+  title: 'Read Me',
+  defaultPosition: { top: 400, left: 20 },
+  width: 340,
+});
+readmePalette.element.classList.add('palette--sticky');
+
+const readmeContent = document.createElement('div');
+readmeContent.className = 'readme-content';
+readmeContent.innerHTML = renderMarkdown(readmeText);
+readmePalette.setContent(readmeContent);
+readmePalette.hide();
+
+// --- Appearance palette (hidden by default) ---
+const appearancePalette = createPalette({
+  id: 'appearance',
+  title: 'Appearance',
+  defaultPosition: { top: 200, left: 520 },
+  width: 240,
+});
+appearancePalette.setContent(buildAppearanceContent());
+appearancePalette.hide();
+
+function toggleAppearancePalette() {
+  if (appearancePalette.element.hidden) {
+    appearancePalette.show();
+  }
+  bringToFront(appearancePalette.element);
+}
+
+// --- Desktop icon handlers ---
+document.getElementById('icon-readme').addEventListener('click', () => {
+  if (readmePalette.element.hidden) readmePalette.show();
+  bringToFront(readmePalette.element);
+});
+
+document.getElementById('icon-appearance').addEventListener('click', toggleAppearancePalette);
+
+// --- Sample PDF desktop icons (drag-to-optimize) ---
+const SAMPLE_TYPE = 'application/x-pdf-sample';
+const desktopIcons = document.getElementById('desktop-icons');
+
+// PDF document SVG icon (shared across sample icons)
+const pdfIconSvg = `<svg class="desktop-icon__img" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+  <polyline points="14 2 14 8 20 8"/>
+  <text x="12" y="17" text-anchor="middle" font-size="6" font-weight="bold" fill="currentColor" stroke="none">PDF</text>
+</svg>`;
+
+SAMPLE_PDFS.forEach((sample) => {
+  const icon = document.createElement('button');
+  icon.type = 'button';
+  icon.className = 'desktop-icon desktop-icon--sample';
+  icon.draggable = true;
+  icon.innerHTML = `${pdfIconSvg}<span class="desktop-icon__label">${escapeHtml(sample.label)}</span>`;
+
+  // Drag: set custom type so drop handlers can distinguish from native file drags
+  icon.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData(SAMPLE_TYPE, JSON.stringify({ name: sample.name, url: sample.url }));
+    e.dataTransfer.effectAllowed = 'copy';
+  });
+
+  // Click fallback: fetch + optimize directly
+  icon.addEventListener('click', async () => {
+    if (icon.classList.contains('desktop-icon--loading')) return;
+    const labelEl = icon.querySelector('.desktop-icon__label');
+    const originalLabel = labelEl.textContent;
+    icon.classList.add('desktop-icon--loading');
+    labelEl.textContent = 'Loading\u2026';
+    try {
+      const file = await fetchPdfAsFile(sample.url, sample.name);
+      await handleFiles([file]);
+    } catch (err) {
+      console.error(`Sample PDF fetch failed (${sample.name}):`, err);
+    } finally {
+      icon.classList.remove('desktop-icon--loading');
+      labelEl.textContent = originalLabel;
+    }
+  });
+
+  desktopIcons.appendChild(icon);
+});
+
 // --- Stale results detection ---
 function checkStaleResults() {
   if (!lastRunOptions) return;
@@ -147,8 +252,20 @@ function checkStaleResults() {
   btnReoptimize.classList.toggle('btn--stale', isStale);
 }
 
+// --- Control Strip ---
+const controlStrip = createControlStrip({
+  onPresetChange: checkStaleResults,
+  onAboutClick: showAboutDialog,
+  onAppearanceClick: toggleAppearancePalette,
+});
+
 // --- Initialize options panel listeners ---
-initOptionsListeners({ onOptionsChanged: checkStaleResults });
+initOptionsListeners({
+  onOptionsChanged: () => {
+    checkStaleResults();
+    controlStrip.updatePresetIndicator();
+  },
+});
 
 // --- Simple state management (no more showState) ---
 function setProcessing(active) {
@@ -239,6 +356,12 @@ function renderResults(results, options) {
   // Show action buttons
   mainActions.hidden = false;
   settingsActions.hidden = false;
+
+  // Easter egg hooks
+  const savingsPct = totalOriginal > 0 ? (totalSaved / totalOriginal) * 100 : 0;
+  const savingsInfo = { pct: totalPct, original: formatSize(totalOriginal), optimized: formatSize(totalOptimized), saved: formatSize(totalSaved) };
+  if (savingsPct >= 30) showHappyMac(savingsInfo);
+  if (savingsPct <= 0) showSadMac(savingsInfo);
 }
 
 // --- Start over ---
@@ -276,6 +399,12 @@ async function handleFiles(files) {
 
   lastFiles = pdfFiles;
   cancelled = false;
+
+  // Easter egg: one-shot startup chime on first file drop
+  if (!hasPlayedChime) {
+    hasPlayedChime = true;
+    playStartupChime();
+  }
 
   const options = collectOptions();
   lastRunOptions = JSON.stringify(options);
@@ -359,8 +488,7 @@ async function handleFiles(files) {
   renderResults(results, options);
 }
 
-// --- Example PDF ---
-const EXAMPLE_PDF_URL = 'https://raw.githubusercontent.com/mozilla/pdf.js/master/test/pdfs/tracemonkey.pdf';
+// --- Example PDF (inline "try an example" button) ---
 const btnTryExample = document.getElementById('btn-try-example');
 
 btnTryExample.addEventListener('click', async (e) => {
@@ -368,10 +496,7 @@ btnTryExample.addEventListener('click', async (e) => {
   btnTryExample.disabled = true;
   btnTryExample.textContent = 'loading\u2026';
   try {
-    const res = await fetch(EXAMPLE_PDF_URL);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const file = new File([blob], 'tracemonkey.pdf', { type: 'application/pdf' });
+    const file = await fetchPdfAsFile(SAMPLE_PDFS[0].url, SAMPLE_PDFS[0].name);
     await handleFiles([file]);
   } catch (err) {
     console.error('Example PDF fetch failed:', err);
@@ -407,9 +532,20 @@ dropArea.addEventListener('dragleave', () => {
   dropArea.classList.remove('drop-area--active');
 });
 
-dropArea.addEventListener('drop', (e) => {
+dropArea.addEventListener('drop', async (e) => {
   e.preventDefault();
   dropArea.classList.remove('drop-area--active');
+  const sampleData = e.dataTransfer.getData(SAMPLE_TYPE);
+  if (sampleData) {
+    try {
+      const { name, url } = JSON.parse(sampleData);
+      const file = await fetchPdfAsFile(url, name);
+      await handleFiles([file]);
+    } catch (err) {
+      console.error('Sample PDF drop failed:', err);
+    }
+    return;
+  }
   if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
 });
 
@@ -417,7 +553,7 @@ dropArea.addEventListener('drop', (e) => {
 let dragCounter = 0;
 
 document.addEventListener('dragenter', (e) => {
-  if (!e.dataTransfer.types.includes('Files')) return;
+  if (!e.dataTransfer.types.includes('Files') && !e.dataTransfer.types.includes(SAMPLE_TYPE)) return;
   // Only show overlay when not processing
   if (!processingSection.hidden) return;
   dragCounter++;
@@ -438,11 +574,22 @@ document.addEventListener('dragover', (e) => {
   e.preventDefault();
 });
 
-document.addEventListener('drop', (e) => {
+document.addEventListener('drop', async (e) => {
   e.preventDefault();
   dragCounter = 0;
   dropOverlay.hidden = true;
   if (!processingSection.hidden) return;
+  const sampleData = e.dataTransfer.getData(SAMPLE_TYPE);
+  if (sampleData) {
+    try {
+      const { name, url } = JSON.parse(sampleData);
+      const file = await fetchPdfAsFile(url, name);
+      await handleFiles([file]);
+    } catch (err) {
+      console.error('Sample PDF drop failed:', err);
+    }
+    return;
+  }
   if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
 });
 

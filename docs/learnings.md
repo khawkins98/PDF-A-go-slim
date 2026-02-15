@@ -281,6 +281,16 @@ ASCII85 encodes 4 bytes into 5 ASCII characters. A 5-character group always deco
 
 ---
 
+## UI Patterns
+
+### Custom dataTransfer Types for Internal Drag-and-Drop
+
+Native HTML5 drag-and-drop uses `e.dataTransfer.types.includes('Files')` to detect file drags from the OS. To support dragging internal elements (like sample PDF icons) onto the same drop zone, use a custom MIME type (e.g., `application/x-pdf-sample`) via `setData()`/`getData()`. This lets drop handlers distinguish internal drags from native file drags without ambiguity.
+
+**Key gotcha:** `dragenter`/`dragover` handlers that gate on `types.includes('Files')` must also check for the custom type, or the full-page drop overlay won't appear for internal drags.
+
+---
+
 ## Browser Constraints
 
 ### Web Worker Boundary

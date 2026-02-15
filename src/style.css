@@ -1735,6 +1735,20 @@ body {
   color: var(--color-text);
 }
 
+.desktop-icon--sample {
+  cursor: grab;
+}
+
+.desktop-icon--sample:active {
+  cursor: grabbing;
+}
+
+.desktop-icon--loading {
+  opacity: 0.5;
+  cursor: wait;
+  pointer-events: none;
+}
+
 /* --- Stickies palette override --- */
 .palette--sticky {
   box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.15);

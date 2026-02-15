@@ -11,7 +11,8 @@ Reference diagram for the PDF-A-go-slim interface. Documents the state model, sc
 The app uses a simplified two-phase model: **idle/results** vs **processing**. There is no `showState()` function — instead, the drop zone is always visible (dimmed during processing), and four floating palettes hold all content. Palettes show empty placeholders until optimization completes.
 
 ```
-                         drop / click / "try example"
+                   drop / click / "try example" / sample icon drag
+
                     +------------------------------------+
                     |                                    |
                     v                                    |
@@ -97,6 +98,8 @@ The app uses a simplified two-phase model: **idle/results** vs **processing**. T
 - Click drop area / keyboard Enter/Space → file picker
 - Drag files onto page → `#drop-overlay` appears
 - Click "try an example PDF" → fetches tracemonkey.pdf from GitHub
+- Drag a sample PDF icon onto drop zone → full-page overlay appears, fetch + optimize on drop
+- Click a sample PDF icon → fetch + optimize directly (loading state on icon)
 - Preset buttons → `applyPreset()`, updates all advanced controls
 - Any option change → `syncPresetIndicator()` highlights matching preset
 
@@ -246,7 +249,7 @@ Shown over any state (except processing) when files are dragged onto the page.
 +============================================================+
 ```
 
-Managed by `dragenter`/`dragleave` counter on `document`. `pointer-events: none` — files fall through to the drop handler.
+Managed by `dragenter`/`dragleave` counter on `document`. Accepts both native `Files` drags and the custom `application/x-pdf-sample` type from sample PDF desktop icons. `pointer-events: none` — files fall through to the drop handler.
 
 ---
 
@@ -329,12 +332,20 @@ index.html
         │                 │     └── .inspect-panel__total
         │                 └── .debug-panel (<details>, ?debug only)
         │
-        └── #palette-preview (created by createPalette())
-              └── .palette__body
-                    └── (populated by buildPreviewContent)
-                          └── .compare-viewer-wrap
-                                ├── .compare-side__label (size + Powered by link)
-                                └── .compare-side__viewer (PDF-A-go-go container)
+        ├── #palette-preview (created by createPalette())
+        │     └── .palette__body
+        │           └── (populated by buildPreviewContent)
+        │                 └── .compare-viewer-wrap
+        │                       ├── .compare-side__label (size + Powered by link)
+        │                       └── .compare-side__viewer (PDF-A-go-go container)
+        │
+        └── #desktop-icons
+              ├── .desktop-icon #icon-readme (static, in HTML)
+              ├── .desktop-icon #icon-github (static, in HTML)
+              ├── .desktop-icon #icon-appearance (static, in HTML)
+              └── .desktop-icon--sample × 3 (dynamic, draggable)
+                    ├── svg.desktop-icon__img (PDF document icon)
+                    └── .desktop-icon__label (Research Paper / TAM Review / Color Graphics)
 ```
 
 ---
@@ -371,12 +382,14 @@ Updated by `setProcessing()` (idle/processing) and `renderResults()` (savings su
 
 ```
 main.js
-  ├── setProcessing()          Toggle processing section + drop zone dimming
-  ├── handleFiles()            Main flow: filter PDFs, run workers, render results
-  ├── renderResults()          Delegates to UI builders, populates palettes
-  ├── checkStaleResults()      Compares current options vs last-run options
-  ├── startOver()              Reset palettes, revoke blob URLs, destroy viewers
-  ├── animateCountUp()         Count-up animation (passed to card builders)
+  ├── SAMPLE_PDFS[]             Sample PDF definitions (name, url, label)
+  ├── fetchPdfAsFile()          Fetch remote PDF → File object (shared by sample icons + "try example")
+  ├── setProcessing()           Toggle processing section + drop zone dimming
+  ├── handleFiles()             Main flow: filter PDFs, run workers, render results
+  ├── renderResults()           Delegates to UI builders, populates palettes
+  ├── checkStaleResults()       Compares current options vs last-run options
+  ├── startOver()               Reset palettes, revoke blob URLs, destroy viewers
+  ├── animateCountUp()          Count-up animation (passed to card builders)
   │
   ├── ui/palette.js              Window manager (~200 lines)
   │     ├── initWindowManager()    Set up .desktop container reference

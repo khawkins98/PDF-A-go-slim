@@ -4,7 +4,8 @@ A browser-based PDF optimization tool that reduces file size entirely client-sid
 
 ## Features
 
-- **Drag-and-drop** — drop one or more PDFs, or use the file picker
+- **Drag-and-drop** — drop one or more PDFs, use the file picker, or drag a sample PDF icon from the desktop
+- **Sample PDFs on the desktop** — three draggable sample PDF icons (Research Paper, TAM Review, Color Graphics) let you try the tool without your own files
 - **8 optimization passes** — stream recompression, image recompression, standard font unembedding, font subsetting, object deduplication, font deduplication, metadata stripping, unreferenced object removal
 - **Optimization presets** — Lossless (default), Web (lossy, 75% quality), Print (lossy, 92% quality)
 - **Advanced controls** — lossy/lossless toggle, image quality slider, font unembedding and subsetting checkboxes

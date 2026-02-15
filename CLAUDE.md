@@ -53,7 +53,9 @@ index.html → src/main.js (UI state machine, drag-and-drop, worker orchestratio
                stats.js        — buildStatsDetail(), buildDebugPanel(), formatPassStats()
                inspector.js    — buildInspectPanel() (object breakdown grid), initInspectorInteractions() ("Show more" delegation)
                options.js      — collectOptions(), applyPreset(), syncPresetIndicator(), getCurrentPresetLabel(), initOptionsListeners()
-               helpers.js      — formatSize(), escapeHtml()
+               control-strip.js — createControlStrip() (Mac OS 8 Control Strip toolbar)
+               appearance.js   — buildAppearanceContent(), initAppearance(), playStartupChime(), showHappyMac(), showSadMac() (desktop patterns, themes, easter egg toggles)
+               helpers.js      — formatSize(), escapeHtml(), renderMarkdown()
 
 scripts/
   benchmark-report.js     — generates docs/benchmark-results.md from reference PDFs
@@ -73,7 +75,7 @@ test/
 
 - **Web Worker boundary:** `main.js` sends an `ArrayBuffer` to `worker.js` (transferred, not copied); the worker calls the pipeline and posts progress/results back. UI never touches pdf-lib directly. Worker message protocol: inbound `{ type: 'optimize', buffer, options }`, outbound `{ type: 'progress' | 'result' | 'error', ... }`.
 - **Floating palette desktop:** Main window has persistent drop zone (always visible, dimmed during processing). Four floating palettes (Settings, Results, Inspector, Preview) are always on screen — empty state placeholder until optimization completes. Palettes are draggable by title bar, shadable (double-click title bar collapses to title bar only), and have z-index management via `bringToFront()`. Mobile (<768px) stacks palettes vertically with no dragging.
-- **Example PDF:** The "try an example" button fetches Mozilla's tracemonkey.pdf (~1MB) from `raw.githubusercontent.com` and feeds it through `handleFiles`. Shows loading/error states.
+- **Sample PDF icons:** Desktop icons for 3 sample PDFs (tracemonkey, TAMReview, calrgb) from pdf.js test suite. Draggable onto drop zone via custom `application/x-pdf-sample` dataTransfer type, or clickable to fetch + optimize directly. Uses shared `fetchPdfAsFile()` helper. The inline "try an example" button also uses this helper.
 - **Size guard:** The pipeline never returns an optimized PDF larger than the input — it falls back to the original bytes.
 - **Image filters preserved:** JPEG, JPEG2000, CCITT, and JBIG2 streams are intentionally skipped (already optimal).
 - **All optimization passes** receive the same `(pdfDoc, options)` signature and mutate the PDFDocument in place. The pipeline `await`s each pass (font-subset is async due to WASM).
