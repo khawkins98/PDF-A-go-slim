@@ -75,13 +75,15 @@ The app uses a simplified two-phase model: **idle/results** vs **processing**. T
 │ status-bar: tagline          GitHub · Debug  │
 └──────────────────────────────────────────────┘
 
-┌── Settings palette ──┐   (always on screen)
-│ [Lossless*][Web][Print] │
-│ ▸ Advanced Settings     │
-│   Mode: [Lossless|Lossy]│
-│   [x] Unembed std fonts │
-│   [x] Subset fonts      │
-└─────────────────────────┘
+┌── Settings palette ──────────┐   (always on screen)
+│ [Lossless*][Web][Print]      │
+│ No quality loss — recompress,│ ← preset hint (updates per tab)
+│ deduplicate, subset fonts    │
+│ ⚙ Advanced Settings          │ ← gear icon
+│   Mode: [Lossless|Lossy]     │
+│   [x] Unembed std fonts      │
+│   [x] Subset fonts           │
+└──────────────────────────────┘
 
 ┌── Results palette ───┐   ┌── Inspector palette ─┐
 │ Drop a PDF to see    │   │ Drop a PDF to see    │
@@ -100,8 +102,8 @@ The app uses a simplified two-phase model: **idle/results** vs **processing**. T
 - Click "try an example PDF" → fetches tracemonkey.pdf from GitHub
 - Drag a sample PDF icon onto drop zone → full-page overlay appears, fetch + optimize on drop
 - Click a sample PDF icon → fetch + optimize directly (loading state on icon)
-- Preset buttons → `applyPreset()`, updates all advanced controls
-- Any option change → `syncPresetIndicator()` highlights matching preset
+- Preset buttons → `applyPreset()`, updates all advanced controls + hint text
+- Any option change → `syncPresetIndicator()` highlights matching preset + updates hint
 
 ---
 
@@ -156,12 +158,13 @@ After optimization, the main window shows "Start Over" and palettes are populate
 │ status-bar: Saved 32.4% — 1.2MB → 840KB     │
 └──────────────────────────────────────────────┘
 
-┌── Settings palette ───────┐
-│ [Lossless*][Web][Print]   │
-│ ▸ Advanced Settings       │
-│ ─────────────────────     │
-│             [Re-optimize] │  ← appears after results
-└───────────────────────────┘
+┌── Settings palette ───────────┐
+│ [Lossless*][Web][Print]       │
+│ No quality loss — recompress… │ ← preset hint
+│ ⚙ Advanced Settings           │
+│ ───────────────────────       │
+│               [Re-optimize]   │  ← appears after results
+└───────────────────────────────┘
 
 ┌── Results palette ────────┐
 │ report.pdf                │
@@ -298,8 +301,10 @@ index.html
         ├── #palette-settings (created by createPalette())
         │     └── .palette__body
         │           └── #options-panel (moved here from HTML on init)
-        │                 ├── .tab-control (Lossless / Web / Print)
+        │                 ├── .tab-control (Lossless / Web / Print, title tooltips)
+        │                 ├── #preset-hint (.tab-control__hint, updates per preset)
         │                 ├── .advanced (<details open>)
+        │                 │     └── .advanced__toggle (⚙ gear icon + "Advanced Settings")
         │                 │     └── .advanced__body (mode, quality, DPI, checkboxes)
         │                 └── #settings-actions (Re-optimize button, hidden until results)
         │

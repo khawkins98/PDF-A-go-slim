@@ -111,13 +111,14 @@
     <!-- Options panel (kept in HTML so options.js module-level querySelectorAll finds elements on import) -->
     <div id="options-panel" class="options-panel" hidden>
       <div class="tab-control" role="tablist">
-        <button class="tab-control__tab tab-control__tab--active" data-preset="lossless" role="tab" aria-selected="true">Lossless</button>
-        <button class="tab-control__tab" data-preset="web" role="tab" aria-selected="false">Web</button>
-        <button class="tab-control__tab" data-preset="print" role="tab" aria-selected="false">Print</button>
+        <button class="tab-control__tab tab-control__tab--active" data-preset="lossless" role="tab" aria-selected="true" title="No quality loss — recompress, deduplicate, subset fonts">Lossless</button>
+        <button class="tab-control__tab" data-preset="web" role="tab" aria-selected="false" title="Lossy JPEG at 75% quality, 150 DPI cap — best for screens">Web</button>
+        <button class="tab-control__tab" data-preset="print" role="tab" aria-selected="false" title="Lossy JPEG at 92% quality, 300 DPI cap — best for print">Print</button>
       </div>
+      <p class="tab-control__hint" id="preset-hint">No quality loss — recompress, deduplicate, subset fonts</p>
 
       <details class="advanced" open>
-        <summary class="advanced__toggle">Advanced Settings</summary>
+        <summary class="advanced__toggle"><svg class="advanced__icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Advanced Settings</summary>
         <div class="advanced__body">
           <div class="control-row">
             <label class="control-label">Mode</label>

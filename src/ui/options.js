@@ -5,6 +5,13 @@ export const PRESETS = {
   print:    { lossy: true,  imageQuality: 0.92, unembedStandardFonts: true, subsetFonts: true, maxImageDpi: 300 },
 };
 
+const PRESET_HINTS = {
+  lossless: 'No quality loss \u2014 recompress, deduplicate, subset fonts',
+  web:      'Lossy JPEG at 75% quality, 150 DPI cap \u2014 best for screens',
+  print:    'Lossy JPEG at 92% quality, 300 DPI cap \u2014 best for print',
+  custom:   'Custom settings',
+};
+
 // --- DOM refs (private to this module) ---
 const presetBtns = document.querySelectorAll('.tab-control__tab');
 const modeBtns = document.querySelectorAll('.mode-btn');
@@ -15,6 +22,7 @@ const dpiRow = document.querySelector('.control-row--dpi');
 const dpiInput = document.getElementById('max-dpi');
 const unembedCheckbox = document.getElementById('unembed-fonts');
 const subsetCheckbox = document.getElementById('subset-fonts');
+const presetHint = document.getElementById('preset-hint');
 
 export function applyPreset(name) {
   const p = PRESETS[name];
@@ -38,6 +46,8 @@ export function applyPreset(name) {
 
   unembedCheckbox.checked = p.unembedStandardFonts;
   subsetCheckbox.checked = p.subsetFonts;
+
+  if (presetHint) presetHint.textContent = PRESET_HINTS[name] || PRESET_HINTS.custom;
 }
 
 export function syncPresetIndicator() {
@@ -52,6 +62,7 @@ export function syncPresetIndicator() {
         btn.classList.toggle('tab-control__tab--active', btn.dataset.preset === name);
         btn.setAttribute('aria-selected', btn.dataset.preset === name ? 'true' : 'false');
       });
+      if (presetHint) presetHint.textContent = PRESET_HINTS[name] || PRESET_HINTS.custom;
       return;
     }
   }
@@ -59,6 +70,7 @@ export function syncPresetIndicator() {
     btn.classList.remove('tab-control__tab--active');
     btn.setAttribute('aria-selected', 'false');
   });
+  if (presetHint) presetHint.textContent = PRESET_HINTS.custom;
 }
 
 /** Return the human-readable label for the currently active preset. */

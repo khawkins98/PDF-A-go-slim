@@ -459,10 +459,14 @@ body {
   padding: 0.5rem;
 }
 
-.drop-area:hover,
+.drop-area:hover {
+  background: #f5f4f0;
+}
+
 .drop-area:focus-visible {
   background: #f5f4f0;
-  outline: none;
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .drop-area--active {
@@ -570,6 +574,13 @@ body {
   z-index: 2;
 }
 
+.tab-control__hint {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  margin: 0.3rem 0.4rem 0;
+  line-height: 1.3;
+}
+
 .advanced {
   border-top: 1px solid var(--color-border-light);
   background: var(--color-surface);
@@ -578,7 +589,7 @@ body {
 }
 
 .advanced__toggle {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-text-muted);
   cursor: pointer;
@@ -589,6 +600,16 @@ body {
 
 .advanced__toggle:hover {
   color: var(--color-text);
+}
+
+.advanced__icon {
+  vertical-align: -1px;
+  margin-right: 2px;
+  opacity: 0.6;
+}
+
+.advanced__toggle:hover .advanced__icon {
+  opacity: 1;
 }
 
 .advanced__body {
@@ -1278,6 +1299,19 @@ body {
 
 .btn--default:active {
   box-shadow: var(--shadow-sunken);
+}
+
+/* --- Focus indicator (all interactive elements) --- */
+.btn:focus-visible, .mode-btn:focus-visible, .tab-control__tab:focus-visible,
+.advanced__toggle:focus-visible, .try-example-link:focus-visible,
+.inspect-show-more:focus-visible, .file-item__retry:focus-visible,
+.theme-btn:focus-visible, .control-strip__btn:focus-visible,
+.control-strip__icon-btn:focus-visible, .desktop-icon:focus-visible,
+.pattern-swatch:focus-visible, .btn-cancel:focus-visible,
+.result-card__disclosure > summary:focus-visible,
+.quality-slider:focus-visible, .dpi-input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 /* --- State visibility --- */
@@ -2100,12 +2134,17 @@ body[data-theme="forest"] .dpi-input {
 body[data-theme="dark"] .drop-area:hover,
 body[data-theme="amber"] .drop-area:hover,
 body[data-theme="ocean"] .drop-area:hover,
-body[data-theme="forest"] .drop-area:hover,
+body[data-theme="forest"] .drop-area:hover {
+  background: var(--color-surface-light);
+}
+
 body[data-theme="dark"] .drop-area:focus-visible,
 body[data-theme="amber"] .drop-area:focus-visible,
 body[data-theme="ocean"] .drop-area:focus-visible,
 body[data-theme="forest"] .drop-area:focus-visible {
   background: var(--color-surface-light);
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 body[data-theme="dark"] .title-bar__ridges,
