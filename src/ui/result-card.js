@@ -251,7 +251,7 @@ export function buildFileCard(result, blob, blobUrl, options, onStaleCheck) {
  * Includes hero card + action buttons.
  * @returns {HTMLElement}
  */
-export function buildResultsPaletteContent(results, blobUrls, options, { animateCountUp, onStaleCheck, onReoptimize, onStartOver }) {
+export function buildResultsPaletteContent(results, blobUrls, options, { animateCountUp, onStaleCheck, onReoptimize }) {
   const container = document.createElement('div');
 
   if (results.length === 1) {
@@ -289,14 +289,7 @@ export function buildResultsPaletteContent(results, blobUrls, options, { animate
   btnReoptimize.textContent = 'Re-optimize';
   btnReoptimize.addEventListener('click', onReoptimize);
 
-  const btnStartOver = document.createElement('button');
-  btnStartOver.className = 'btn btn--secondary';
-  btnStartOver.id = 'btn-start-over';
-  btnStartOver.textContent = 'Start Over';
-  btnStartOver.addEventListener('click', onStartOver);
-
   actions.appendChild(btnReoptimize);
-  actions.appendChild(btnStartOver);
   container.appendChild(actions);
 
   return container;

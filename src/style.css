@@ -296,6 +296,17 @@ body {
   pointer-events: none;
 }
 
+/* Start Over action bar in main window */
+.main-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.5rem;
+}
+
+.main-actions[hidden] {
+  display: none;
+}
+
 /* --- Drop zone --- */
 .drop-area {
   min-height: 200px;

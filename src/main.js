@@ -66,6 +66,8 @@ const processingSection = document.getElementById('processing');
 const fileList = document.getElementById('file-list');
 const dropOverlay = document.getElementById('drop-overlay');
 const btnCancel = document.getElementById('btn-cancel');
+const mainActions = document.getElementById('main-actions');
+const btnStartOver = document.getElementById('btn-start-over');
 const statusLeft = document.getElementById('status-left');
 
 // --- Initialize window manager ---
@@ -208,7 +210,6 @@ function renderResults(results, options) {
     animateCountUp,
     onStaleCheck: checkStaleResults,
     onReoptimize: () => { if (lastFiles) handleFiles(lastFiles); },
-    onStartOver: startOver,
   });
   resultsPalette.setContent(resultsContent);
 
@@ -226,6 +227,9 @@ function renderResults(results, options) {
   const blob = new Blob([previewResult.result], { type: 'application/pdf' });
   const previewContent = buildPreviewContent(previewResult.originalFile, blob);
   previewPalette.setContent(previewContent);
+
+  // Show Start Over in main window
+  mainActions.hidden = false;
 }
 
 // --- Start over ---
@@ -240,8 +244,11 @@ function startOver() {
   inspectorPalette.showEmpty('Drop a PDF to see object breakdown');
   previewPalette.showEmpty('Drop a PDF to see preview');
 
+  mainActions.hidden = true;
   statusLeft.textContent = 'Reduce PDF file size \u2014 files never leave your device';
 }
+
+btnStartOver.addEventListener('click', startOver);
 
 // --- Main flow ---
 async function handleFiles(files) {
