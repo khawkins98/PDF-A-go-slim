@@ -432,25 +432,20 @@ body {
 }
 
 .advanced {
-  box-shadow: var(--shadow-etched);
+  border-top: 1px solid var(--color-border-light);
   background: var(--color-surface);
-  padding: 0.4rem 0.5rem 0;
-  position: relative;
-  margin-top: 0;
+  padding: 0.35rem 0.5rem 0;
+  margin-top: 0.35rem;
 }
 
 .advanced__toggle {
-  position: absolute;
-  top: -0.55em;
-  left: 0.5rem;
-  background: var(--color-surface);
-  padding: 0 0.3rem;
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--color-text-muted);
   cursor: pointer;
   user-select: none;
   line-height: 1;
+  padding: 0;
 }
 
 .advanced__toggle:hover {
