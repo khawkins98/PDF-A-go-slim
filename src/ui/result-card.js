@@ -287,16 +287,31 @@ export function buildResultsPaletteContent(results, blobUrls, options, { animate
  * @param {Object} options - Current optimization options
  * @returns {HTMLElement|null}
  */
+function buildMetaHeader(stats) {
+  if (!stats?.documentInfo) return '';
+  const info = stats.documentInfo;
+  const traits = stats.pdfTraits || {};
+  const rows = [];
+  rows.push(`<span class="inspector-meta__label">Pages</span><span class="inspector-meta__value">${info.pageCount}</span>`);
+  if (info.producer) rows.push(`<span class="inspector-meta__label">Producer</span><span class="inspector-meta__value">${info.producer}</span>`);
+  if (traits.pdfALevel) {
+    rows.push(`<span class="inspector-meta__label">PDF/A</span><span class="inspector-meta__value">${traits.pdfALevel}</span>`);
+  }
+  rows.push(`<span class="inspector-meta__label">Tagged</span><span class="inspector-meta__value">${traits.isTagged ? 'Yes' : 'No'}</span>`);
+  return `<div class="inspector-meta">${rows.join('')}</div>`;
+}
+
 export function buildInspectorPaletteContent(result, options) {
   const container = document.createElement('div');
 
+  const metaHtml = buildMetaHeader(result.stats);
   const statsHtml = buildStatsDetail(result.stats);
   const inspectHtml = buildInspectPanel(result.stats);
 
-  if (!statsHtml && !inspectHtml) return null;
+  if (!statsHtml && !inspectHtml && !metaHtml) return null;
 
   const content = document.createElement('div');
-  content.innerHTML = (statsHtml || '') + (inspectHtml || '');
+  content.innerHTML = (metaHtml || '') + (statsHtml || '') + (inspectHtml || '');
   container.appendChild(content);
 
   // Wire up "Show more" interactions

@@ -158,12 +158,120 @@ body {
   color: var(--color-text);
 }
 
+.status-bar__right .about-link {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+}
+
+.status-bar__right .about-link:hover {
+  text-decoration: underline;
+  color: var(--color-text);
+}
+
 .status-bar__right .debug-link {
   opacity: 0.6;
 }
 
 .status-bar__right .debug-link:hover {
   opacity: 1;
+}
+
+/* --- About dialog --- */
+.about-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.about-dialog {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  width: 320px;
+  max-width: 90vw;
+}
+
+.about-dialog__title-bar {
+  background: var(--color-surface);
+  padding: 2px 5px;
+  min-height: 15px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.about-dialog__close-box {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.about-dialog__close-box:hover {
+  background: var(--color-surface-light);
+}
+
+.about-dialog__stripes {
+  flex: 1;
+  height: 4px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--color-border-light) 0px, var(--color-border-light) 1px,
+    #fff 1px, #fff 2px,
+    transparent 2px, transparent 3px
+  );
+  min-width: 6px;
+}
+
+.about-dialog__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 0 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.about-dialog__body {
+  padding: 1rem 1.2rem;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.about-dialog__name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.about-dialog__body p {
+  margin: 0.3rem 0;
+  color: var(--color-text-muted);
+}
+
+.about-dialog__body a {
+  color: var(--color-primary);
+}
+
+.about-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem 1.2rem 0.8rem;
 }
 
 /* --- Floating palette chrome --- */
@@ -580,6 +688,29 @@ body {
   font-weight: 600;
   color: var(--color-text);
   margin-top: 0.25rem;
+}
+
+/* --- Inspector metadata header --- */
+.inspector-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.1rem 0.6rem;
+  font-size: 0.72rem;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--color-border-light);
+  margin-bottom: 0.2rem;
+}
+
+.inspector-meta__label {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.inspector-meta__value {
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* --- Object inspector --- */
@@ -1316,17 +1447,15 @@ body {
   text-align: center;
 }
 
-/* --- Full-page drop overlay --- */
+/* --- Full-page drop overlay (Platinum dialog style) --- */
 .drop-overlay {
   position: fixed;
   inset: 0;
   z-index: 999;
-  background: rgba(26, 58, 110, 0.08);
-  backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 3px dashed var(--color-primary);
   pointer-events: none;
 }
 
@@ -1336,34 +1465,46 @@ body {
 
 .drop-overlay__content {
   text-align: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.5rem 2rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 .drop-overlay__icon {
-  color: var(--color-primary);
+  color: var(--color-text-muted);
   margin-bottom: 0.5rem;
 }
 
 .drop-overlay__text {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-text);
 }
 
-/* --- Toast notification --- */
+/* --- Toast notification (Platinum alert style) --- */
 .toast {
   position: fixed;
   bottom: 1.5rem;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--color-text);
-  color: #fff;
-  padding: 0.45rem 0.9rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 0.45rem 0.9rem 0.45rem 0.6rem;
   font-size: 0.78rem;
   font-weight: 500;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   z-index: 1000;
   opacity: 1;
   transition: opacity 0.3s ease;
+}
+
+.toast::before {
+  content: '\26A0';
+  margin-right: 0.4rem;
 }
 
 .toast--fading {

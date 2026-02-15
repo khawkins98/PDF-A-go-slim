@@ -135,9 +135,9 @@ optionsPanel.hidden = false;
 settingsPalette.setContent(optionsPanel);
 
 // Set empty states for result palettes
-resultsPalette.showEmpty('Drop a PDF to see results');
-inspectorPalette.showEmpty('Drop a PDF to see object breakdown');
-previewPalette.showEmpty('Drop a PDF to see preview');
+resultsPalette.showEmpty('Nothing to report yet');
+inspectorPalette.showEmpty('Waiting for a PDF to dissect');
+previewPalette.showEmpty('No document loaded');
 
 // --- Stale results detection ---
 function checkStaleResults() {
@@ -156,7 +156,7 @@ function setProcessing(active) {
   dropZone.classList.toggle('state--dimmed', active);
   statusLeft.textContent = active
     ? 'Optimizing\u2026'
-    : 'Reduce PDF file size \u2014 files never leave your device';
+    : 'Ready \u2014 files never leave your device';
 }
 
 function revokeBlobUrls() {
@@ -211,7 +211,7 @@ function renderResults(results, options) {
   if (totalSaved > 0) {
     statusLeft.textContent = `Saved ${totalPct}% \u2014 ${formatSize(totalOriginal)} \u2192 ${formatSize(totalOptimized)}`;
   } else {
-    statusLeft.textContent = 'Done \u2014 no size reduction';
+    statusLeft.textContent = 'Done \u2014 already well-optimized';
   }
 
   // Results palette
@@ -249,14 +249,14 @@ function startOver() {
   lastRunOptions = null;
   fileInput.value = '';
 
-  resultsPalette.showEmpty('Drop a PDF to see results');
-  inspectorPalette.showEmpty('Drop a PDF to see object breakdown');
-  previewPalette.showEmpty('Drop a PDF to see preview');
+  resultsPalette.showEmpty('Nothing to report yet');
+  inspectorPalette.showEmpty('Waiting for a PDF to dissect');
+  previewPalette.showEmpty('No document loaded');
 
   mainActions.hidden = true;
   settingsActions.hidden = true;
   btnReoptimize.classList.remove('btn--stale');
-  statusLeft.textContent = 'Reduce PDF file size \u2014 files never leave your device';
+  statusLeft.textContent = 'Ready \u2014 files never leave your device';
 }
 
 btnStartOver.addEventListener('click', startOver);
@@ -456,6 +456,41 @@ btnCancel.addEventListener('click', () => {
   setProcessing(false);
 });
 
+// --- About dialog ---
+function showAboutDialog() {
+  const overlay = document.createElement('div');
+  overlay.className = 'about-overlay';
+  overlay.innerHTML = `
+    <div class="about-dialog">
+      <div class="about-dialog__title-bar">
+        <div class="about-dialog__close-box" data-action="close"></div>
+        <div class="about-dialog__stripes"></div>
+        <span class="about-dialog__title">About</span>
+        <div class="about-dialog__stripes"></div>
+      </div>
+      <div class="about-dialog__body">
+        <div class="about-dialog__name">PDF-A-go-slim</div>
+        <p>Reduce PDF file size entirely in your browser. No uploads, no server.</p>
+        <p>Built with pdf-lib, fflate, harfbuzzjs, and jpeg-js.</p>
+        <p><a href="https://github.com/khawkins98/PDF-A-go-slim" target="_blank" rel="noopener">github.com/khawkins98/PDF-A-go-slim</a></p>
+      </div>
+      <div class="about-dialog__footer">
+        <button class="btn btn--default" data-action="close">OK</button>
+      </div>
+    </div>`;
+
+  function close() { overlay.remove(); }
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay || e.target.closest('[data-action="close"]')) close();
+  });
+  document.addEventListener('keydown', function onKey(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+  });
+  document.body.appendChild(overlay);
+}
+
+document.getElementById('btn-about').addEventListener('click', showAboutDialog);
+
 // --- Debug mode indicator ---
 if (new URLSearchParams(window.location.search).has('debug')) {
   const banner = document.createElement('div');
@@ -466,4 +501,4 @@ if (new URLSearchParams(window.location.search).has('debug')) {
 }
 
 // --- Initial state ---
-statusLeft.textContent = 'Reduce PDF file size \u2014 files never leave your device';
+statusLeft.textContent = 'Ready \u2014 files never leave your device';

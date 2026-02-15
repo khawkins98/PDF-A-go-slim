@@ -46,6 +46,14 @@ export async function optimize(inputBytes, options = {}, onProgress) {
   const passOptions = { ...options, _pdfTraits: pdfTraits };
 
   const stats = { inputSize, pdfTraits, passes: [] };
+
+  stats.documentInfo = {
+    pageCount: pdfDoc.getPages().length,
+    producer: pdfDoc.getProducer() || null,
+    creator: pdfDoc.getCreator() || null,
+    title: pdfDoc.getTitle() || null,
+  };
+
   const inspectBefore = inspectDocument(pdfDoc);
 
   for (let i = 0; i < PASSES.length; i++) {
