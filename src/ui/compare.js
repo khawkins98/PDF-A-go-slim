@@ -8,27 +8,37 @@ const activeContainers = [];
 const activeObservers = new Map();
 
 /**
- * Watch a viewer element for size changes.
- * - Dispatches window resize so PDF-A-go-go re-renders at correct size.
- * - When the viewer height changes (e.g. via grip drag), syncs the palette height.
+ * Watch the palette for size changes and keep the viewer height in sync.
+ * Observes the palette (not the viewer) to avoid feedback loops.
+ * On each resize, calculates available height and sets it on the viewer,
+ * then dispatches window.resize so PDF-A-go-go re-renders.
  */
 function observeResize(viewer) {
   if (activeObservers.has(viewer)) return;
-  let lastHeight = viewer.offsetHeight;
   const palette = viewer.closest('.palette');
-  const ro = new ResizeObserver(() => {
-    window.dispatchEvent(new Event('resize'));
-    // Sync grip-driven height changes to the palette
-    const newHeight = viewer.offsetHeight;
-    if (palette && newHeight !== lastHeight) {
-      const delta = newHeight - lastHeight;
-      const currentPaletteHeight = palette.offsetHeight;
-      palette.style.height = `${currentPaletteHeight + delta}px`;
-      lastHeight = newHeight;
+  if (!palette) return;
+  const body = palette.querySelector('.palette__body');
+  if (!body) return;
+
+  function syncHeight() {
+    const label = viewer.parentElement?.querySelector('.compare-side__label');
+    const labelH = label ? label.offsetHeight : 0;
+    const wrap = viewer.parentElement;
+    const wrapPad = wrap ? (parseFloat(getComputedStyle(wrap).paddingTop) + parseFloat(getComputedStyle(wrap).paddingBottom)) : 0;
+    const bodyPad = parseFloat(getComputedStyle(body).paddingTop) + parseFloat(getComputedStyle(body).paddingBottom);
+    const available = body.clientHeight - bodyPad - labelH - wrapPad;
+    if (available > 200) {
+      viewer.style.height = `${available}px`;
     }
-  });
-  ro.observe(viewer);
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  const ro = new ResizeObserver(syncHeight);
+  ro.observe(body);
   activeObservers.set(viewer, ro);
+
+  // Initial sync
+  syncHeight();
 }
 
 /** Lazy-load pdf-a-go-go JS + CSS from CDN. Deduplicates concurrent calls. */

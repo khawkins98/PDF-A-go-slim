@@ -20,9 +20,6 @@
   /* Bevel system — thin single-pixel borders */
   --shadow-raised: inset -1px -1px 0 var(--color-border), inset 1px 1px 0 #fff;
   --shadow-sunken: inset 1px 1px 0 var(--color-border), inset -1px -1px 0 #fff;
-  --shadow-raised-sm: inset -1px -1px 0 var(--color-border), inset 1px 1px 0 #fff;
-  --shadow-sunken-sm: inset 1px 1px 0 var(--color-border), inset -1px -1px 0 #fff;
-  --shadow-etched: inset 1px 1px 0 var(--color-border), inset -1px -1px 0 #fff;
 }
 
 *,
@@ -234,9 +231,6 @@ body {
   border-radius: 2px;
   background: var(--color-surface);
   cursor: pointer;
-}
-
-.palette__collapse-box {
   margin-left: 3px;
 }
 
@@ -248,10 +242,8 @@ body {
   min-height: 0;
 }
 
-/* Preview palette body: flex layout so viewer fills available space */
+/* Preview palette body: JS manages viewer height via ResizeObserver */
 #palette-preview .palette__body {
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
   max-height: none;
 }
@@ -980,11 +972,6 @@ body {
   background: var(--color-surface);
 }
 
-.result-table__row-data--expanded {
-  background: var(--color-surface);
-  font-weight: 600;
-}
-
 .result-table__cell--name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -999,16 +986,6 @@ body {
 
 .result-table__cell--dl {
   justify-self: end;
-}
-
-.result-table__row-detail {
-  padding: 0.3rem 0.5rem 0.5rem;
-  border-top: 1px solid var(--color-border-light);
-  background: var(--color-surface-light);
-}
-
-.result-table__row-detail[hidden] {
-  display: none;
 }
 
 /* --- Disclosure sections (details/summary) --- */
@@ -1052,19 +1029,6 @@ body {
 
 .result-card__disclosure > summary:hover {
   color: var(--color-text);
-}
-
-.result-card__disclosure-content {
-  padding-bottom: 0.25rem;
-}
-
-/* --- Results actions (inside Results palette) --- */
-.results-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 0.35rem;
-  padding-top: 0.5rem;
 }
 
 /* --- Pass stats --- */
@@ -1170,22 +1134,6 @@ body {
 /* --- State visibility --- */
 .state[hidden] {
   display: none;
-}
-
-/* --- State transitions --- */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.state--entering {
-  animation: fadeIn 0.15s ease-out;
 }
 
 /* --- Zero-diff dash --- */
@@ -1320,9 +1268,8 @@ body {
   min-height: 0;
 }
 
-/* When used directly in the Preview palette body, fill available space */
+/* When used directly in the Preview palette body */
 .palette__body > .compare-viewer-wrap {
-  flex: 1;
   margin: 0;
 }
 
@@ -1353,8 +1300,7 @@ body {
 }
 
 .compare-side__viewer {
-  flex: 1;
-  min-height: 400px;
+  min-height: 300px;
   position: relative;
 }
 
