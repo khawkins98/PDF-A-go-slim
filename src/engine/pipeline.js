@@ -4,7 +4,7 @@
  * Loads a PDF, runs optimization passes in order, saves with compact settings.
  * Returns original bytes if output is not smaller (size guard).
  */
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFRef, PDFArray } from 'pdf-lib';
 import { recompressStreams } from './optimize/streams.js';
 import { recompressImages } from './optimize/images.js';
 import { unembedStandardFonts } from './optimize/font-unembed.js';
@@ -15,6 +15,30 @@ import { stripMetadata } from './optimize/metadata.js';
 import { removeUnreferencedObjects } from './optimize/unreferenced.js';
 import { inspectDocument } from './inspect.js';
 import { detectAccessibilityTraits } from './utils/accessibility-detect.js';
+
+/**
+ * Lightweight post-pipeline integrity check.
+ * Detects pages with missing or dangling content stream references —
+ * a sign that the unreferenced pass (or another pass) removed live objects.
+ */
+function checkContentIntegrity(pdfDoc) {
+  const warnings = [];
+  const pages = pdfDoc.getPages();
+  for (let i = 0; i < pages.length; i++) {
+    const contents = pages[i].node.get(PDFName.of('Contents'));
+    if (!contents) continue; // No content stream is valid (blank page)
+    // Contents can be a single ref or an array of refs
+    const refs = contents instanceof PDFArray
+      ? Array.from({ length: contents.size() }, (_, j) => contents.get(j))
+      : [contents];
+    for (const ref of refs) {
+      if (ref instanceof PDFRef && !pdfDoc.context.lookup(ref)) {
+        warnings.push(`Page ${i + 1}: dangling content stream ref ${ref.tag}`);
+      }
+    }
+  }
+  return warnings;
+}
 
 const PASSES = [
   { name: 'Recompressing streams', fn: recompressStreams },
@@ -73,6 +97,17 @@ export async function optimize(inputBytes, options = {}, onProgress) {
 
   const inspectAfter = inspectDocument(pdfDoc);
   stats.inspect = { before: inspectBefore, after: inspectAfter };
+
+  // Content integrity check — detect content-destructive bugs
+  const contentWarnings = checkContentIntegrity(pdfDoc);
+  if (contentWarnings.length > 0) {
+    stats.contentWarnings = contentWarnings;
+    // Fall back to original bytes — don't return a broken PDF
+    return {
+      output: inputBytes instanceof Uint8Array ? inputBytes : new Uint8Array(inputBytes),
+      stats: { ...stats, outputSize: inputSize, savedBytes: 0, savedPercent: 0, contentGuard: true },
+    };
+  }
 
   const outputBytes = await pdfDoc.save({
     useObjectStreams: !(pdfTraits.isPdfA && pdfTraits.pdfALevel?.startsWith('1')),

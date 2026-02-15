@@ -5,7 +5,7 @@
  * PDFDict, PDFArray, and PDFRef values. Returns a Set<string> of all
  * reachable ref tags (e.g. "1 0 R").
  */
-import { PDFDict, PDFArray, PDFRef, PDFRawStream } from 'pdf-lib';
+import { PDFDict, PDFArray, PDFRef, PDFStream } from 'pdf-lib';
 
 /**
  * Collect all refs reachable from the document trailer.
@@ -53,8 +53,9 @@ export function findReachableRefs(context) {
       continue;
     }
 
-    if (item instanceof PDFRawStream) {
-      // The dict part of a stream may contain refs
+    if (item instanceof PDFStream) {
+      // The dict part of a stream may contain refs (catches PDFRawStream,
+      // PDFFlateStream, PDFContentStream, and any future subclass)
       queue.push(item.dict);
       continue;
     }

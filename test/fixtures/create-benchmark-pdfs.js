@@ -11,6 +11,7 @@ import {
   PDFDict,
   PDFArray,
   PDFString,
+  PDFNumber,
   PDFRawStream,
   PDFRef,
   StandardFonts,
@@ -631,6 +632,119 @@ export async function createKitchenSinkPdf() {
   addOrphans(doc, 3);
 
   // Level-1 streams
+  addPoorlyCompressedStreams(doc, 4);
+
+  return new Uint8Array(await doc.save({ useObjectStreams: false }));
+}
+
+/**
+ * Simulates a CalRGB/CalGray color-space-heavy PDF.
+ * Exercises color space traversal paths that must survive BFS-based unreferenced removal.
+ *
+ * - CS1: CalRGB with inline params dict
+ * - CS2: CalRGB with indirect (registered) params dict
+ * - CS3: CalGray with inline params dict
+ * - Content stream using all three color spaces + text
+ * - 1 embedded standard font (Helvetica) with font file
+ * - PieceInfo + XMP bloat keys
+ * - 3 orphan objects
+ * - 4 poorly compressed streams
+ */
+export async function createCalRGBGraphicsPdf() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]); // US Letter
+
+  // --- CalRGB color space CS1 (inline params dict) ---
+  const calRgb1Params = doc.context.obj({});
+  calRgb1Params.set(PDFName.of('WhitePoint'), doc.context.obj([0.9505, 1.0, 1.089]));
+  calRgb1Params.set(PDFName.of('Gamma'), doc.context.obj([2.2, 2.2, 2.2]));
+  const cs1Array = doc.context.obj([PDFName.of('CalRGB'), calRgb1Params]);
+
+  // --- CalRGB color space CS2 (indirect params dict — the tricky case) ---
+  const calRgb2Params = doc.context.obj({});
+  calRgb2Params.set(PDFName.of('WhitePoint'), doc.context.obj([0.9505, 1.0, 1.089]));
+  calRgb2Params.set(PDFName.of('Gamma'), doc.context.obj([1.8, 1.8, 1.8]));
+  calRgb2Params.set(PDFName.of('Matrix'), doc.context.obj([
+    0.4497, 0.2446, 0.0252,
+    0.3163, 0.6720, 0.1412,
+    0.1845, 0.0834, 0.9227,
+  ]));
+  const calRgb2ParamsRef = doc.context.register(calRgb2Params);
+  const cs2Array = doc.context.obj([PDFName.of('CalRGB'), calRgb2ParamsRef]);
+
+  // --- CalGray color space CS3 (inline params) ---
+  const calGrayParams = doc.context.obj({});
+  calGrayParams.set(PDFName.of('WhitePoint'), doc.context.obj([0.9505, 1.0, 1.089]));
+  calGrayParams.set(PDFName.of('Gamma'), PDFNumber.of(1.8));
+  const cs3Array = doc.context.obj([PDFName.of('CalGray'), calGrayParams]);
+
+  // --- Wire color spaces into page Resources ---
+  let resources = page.node.get(PDFName.of('Resources'));
+  if (!resources || !(resources instanceof PDFDict)) {
+    resources = doc.context.obj({});
+    page.node.set(PDFName.of('Resources'), resources);
+  }
+  const colorSpaceDict = doc.context.obj({});
+  colorSpaceDict.set(PDFName.of('CS1'), cs1Array);
+  colorSpaceDict.set(PDFName.of('CS2'), cs2Array);
+  colorSpaceDict.set(PDFName.of('CS3'), cs3Array);
+  resources.set(PDFName.of('ColorSpace'), colorSpaceDict);
+
+  // --- Embedded standard font (Helvetica with FontFile2) ---
+  addEmbeddedStandardFont(doc, page, 'Helvetica', 'F1');
+
+  // --- Content stream using CalRGB/CalGray + text ---
+  const contentOps = [
+    // CalRGB fill (CS1) — full-page background
+    '/CS1 cs 0.8 0.2 0.5 sc',
+    '0 0 612 792 re f',
+    // CalRGB stroke (CS2) — rectangle outline
+    '/CS2 CS 0.1 0.7 0.3 SC',
+    '5 w 50 50 512 692 re S',
+    // CalGray fill (CS3) — inner rectangle
+    '/CS3 cs 0.6 sc',
+    '100 100 412 592 re f',
+    // Text using Helvetica
+    'BT',
+    '/F1 24 Tf',
+    '0 0 0 rg',
+    '150 400 Td',
+    '(CalRGB Color Test) Tj',
+    'ET',
+  ].join('\n');
+  const contentBytes = new TextEncoder().encode(contentOps);
+  const compressedContent = deflateSync(contentBytes, { level: 1 }); // level 1 = bloated
+
+  const contentDict = doc.context.obj({});
+  contentDict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+  contentDict.set(PDFName.of('Length'), doc.context.obj(compressedContent.length));
+  const contentStream = PDFRawStream.of(contentDict, compressedContent);
+  const contentRef = doc.context.register(contentStream);
+  page.node.set(PDFName.of('Contents'), contentRef);
+
+  // --- XMP metadata ---
+  addXmpMetadata(doc,
+    '<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>' +
+    '<x:xmpmeta xmlns:x="adobe:ns:meta/">' +
+    '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">' +
+    '<rdf:Description rdf:about=""' +
+    ' xmlns:xmp="http://ns.adobe.com/xap/1.0/">' +
+    '<xmp:CreatorTool>CalRGB Test Generator</xmp:CreatorTool>' +
+    '</rdf:Description>' +
+    '</rdf:RDF></x:xmpmeta>' +
+    ' '.repeat(2000) +
+    '<?xpacket end="w"?>',
+  );
+
+  // --- PieceInfo bloat ---
+  const pieceInfo = doc.context.obj({});
+  pieceInfo.set(PDFName.of('Illustrator'), doc.context.obj({}));
+  page.node.set(PDFName.of('PieceInfo'), pieceInfo);
+
+  // --- Orphan objects ---
+  addOrphans(doc, 3);
+
+  // --- Poorly compressed streams ---
   addPoorlyCompressedStreams(doc, 4);
 
   return new Uint8Array(await doc.save({ useObjectStreams: false }));

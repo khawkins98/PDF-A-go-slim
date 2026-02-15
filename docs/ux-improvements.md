@@ -50,7 +50,7 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 
 ## Bugs
 
-- [ ] **calrgb.pdf loses all background colors and text after optimization** — Processing `calrgb.pdf` (~322 KB, CalRGB color-space-heavy PDF from pdf.js test suite) produces a 93.4% smaller file that renders blank — no background colors, no text. This is a content-destructive bug, not just cosmetic. Likely suspects: (1) unreferenced object removal via BFS may not be traversing CalRGB/CalGray color space objects correctly if they're referenced indirectly through page `/Resources/ColorSpace` dicts; (2) stream recompression may be corrupting color space stream data; (3) metadata stripping may be removing color space definitions that share keys with bloat metadata. **To investigate:** run with `?debug`, compare the before/after Inspector breakdown, and diff the raw PDF objects to identify which pass is removing the content. A targeted benchmark test with a CalRGB fixture would prevent regression.
+- [x] **calrgb.pdf loses all background colors and text after optimization** — **Fixed.** Root cause: fflate's `deflateSync` produces raw DEFLATE without the 2-byte zlib header (RFC 1950), but PDF's FlateDecode spec expects zlib-wrapped data. macOS Preview and other PDF viewers silently fail on headerless deflate, rendering blank pages. This affected all stream recompression and font subsetting output. Fix: replaced `deflateSync` with `zlibSync` in `streams.js` and `font-subset.js`. Also hardened the BFS traversal (`PDFRawStream` → `PDFStream` base class) and added a `checkContentIntegrity()` post-pipeline guard.
 
 ## Lower priority
 

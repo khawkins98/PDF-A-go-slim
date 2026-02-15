@@ -2,10 +2,10 @@
  * Stream recompression pass.
  *
  * Iterates all indirect objects. For each PDFRawStream, decodes with our
- * decoders, recompresses with fflate deflateSync at level 9.
+ * decoders, recompresses with fflate zlibSync at level 9.
  * Only replaces if recompressed size < original. Skips image-native filters.
  */
-import { deflateSync } from 'fflate';
+import { zlibSync } from 'fflate';
 import { PDFName, PDFRawStream } from 'pdf-lib';
 import {
   decodeStream,
@@ -54,7 +54,7 @@ export function recompressStreams(pdfDoc) {
       const decoded = filters ? decodeStream(rawBytes, filters) : rawBytes;
 
       // Recompress with optimal deflate
-      const recompressedBytes = deflateSync(decoded, { level: 9 });
+      const recompressedBytes = zlibSync(decoded, { level: 9 });
 
       // Only replace if we saved space
       if (recompressedBytes.length < rawBytes.length) {

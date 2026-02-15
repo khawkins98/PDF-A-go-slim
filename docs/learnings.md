@@ -63,7 +63,9 @@ Pure JS JPEG encoder/decoder (~15 KB). Chosen over `OffscreenCanvas` because Off
 
 ### fflate
 
-Pure JS zlib, faster and smaller than pako. Used for `deflateSync`/`inflateSync`. Level 9 recompression of existing streams is a reliable win — many PDFs use low compression levels or no compression at all.
+Pure JS zlib, faster and smaller than pako. Used for `zlibSync`/`inflateSync`/`decompressSync`. Level 9 recompression of existing streams is a reliable win — many PDFs use low compression levels or no compression at all.
+
+**Critical:** Always use `zlibSync` (not `deflateSync`) when writing FlateDecode streams. `deflateSync` produces raw DEFLATE without the zlib header, which causes blank pages in macOS Preview and other viewers. See "fflate `deflateSync` vs `zlibSync`" in the debugging section above.
 
 ---
 
@@ -330,6 +332,28 @@ pdf-lib creates font dict objects lazily — after `embedFont()` + `drawText()`,
 ### pdf-lib Uses pako Internally
 
 pdf-lib uses pako for internal compression. fflate's `inflateSync` can fail with "unexpected EOF" on some pako-produced zlib streams, but `decompressSync` (full zlib-wrapper handling) succeeds. The `decodeFlateDecode` function should try `inflateSync` first and fall back to `decompressSync`.
+
+### fflate `deflateSync` vs `zlibSync` — the CalRGB blank-page bug
+
+fflate provides two compression functions:
+- `deflateSync` — raw DEFLATE (RFC 1951, no header)
+- `zlibSync` — zlib-wrapped DEFLATE (RFC 1950, 2-byte header starting with `0x78`)
+
+PDF's FlateDecode (ISO 32000, section 7.4.4) references both RFC 1950 (zlib) and RFC 1951 (raw), but in practice **most PDF viewers expect zlib-wrapped data**. macOS Preview, in particular, silently fails on raw DEFLATE — it doesn't error, it just renders the page blank.
+
+**Symptom:** calrgb.pdf (322 KB, 17 pages of CalRGB color swatches) rendered blank after optimization. Content stream bytes survived byte-for-byte through the decode/re-encode cycle, all PDF structure was intact, but viewers showed white pages.
+
+**Root cause:** `streams.js` used `deflateSync` to recompress streams, producing raw DEFLATE without the zlib header. calrgb.pdf's content streams were originally uncompressed (no Filter), so the pass added `/Filter /FlateDecode` with raw DEFLATE data — a combination viewers couldn't handle.
+
+**Fix:** Replaced `deflateSync` with `zlibSync` in both `streams.js` and `font-subset.js`. The zlib header adds only 6 bytes overhead (2-byte header + 4-byte Adler-32 checksum) per stream.
+
+**Why it wasn't caught earlier:** All test fixtures use fflate's `deflateSync` to create FlateDecode streams. The decode path (`inflateSync`/`decompressSync`) handles both formats. Tests only verify data integrity via pdf-lib reload, not actual rendering. The bug only manifests when a PDF viewer renders the output.
+
+### BFS Traversal and PDFStream Subclasses
+
+The BFS traversal in `pdf-traversal.js` should use `instanceof PDFStream` (the base class), not `instanceof PDFRawStream`. pdf-lib has multiple stream subclasses (`PDFRawStream`, `PDFFlateStream`, `PDFContentStream`). Using the base class is defensive against edge cases where streams aren't `PDFRawStream` instances.
+
+**Defense in depth:** A `checkContentIntegrity()` function in `pipeline.js` runs after all passes and before `save()`. It checks each page's `/Contents` ref to ensure it resolves to an actual object. If any page has a dangling content stream ref, the pipeline falls back to original bytes (like the size guard).
 
 ### Node.js fetch() Detection
 
