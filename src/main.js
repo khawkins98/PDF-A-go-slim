@@ -122,28 +122,28 @@ if (mainCollapseBox) {
 const settingsPalette = createPalette({
   id: 'settings',
   title: 'Settings',
-  defaultPosition: { top: 20, left: 520 },
+  defaultPosition: { top: 20, right: 20 },
   width: 260,
 });
 
 const resultsPalette = createPalette({
   id: 'results',
   title: 'Results',
-  defaultPosition: { top: 20, left: 800 },
-  width: 260,
+  defaultPosition: { top: 20, left: 520 },
+  width: 420,
 });
 
 const inspectorPalette = createPalette({
   id: 'inspector',
   title: 'Inspector',
-  defaultPosition: { top: 320, left: 20 },
+  defaultPosition: { top: 220, left: 20 },
   width: 480,
 });
 
 const previewPalette = createPalette({
   id: 'preview',
   title: 'Preview',
-  defaultPosition: { top: 280, left: 520 },
+  defaultPosition: { bottom: 30, right: 120 },
   width: 600,
 });
 // Set an initial height so the viewer favors landscape proportions.

@@ -102,8 +102,16 @@ export function createPalette({ id, title, defaultPosition, width, closable = fa
   el.className = 'palette';
   el.id = `palette-${id}`;
   el.style.position = 'absolute';
-  el.style.top = `${defaultPosition.top}px`;
-  el.style.left = `${defaultPosition.left}px`;
+  if (defaultPosition.bottom != null) {
+    el.style.bottom = `${defaultPosition.bottom}px`;
+  } else {
+    el.style.top = `${defaultPosition.top}px`;
+  }
+  if (defaultPosition.right != null) {
+    el.style.right = `${defaultPosition.right}px`;
+  } else {
+    el.style.left = `${defaultPosition.left}px`;
+  }
   el.style.width = `${width}px`;
 
   // Title bar
