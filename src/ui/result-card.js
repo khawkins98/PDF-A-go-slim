@@ -154,16 +154,23 @@ export function buildSingleFileCard(result, blob, blobUrl, options, animateCount
 
   const saved = result.original - result.result.byteLength;
 
-  // Hero section (filename → stats → download, all centered)
+  // Hero section: horizontal split (metrics left, download right)
   const { heroEl, animateHero } = buildHeroContent(result.original, result.result.byteLength);
 
-  // Filename at top of hero as contextual label
+  // Wrap metric children (pct, sizes, bar) in a container for grid layout
+  const metricsEl = document.createElement('div');
+  metricsEl.className = 'results-hero__metrics';
+  while (heroEl.firstChild) metricsEl.appendChild(heroEl.firstChild);
+
+  // Filename as contextual label above the percentage
   const filenameEl = document.createElement('div');
   filenameEl.className = 'result-card__filename';
   filenameEl.textContent = result.name;
-  heroEl.prepend(filenameEl);
+  metricsEl.prepend(filenameEl);
 
-  // Download button at bottom of hero
+  heroEl.appendChild(metricsEl);
+
+  // Download button in right column
   const downloadLink = document.createElement('a');
   downloadLink.href = blobUrl;
   downloadLink.download = result.name;

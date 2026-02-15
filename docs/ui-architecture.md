@@ -137,14 +137,11 @@ The app has three mutually exclusive states managed by `showState()` in `main.js
 
 +-- .result-card ----------------------------------------+
 |                                                        |
-|  .result-card__hero                                    |
-|                   -32.4%        (count-up animation)   |
-|              1.2 MB -> 840 KB                          |
-|              [========        ] (animated bar)         |
-|                                                        |
-|              [ Download ]                              |
-|                                                        |
-|              report.pdf                                |
+|  .result-card__hero (grid: metrics left, download right)|
+|  report.pdf                                            |
+|  -32.4%                          [ Download ]          |
+|  1.2 MB -> 840 KB                                      |
+|  [========        ] (animated bar)                     |
 |                                                        |
 |  +-- .hint-banner (conditional) --------------------+  |
 |  | Images make up 73% of this file.                 |  |
@@ -319,9 +316,9 @@ index.html
   |     +-- #results  [RESULTS state]
   |           +-- #results-summary
   |           |     +-- .result-card  (single file)
-  |           |     |     +-- .result-card__hero (pct, sizes, bar)
-  |           |     |     +-- .result-card__download (<a>)
-  |           |     |     +-- .result-card__filename
+  |           |     |     +-- .result-card__hero (grid: metrics | download)
+  |           |     |     |     +-- .results-hero__metrics (filename, pct, sizes, bar)
+  |           |     |     |     +-- .result-card__download (<a>)
   |           |     |     +-- .hint-banner (conditional)
   |           |     |     +-- <details> "What was optimized" (pass stats + inspector)
   |           |     |     +-- <details> "Preview" (lazy PDF viewer)

@@ -621,7 +621,7 @@ header h1 {
   background: var(--color-bar-bg);
   border-radius: 3px;
   overflow: hidden;
-  margin: 0.75rem auto 0;
+  margin-top: 0.75rem;
   max-width: 300px;
 }
 
@@ -643,7 +643,10 @@ header h1 {
 }
 
 .result-card__hero {
-  text-align: center;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0 1.5rem;
 }
 
 .result-card__filename {
@@ -656,8 +659,23 @@ header h1 {
 }
 
 .result-card__download {
+  align-self: center;
+}
+
+/* Summary card keeps centered layout */
+.result-card--summary .result-card__hero {
+  display: block;
+  text-align: center;
+}
+
+.result-card--summary .result-card__download {
   display: inline-block;
   margin-top: 1rem;
+}
+
+.result-card--summary .results-hero__bar {
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* --- Disclosure sections (details/summary) --- */
