@@ -12,6 +12,10 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 
 - [ ] **Non-PDF file rejection feedback** — `handleFiles` silently returns when no PDFs are found. Show a brief inline message: "Only PDF files are supported. N files were skipped."
 
+- [ ] **Personality pass on empty states** — Replace generic placeholder text ("Drop a PDF to see results") with copy that has character. Inspired by PostHog's personality-in-every-surface approach.
+
+- [ ] **Richer zero-savings message** — Explain *why* ("Already well-optimized — every pass found nothing to improve") not just "Done — no size reduction."
+
 - [ ] **Focus indicator consistency** — The drop area sets `outline: none` on `:focus-visible` (WCAG failure). Replace with a custom focus ring (`outline: 2px solid var(--color-primary); outline-offset: 2px`). Add `:focus-visible` styles to `.btn`, `.preset-btn`, `.mode-btn`.
 
 - [ ] **Preset discoverability** — Bump `.preset-btn__desc` from `0.65rem` to `0.72rem`. Add a gear icon to the "Advanced Settings" toggle. Consider a counter badge ("2 options customized").
@@ -28,6 +32,12 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 
 - [ ] **Large file warning + cancel** — For files >50 MB, show a warning about processing time. For >200 MB, recommend a desktop tool. Add a "Cancel" button during processing that calls `worker.terminate()`.
 
+- [ ] **Themed transient UI** — Apply Platinum vocabulary to `.toast` (alert box style) and `.drop-overlay` (dialog pattern). PostHog wraps every surface in OS chrome; we should do the same for transient elements.
+
+- [ ] **Surface PDF metadata** — Show page count, producer, PDF/A level in Inspector header. Data already available in `stats.pdfTraits` — just surface it. Inspired by PostHog's transparency-as-UX: show users the "why" behind optimization decisions.
+
+- [ ] **Credits/colophon dialog** — "About" link in status bar opening a Platinum-styled dialog with version, tech stack, and attributions. Small easter egg opportunity.
+
 - [ ] **Batch progress indicator** — For multi-file uploads, add a header: "Optimizing file 2 of 5..." with an overall progress bar above the per-file list.
 
 ## Lower priority
@@ -37,3 +47,7 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 - [ ] **Single-file results consolidation** — For the most common case (one file), hide the table entirely and consolidate everything into the hero card: move "Show details" and "Object breakdown" toggles into the hero section.
 
 - [ ] **Typography scale consolidation** — Currently 9+ different font sizes from `0.65rem` to `2rem`. Consolidate to a 5-step scale defined as CSS custom properties (`--text-xs` through `--text-xl`). Bump inspector minimum from `0.72rem` to `0.75rem`.
+
+- [ ] **Sound effects for key moments** — Optional audio cues for optimization complete, error, drag-over (off by default, respect `prefers-reduced-motion`). PostHog uses sound effects throughout; we'd keep it minimal and opt-in.
+
+- [ ] **Keyboard shortcuts overlay** — `?shortcuts` URL param showing available shortcuts in a Platinum-styled window. Builds on the `?debug` pattern we already have.
