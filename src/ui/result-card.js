@@ -251,7 +251,7 @@ export function buildFileCard(result, blob, blobUrl, options, onStaleCheck) {
  * Includes hero card + action buttons.
  * @returns {HTMLElement}
  */
-export function buildResultsPaletteContent(results, blobUrls, options, { animateCountUp, onStaleCheck, onReoptimize }) {
+export function buildResultsPaletteContent(results, blobUrls, options, { animateCountUp, onStaleCheck }) {
   const container = document.createElement('div');
 
   if (results.length === 1) {
@@ -278,19 +278,6 @@ export function buildResultsPaletteContent(results, blobUrls, options, { animate
     }
     container.appendChild(table);
   }
-
-  // Action buttons
-  const actions = document.createElement('div');
-  actions.className = 'results-actions';
-
-  const btnReoptimize = document.createElement('button');
-  btnReoptimize.className = 'btn btn--secondary';
-  btnReoptimize.id = 'btn-reoptimize';
-  btnReoptimize.textContent = 'Re-optimize';
-  btnReoptimize.addEventListener('click', onReoptimize);
-
-  actions.appendChild(btnReoptimize);
-  container.appendChild(actions);
 
   return container;
 }

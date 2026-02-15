@@ -68,6 +68,8 @@ const dropOverlay = document.getElementById('drop-overlay');
 const btnCancel = document.getElementById('btn-cancel');
 const mainActions = document.getElementById('main-actions');
 const btnStartOver = document.getElementById('btn-start-over');
+const settingsActions = document.getElementById('settings-actions');
+const btnReoptimize = document.getElementById('btn-reoptimize');
 const statusLeft = document.getElementById('status-left');
 
 // --- Initialize window manager ---
@@ -134,8 +136,7 @@ function checkStaleResults() {
   if (!lastRunOptions) return;
   const current = JSON.stringify(collectOptions());
   const isStale = current !== lastRunOptions;
-  const btn = document.getElementById('btn-reoptimize');
-  if (btn) btn.classList.toggle('btn--stale', isStale);
+  btnReoptimize.classList.toggle('btn--stale', isStale);
 }
 
 // --- Initialize options panel listeners ---
@@ -209,7 +210,6 @@ function renderResults(results, options) {
   const resultsContent = buildResultsPaletteContent(results, blobUrls, options, {
     animateCountUp,
     onStaleCheck: checkStaleResults,
-    onReoptimize: () => { if (lastFiles) handleFiles(lastFiles); },
   });
   resultsPalette.setContent(resultsContent);
 
@@ -228,8 +228,9 @@ function renderResults(results, options) {
   const previewContent = buildPreviewContent(previewResult.originalFile, blob);
   previewPalette.setContent(previewContent);
 
-  // Show Start Over in main window
+  // Show action buttons
   mainActions.hidden = false;
+  settingsActions.hidden = false;
 }
 
 // --- Start over ---
@@ -245,10 +246,13 @@ function startOver() {
   previewPalette.showEmpty('Drop a PDF to see preview');
 
   mainActions.hidden = true;
+  settingsActions.hidden = true;
+  btnReoptimize.classList.remove('btn--stale');
   statusLeft.textContent = 'Reduce PDF file size \u2014 files never leave your device';
 }
 
 btnStartOver.addEventListener('click', startOver);
+btnReoptimize.addEventListener('click', () => { if (lastFiles) handleFiles(lastFiles); });
 
 // --- Main flow ---
 async function handleFiles(files) {

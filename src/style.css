@@ -307,6 +307,19 @@ body {
   display: none;
 }
 
+/* Re-optimize action bar in Settings palette */
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.5rem;
+  margin-top: 0.35rem;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.settings-actions[hidden] {
+  display: none;
+}
+
 /* --- Drop zone --- */
 .drop-area {
   min-height: 200px;
