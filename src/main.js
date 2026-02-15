@@ -367,7 +367,7 @@ function renderResults(results, options) {
 
   // Easter egg hooks
   const savingsPct = totalOriginal > 0 ? (totalSaved / totalOriginal) * 100 : 0;
-  const savingsInfo = { pct: totalPct, original: formatSize(totalOriginal), optimized: formatSize(totalOptimized), saved: formatSize(totalSaved) };
+  const savingsInfo = { pct: totalPct, original: formatSize(totalOriginal), optimized: formatSize(totalOptimized), saved: formatSize(totalSaved), savedBytes: totalSaved };
   if (savingsPct >= 30) showHappyMac(savingsInfo);
   if (savingsPct <= 0) showSadMac(savingsInfo);
 }

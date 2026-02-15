@@ -308,12 +308,19 @@ const SAD_MAC_SVG = `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.o
 <rect x="6" y="12" width="4" height="1" rx="0.5" fill="#666"/>
 </svg>`;
 
-export function showHappyMac({ pct, original, optimized, saved } = {}) {
+export function showHappyMac({ pct, original, optimized, saved, savedBytes } = {}) {
   if (getLS('pdfa-easter-happy-mac') !== 'true') return;
   if (prefersReducedMotion()) return;
-  const body = pct
-    ? `<p><b>${pct}% smaller!</b></p><p>${original} \u2192 ${optimized}</p><p>You saved ${saved}.</p>`
-    : '<p>Excellent savings!</p>';
+  let body;
+  if (pct) {
+    const dialupSeconds = savedBytes > 0 ? (savedBytes * 8) / 56000 : 0;
+    const dialupStr = dialupSeconds >= 60
+      ? `${(dialupSeconds / 60).toFixed(1)} minutes`
+      : `${dialupSeconds.toFixed(1)} seconds`;
+    body = `<p><b>${pct}% smaller!</b></p><p>${original} \u2192 ${optimized}</p><p>You saved ${saved} (${dialupStr} at 56 Kbps).</p>`;
+  } else {
+    body = '<p>Excellent savings!</p>';
+  }
   showMacFace('Optimization Complete', HAPPY_MAC_SVG, body);
 }
 
