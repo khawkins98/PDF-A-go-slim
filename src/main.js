@@ -185,6 +185,13 @@ const appearancePalette = createPalette({
 appearancePalette.setContent(buildAppearanceContent());
 appearancePalette.hide();
 
+// Establish initial z-order: Read Me behind work palettes
+bringToFront(readmePalette.element);
+bringToFront(settingsPalette.element);
+bringToFront(resultsPalette.element);
+bringToFront(previewPalette.element);
+bringToFront(inspectorPalette.element);
+
 function toggleAppearancePalette() {
   if (appearancePalette.element.hidden) {
     appearancePalette.show();
