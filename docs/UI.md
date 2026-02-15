@@ -66,7 +66,7 @@ The old three-state machine (`idle → processing → results`) with `showState(
 | Settings | `top: 20, left: 520`, `width: 260px` |
 | Results | `top: 110, left: 520`, `width: 260px` |
 | Inspector | `top: 320, left: 20`, `width: 480px` |
-| Preview | `top: 280, left: 520`, `width: 400px` |
+| Preview | `top: 280, left: 520`, `width: 600px`, `height: 460px` |
 
 ### Mobile (<768px)
 
@@ -178,3 +178,37 @@ Not everything should be expanded. These remain controlled:
 - **Classic property sheets** — Tabbed panels, fieldset grouping, dense control rows.
 - **List views / details views** — Column headers, compact row spacing, tabular data presentation.
 - **Status bars** — Sunken fields at the bottom with contextual information.
+- **[PostHog website redesign](https://posthog.com/)** — In 2025, PostHog (a developer analytics company) redesigned their marketing site as a full Windows-style desktop OS in the browser: draggable windows, start menu, screensaver, functional text editor, games, trash folder with joke files, sound effects. Built by [@ninepixelgrid](https://x.com/ninepixelgrid/status/1965618996990136539) over 6 months. Why it matters: a developer tools company independently chose the same retro desktop metaphor — validating the aesthetic for technical audiences. Key difference: they're a content-rich marketing site with dozens of pages; we're a single-purpose utility. Take selective cues, not their scope. [HN discussion](https://news.ycombinator.com/item?id=45217269).
+
+---
+
+## PostHog Lessons for PDF-A-go-slim
+
+PostHog proves the retro desktop metaphor works for developer tools. The difference is scope. They built an operating system to present a portfolio of products. We build a utility window to do one job. Take the personality and polish, leave the complexity.
+
+### What to adopt
+
+| Lesson | PostHog does... | We should... |
+|--------|----------------|-------------|
+| Personality in copy | Humor everywhere: joke files in Trash, "Talk to a human" | Voice in empty states, status bar, processing labels. Keep errors clear |
+| Easter eggs | Games, photobooth, screensaver, coloring book PDF | Fun zero-savings message, hidden `?` features, credits dialog |
+| Transparency as UX | Public roadmap, handbook, pricing breakdown | Surface "why": PDF producer, page count, why passes were skipped |
+| Metaphor consistency | OS chrome on everything: 404 page, pricing, blog | Platinum vocabulary on toasts (alert box) and drop overlay (dialog) |
+| Progressive disclosure | Desktop icons casual, navbar structured | Protect our existing pattern: new features default hidden |
+
+### What to avoid
+
+Lessons from [HN criticism](https://news.ycombinator.com/item?id=45217269) of PostHog's implementation:
+
+| PostHog problem | Our guardrail |
+|----------------|--------------|
+| Custom right-click broke browser context menu | Never override native browser behavior |
+| Pointer-only, no keyboard scrolling | All controls keyboard-accessible |
+| 29% CPU during drags | Our vanilla JS drag is already lightweight |
+| 20s mobile load on Firefox Android | Mobile degrades to stacked layout, keep bundle small |
+| Accessibility readers broken | Semantic HTML underneath the visual metaphor |
+
+### Scope boundary
+
+- **Yes**: Copy personality, themed transient UI, small easter eggs, transparency, metaphor consistency
+- **No**: Start menu, file system navigation, screensaver, games, editable content, sound effects by default

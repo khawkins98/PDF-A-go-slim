@@ -5,6 +5,11 @@ import { buildResultsPaletteContent, buildInspectorPaletteContent } from './ui/r
 import { buildPreviewContent, destroyAllComparisons } from './ui/compare.js';
 import { initWindowManager, createPalette, initDrag } from './ui/palette.js';
 
+// Suppress benign ResizeObserver loop error (triggered by viewer resize ↔ layout cycle)
+window.addEventListener('error', (e) => {
+  if (e.message?.includes('ResizeObserver loop')) e.stopImmediatePropagation();
+});
+
 // --- Friendly pass name labels (pipeline names stay unchanged for test compat) ---
 const PASS_LABELS = {
   'Recompressing streams': 'Compressing data\u2026',
@@ -118,8 +123,11 @@ const previewPalette = createPalette({
   id: 'preview',
   title: 'Preview',
   defaultPosition: { top: 280, left: 520 },
-  width: 400,
+  width: 600,
 });
+// Set an initial height so the viewer favors landscape proportions.
+// CSS resize:both lets the user adjust from here.
+previewPalette.element.style.height = '460px';
 
 // Move #options-panel into Settings palette
 const optionsPanel = document.getElementById('options-panel');

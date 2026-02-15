@@ -5,40 +5,104 @@ const CDN_BASE = 'https://khawkins98.github.io/PDF-A-go-go/';
 let loadPromise = null;
 const activeBlobUrls = new Set();
 const activeContainers = [];
-const activeObservers = new Map();
+const activeObservers = new Map(); // keyed by palette element
 
 /**
- * Watch the palette for size changes and keep the viewer height in sync.
- * Observes the palette (not the viewer) to avoid feedback loops.
- * On each resize, calculates available height and sets it on the viewer,
- * then dispatches window.resize so PDF-A-go-go re-renders.
+ * Watch the palette for size changes (from CSS resize grip) and destroy +
+ * reinitialize the PDF-A-go-go viewer at the new dimensions.
+ *
+ * Why destroy/recreate instead of CSS resize:
+ *   PDF-A-go-go renders into a fixed-size canvas on init. It doesn't
+ *   re-render when its container changes size — an explicit pixel height +
+ *   window.resize dispatch isn't enough. The only reliable way to get a
+ *   correctly-sized viewer after a palette resize is to tear it down and
+ *   build a fresh instance.
+ *
+ * Why observe the palette, not the wrap:
+ *   PDF-A-go-go inserts its own internal DOM inside the wrap during init,
+ *   which changes the wrap's size. Observing the wrap would false-trigger
+ *   a reinit on every initial load. The palette's size only changes when
+ *   the user drags the CSS resize grip.
+ *
+ * Why closest() instead of parentElement:
+ *   PDF-A-go-go wraps the viewer element in its own internal containers
+ *   during initializeContainer(). After init, viewer.parentElement points
+ *   to a PDF-A-go-go wrapper, not our .compare-viewer-wrap. Using
+ *   closest() traverses up to the correct ancestor.
+ *
+ * Why freeze palette height:
+ *   The palette's CSS height is auto (content-driven) until the user
+ *   manually resizes it. During reinit the old viewer is removed, which
+ *   would collapse the palette to the label's height. Freezing the
+ *   palette's inline height before observing prevents this. CSS
+ *   resize:both overwrites inline height when the user drags, so the
+ *   freeze doesn't block manual resizing.
+ *
+ * Why disconnect during reinit:
+ *   Removing/appending DOM nodes inside the wrap changes its size, which
+ *   would re-trigger the ResizeObserver and start another reinit cycle.
+ *   Disconnecting before the DOM swap and reconnecting after breaks the
+ *   feedback loop.
  */
-function observeResize(viewer) {
-  if (activeObservers.has(viewer)) return;
-  const palette = viewer.closest('.palette');
-  if (!palette) return;
-  const body = palette.querySelector('.palette__body');
-  if (!body) return;
+function observeResize(viewer, blobUrl) {
+  const wrap = viewer.closest('.compare-viewer-wrap');
+  if (!wrap) return;
 
-  function syncHeight() {
-    const label = viewer.parentElement?.querySelector('.compare-side__label');
-    const labelH = label ? label.offsetHeight : 0;
-    const wrap = viewer.parentElement;
-    const wrapPad = wrap ? (parseFloat(getComputedStyle(wrap).paddingTop) + parseFloat(getComputedStyle(wrap).paddingBottom)) : 0;
-    const bodyPad = parseFloat(getComputedStyle(body).paddingTop) + parseFloat(getComputedStyle(body).paddingBottom);
-    const available = body.clientHeight - bodyPad - labelH - wrapPad;
-    if (available > 200) {
-      viewer.style.height = `${available}px`;
-    }
-    window.dispatchEvent(new Event('resize'));
+  // Observe the palette element, not the wrap. PDF-A-go-go renders content
+  // inside the wrap which changes its size — that would false-trigger reinit
+  // on every initial load. The palette's size only changes when the user
+  // drags the CSS resize grip.
+  const palette = wrap.closest('.palette');
+  if (!palette || activeObservers.has(palette)) return;
+
+  if (!palette.style.height) {
+    palette.style.height = `${palette.offsetHeight}px`;
   }
 
-  const ro = new ResizeObserver(syncHeight);
-  ro.observe(body);
-  activeObservers.set(viewer, ro);
+  let debounceTimer = null;
+  let currentViewer = viewer;
+  let firstFire = true;
 
-  // Initial sync
-  syncHeight();
+  const ro = new ResizeObserver(() => {
+    // Skip the initial fire when the observer first attaches
+    if (firstFire) { firstFire = false; return; }
+
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      ro.disconnect();
+
+      // Destroy current viewer
+      const instance = currentViewer._pdfagogoInstance;
+      if (instance && !instance.destroyed) {
+        try { instance.destroy(); } catch (_) { /* already gone */ }
+      }
+      const idx = activeContainers.indexOf(currentViewer);
+      if (idx !== -1) activeContainers.splice(idx, 1);
+      currentViewer.remove();
+
+      // Create fresh viewer element
+      const newViewer = document.createElement('div');
+      newViewer.className = 'compare-side__viewer pdfagogo-container';
+      newViewer.dataset.pdfUrl = blobUrl;
+      wrap.appendChild(newViewer);
+
+      try {
+        const pdfagogo = window.flipbook?.default || window.flipbook;
+        await pdfagogo.initializeContainer(newViewer, { pdfUrl: blobUrl, ...VIEWER_CONFIG });
+        activeContainers.push(newViewer);
+        currentViewer = newViewer;
+      } catch (err) {
+        console.error('[Preview] Reinit failed:', err);
+      } finally {
+        // Always reconnect — skip the re-attach fire
+        firstFire = true;
+        ro.observe(palette);
+      }
+    }, 400);
+  });
+
+  ro.observe(palette);
+  activeObservers.set(palette, ro);
 }
 
 /** Lazy-load pdf-a-go-go JS + CSS from CDN. Deduplicates concurrent calls. */
@@ -79,7 +143,7 @@ const VIEWER_CONFIG = {
   showDownload: false,
   showFullscreen: false,
   showShare: false,
-  showResizeGrip: true,
+  showResizeGrip: false,
   showAccessibilityControlsVisibly: false,
 };
 
@@ -146,7 +210,7 @@ export function buildCompareSection(originalFile, optimizedBlob, { autoOpen = fa
       const pdfagogo = window.flipbook?.default || window.flipbook;
       await pdfagogo.initializeContainer(viewer, { pdfUrl: blobUrl, ...VIEWER_CONFIG });
       activeContainers.push(viewer);
-      observeResize(viewer);
+      observeResize(viewer, blobUrl);
     } catch (err) {
       viewerContainer.innerHTML = `<div class="compare-error">Error initializing viewer: ${err.message}</div>`;
     }
@@ -197,7 +261,7 @@ export function buildPreviewContent(originalFile, optimizedBlob) {
       const pdfagogo = window.flipbook?.default || window.flipbook;
       await pdfagogo.initializeContainer(viewer, { pdfUrl: blobUrl, ...VIEWER_CONFIG });
       activeContainers.push(viewer);
-      observeResize(viewer);
+      observeResize(viewer, blobUrl);
     } catch (err) {
       viewerContainer.innerHTML = `<div class="compare-error">Error initializing viewer: ${err.message}</div>`;
     }
@@ -213,11 +277,16 @@ function destroyCompareViewers(container) {
     if (instance && !instance.destroyed) {
       try { instance.destroy(); } catch (_) { /* already destroyed */ }
     }
-    const ro = activeObservers.get(el);
-    if (ro) { ro.disconnect(); activeObservers.delete(el); }
     const idx = activeContainers.indexOf(el);
     if (idx !== -1) activeContainers.splice(idx, 1);
   });
+
+  // Disconnect resize observer on the parent palette (keyed by palette element)
+  const palette = container.closest('.palette');
+  if (palette) {
+    const ro = activeObservers.get(palette);
+    if (ro) { ro.disconnect(); activeObservers.delete(palette); }
+  }
 }
 
 /** Destroy all active comparison instances and revoke all blob URLs. */
@@ -227,10 +296,13 @@ export function destroyAllComparisons() {
     if (instance && !instance.destroyed) {
       try { instance.destroy(); } catch (_) { /* ignore */ }
     }
-    const ro = activeObservers.get(el);
-    if (ro) { ro.disconnect(); activeObservers.delete(el); }
   }
   activeContainers.length = 0;
+
+  for (const [, ro] of activeObservers) {
+    ro.disconnect();
+  }
+  activeObservers.clear();
 
   for (const url of activeBlobUrls) {
     URL.revokeObjectURL(url);

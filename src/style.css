@@ -242,8 +242,11 @@ body {
   min-height: 0;
 }
 
-/* Preview palette body: JS manages viewer height via ResizeObserver */
+/* Preview palette body: overflow hidden prevents the viewer from growing the
+   palette. On palette resize, the viewer is destroyed and reinstantiated. */
 #palette-preview .palette__body {
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   max-height: none;
 }
@@ -1268,9 +1271,11 @@ body {
   min-height: 0;
 }
 
-/* When used directly in the Preview palette body */
+/* When used directly in the Preview palette body, fill available space without growing it */
 .palette__body > .compare-viewer-wrap {
+  flex: 1;
   margin: 0;
+  min-height: 0;
 }
 
 .compare-side__label {
@@ -1300,7 +1305,7 @@ body {
 }
 
 .compare-side__viewer {
-  min-height: 300px;
+  min-height: 200px;
   position: relative;
 }
 
@@ -1451,7 +1456,7 @@ body {
   }
 
   .compare-side__viewer {
-    min-height: 350px;
+    min-height: 200px;
   }
 
   /* Hide decorative Platinum title bar elements on narrow screens */
