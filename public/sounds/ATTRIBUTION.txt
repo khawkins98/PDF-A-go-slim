@@ -1,0 +1,9 @@
+MacOS Classic Sound Pack v1.5
+
+Curated by Steven Jay Cohen (stevenjaycohen.com)
+With help from Karl Laurent and Ginger Lindsey
+
+Source: https://code.google.com/archive/p/stevenjaycohen/downloads
+Blog: https://stevenjaycohen.com/journal/macos-classic-sound-pack-v1-4
+
+Original sounds from classic Mac OS system software.

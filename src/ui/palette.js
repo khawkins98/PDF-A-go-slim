@@ -3,6 +3,19 @@
 let zCounter = 10;
 let desktopEl = null;
 
+/** Window registry: id → { title, element, type } */
+const windowRegistry = new Map();
+
+/** Register a window in the global registry (for menu bar Window menu). */
+export function registerWindow(id, title, element, type = 'palette') {
+  windowRegistry.set(id, { title, element, type });
+}
+
+/** Returns the window registry Map. */
+export function getWindowRegistry() {
+  return windowRegistry;
+}
+
 /** Returns true if viewport is mobile-width (<768px). */
 export function isMobile() {
   return window.innerWidth < 768;
@@ -23,13 +36,14 @@ export function bringToFront(el) {
  * Make an element draggable by its title bar.
  * @param {HTMLElement} el - The element to drag (gets position: absolute)
  * @param {HTMLElement} handleEl - The drag handle (title bar)
+ * @param {{ onDragMove?: () => void }} [callbacks] - Optional callbacks
  */
-export function initDrag(el, handleEl) {
+export function initDrag(el, handleEl, callbacks = {}) {
   let startX, startY, startLeft, startTop, dragging = false;
 
   function onPointerDown(e) {
-    // Don't drag when clicking collapse or close boxes
-    if (e.target.closest('[class*="collapse-box"]') || e.target.closest('[class*="close-box"]')) return;
+    // Don't drag when clicking collapse, close, or zoom boxes
+    if (e.target.closest('[class*="collapse-box"]') || e.target.closest('[class*="close-box"]') || e.target.closest('[class*="zoom-box"]')) return;
     if (isMobile()) return;
 
     dragging = true;
@@ -57,6 +71,9 @@ export function initDrag(el, handleEl) {
     el.style.top = `${startTop + dy}px`;
     el.style.right = 'auto';
     el.style.bottom = 'auto';
+    if (callbacks.onDragMove && (Math.abs(dx) > 7 || Math.abs(dy) > 7)) {
+      callbacks.onDragMove();
+    }
   }
 
   function onTouchMove(e) {
@@ -69,6 +86,9 @@ export function initDrag(el, handleEl) {
     el.style.top = `${startTop + dy}px`;
     el.style.right = 'auto';
     el.style.bottom = 'auto';
+    if (callbacks.onDragMove && (Math.abs(dx) > 7 || Math.abs(dy) > 7)) {
+      callbacks.onDragMove();
+    }
   }
 
   function onPointerUp() {
@@ -82,7 +102,7 @@ export function initDrag(el, handleEl) {
 
   handleEl.addEventListener('mousedown', onPointerDown);
   handleEl.addEventListener('touchstart', (e) => {
-    if (e.target.closest('[class*="collapse-box"]') || e.target.closest('[class*="close-box"]')) return;
+    if (e.target.closest('[class*="collapse-box"]') || e.target.closest('[class*="close-box"]') || e.target.closest('[class*="zoom-box"]')) return;
     if (isMobile()) return;
     const touch = e.touches[0];
     onPointerDown({ clientX: touch.clientX, clientY: touch.clientY, target: e.target, preventDefault() {} });
@@ -140,6 +160,12 @@ export function createPalette({ id, title, defaultPosition, width, closable = fa
   stripes2.className = 'palette__stripes';
   stripes2.setAttribute('aria-hidden', 'true');
 
+  // Zoom box (between stripes and collapse box)
+  const zoomBox = document.createElement('div');
+  zoomBox.className = 'palette__zoom-box';
+  zoomBox.setAttribute('aria-label', 'Zoom');
+  zoomBox.setAttribute('role', 'button');
+
   const collapseBox = document.createElement('div');
   collapseBox.className = 'palette__collapse-box';
   collapseBox.setAttribute('aria-hidden', 'true');
@@ -147,6 +173,7 @@ export function createPalette({ id, title, defaultPosition, width, closable = fa
   titleBar.appendChild(stripes1);
   titleBar.appendChild(titleSpan);
   titleBar.appendChild(stripes2);
+  titleBar.appendChild(zoomBox);
   titleBar.appendChild(collapseBox);
 
   // Body
@@ -196,8 +223,88 @@ export function createPalette({ id, title, defaultPosition, width, closable = fa
     });
   }
 
-  // Init drag
-  initDrag(el, titleBar);
+  // --- Zoom box state ---
+  let isInStandardState = false;
+  let userState = null; // { width, height, top, left }
+
+  function clearZoomState() {
+    isInStandardState = false;
+    el.classList.remove('palette--zoomed');
+  }
+
+  function computeStandardState() {
+    const titleBarHeight = titleBar.offsetHeight;
+    const bodyPadding = 16; // 8px top + 8px bottom
+    const border = 2; // 1px top + 1px bottom
+    const contentHeight = bodyEl.scrollHeight;
+    const totalHeight = titleBarHeight + contentHeight + bodyPadding + border;
+
+    // Available viewport (account for menu bar 21px + control strip 28px + some margin)
+    const maxHeight = Math.round(window.innerHeight * 0.85) - 49;
+    const maxWidth = Math.round(window.innerWidth * 0.85);
+
+    const stdHeight = Math.max(80, Math.min(totalHeight, maxHeight));
+    const stdWidth = Math.min(el.offsetWidth, maxWidth);
+
+    // Position: keep roughly centered on current position, clamped to viewport
+    const rect = el.getBoundingClientRect();
+    let stdTop = rect.top;
+    let stdLeft = rect.left;
+
+    // Clamp to viewport
+    const menuBarOffset = 21;
+    stdTop = Math.max(menuBarOffset + 4, Math.min(stdTop, window.innerHeight - stdHeight - 32));
+    stdLeft = Math.max(4, Math.min(stdLeft, window.innerWidth - stdWidth - 4));
+
+    return { width: stdWidth, height: stdHeight, top: stdTop, left: stdLeft };
+  }
+
+  zoomBox.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (el.classList.contains('palette--shaded')) return;
+
+    if (isInStandardState) {
+      // Restore user state
+      if (userState) {
+        el.style.width = `${userState.width}px`;
+        el.style.height = userState.height ? `${userState.height}px` : '';
+        el.style.top = `${userState.top}px`;
+        el.style.left = `${userState.left}px`;
+        el.style.right = 'auto';
+        el.style.bottom = 'auto';
+      }
+      isInStandardState = false;
+      el.classList.remove('palette--zoomed');
+    } else {
+      // Save current state
+      const rect = el.getBoundingClientRect();
+      userState = {
+        width: rect.width,
+        height: el.style.height ? rect.height : null,
+        top: rect.top,
+        left: rect.left,
+      };
+
+      // Compute and apply standard state
+      const std = computeStandardState();
+      el.style.width = `${std.width}px`;
+      el.style.height = `${std.height}px`;
+      el.style.top = `${std.top}px`;
+      el.style.left = `${std.left}px`;
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+      isInStandardState = true;
+      el.classList.add('palette--zoomed');
+    }
+  });
+
+  // Init drag — dragging 7+ px clears zoomed state per Mac HIG
+  initDrag(el, titleBar, {
+    onDragMove: clearZoomState,
+  });
+
+  // Register in window registry
+  registerWindow(id, title, el, closable ? 'closable' : 'palette');
 
   // API
   function setContent(nodeOrHtml) {
