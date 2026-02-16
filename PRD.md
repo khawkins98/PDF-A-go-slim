@@ -283,9 +283,9 @@ PDF optimization can degrade accessibility. The following mitigations are in pla
 
 A dedicated Accessibility floating palette surfaces accessibility information after optimization:
 
-- **Trait checklist** — pass/fail rows for Tagged PDF, Structure Tree, Document Language, PDF/A, PDF/UA. Uses existing `stats.pdfTraits`.
+- **Trait checklist** — pass/fail rows for Tagged PDF, Structure Tree, Document Title, Display Title, Document Language, PDF/A, PDF/UA. Uses existing `stats.pdfTraits`. Additional checks (title, displayDocTitle, markedStatus) inspired by [PDFcheck](https://github.com/jsnmrs/pdfcheck) by Jason Morris.
 - **Lightweight audits** — three `<details>` sections: ToUnicode CMap coverage (text extractability), image alt text coverage (Figure StructElems with `/Alt`), structure tree depth/types. Runs on the optimized document via `auditAccessibility()` in `accessibility-detect.js`.
-- **External validator links** — veraPDF (PDF/A), PAC (PDF/UA), PAVE (online checker). Always visible, even in empty state.
+- **External validator links** — Download: veraPDF (PDF/A), PAC (PDF/UA). Online: PDFcheck, PDFix, axes4, PAVE. Shown after optimization completes.
 
 ### Future work
 

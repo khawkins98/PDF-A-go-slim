@@ -2607,10 +2607,17 @@ body.crt-overlay::after {
   padding: 0.35rem 0.5rem;
 }
 
+.a11y-validators__heading {
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 0.3rem;
+}
+
 .a11y-validators__title {
   font-weight: 600;
   color: var(--color-text-muted);
   margin-bottom: 0.2rem;
+  margin-top: 0.3rem;
 }
 
 .a11y-validators__list {

@@ -3,19 +3,28 @@
  */
 import { escapeHtml } from './helpers.js';
 
-const VALIDATORS = [
-  { name: 'veraPDF', desc: 'PDF/A conformance', url: 'https://verapdf.org' },
-  { name: 'PAC', desc: 'PDF/UA accessibility', url: 'https://pdfua.foundation/en/pac-download' },
-  { name: 'PAVE', desc: 'Online checker', url: 'https://pave-pdf.org' },
+const VALIDATOR_DOWNLOADS = [
+  { name: 'veraPDF', desc: 'PDF/A conformance', url: 'https://verapdf.org/software/' },
+  { name: 'PAC', desc: 'PDF/UA accessibility', url: 'https://pac.pdf-accessibility.org/en/download' },
+];
+
+const VALIDATOR_ONLINE = [
+  { name: 'PDFcheck', desc: 'Free, client-side, no login', url: 'https://code.jasonmorris.com/pdfcheck/' },
+  { name: 'PDFix', desc: 'PDF/UA validation', url: 'https://pdfix.io/validate-pdf-ua/' },
+  { name: 'axes4 checker', desc: 'No login required', url: 'https://check.axes4.com/en/' },
+  { name: 'PAVE', desc: 'Login required', url: 'https://pave-pdf.org' },
 ];
 
 function buildValidatorLinks() {
-  const items = VALIDATORS.map(
+  const renderList = items => items.map(
     v => `<li><a href="${v.url}" target="_blank" rel="noopener">${escapeHtml(v.name)}</a> &mdash; ${escapeHtml(v.desc)}</li>`
   ).join('');
   return `<div class="a11y-validators">
-    <div class="a11y-validators__title">Validate with external tools</div>
-    <ul class="a11y-validators__list">${items}</ul>
+    <div class="a11y-validators__heading">Further tools to check PDF accessibility</div>
+    <div class="a11y-validators__title">Download</div>
+    <ul class="a11y-validators__list">${renderList(VALIDATOR_DOWNLOADS)}</ul>
+    <div class="a11y-validators__title">Online</div>
+    <ul class="a11y-validators__list">${renderList(VALIDATOR_ONLINE)}</ul>
   </div>`;
 }
 
@@ -29,11 +38,36 @@ function checkIcon(status) {
   return `<span class="a11y-check__icon a11y-check__icon--neutral">\u2014</span>`;
 }
 
+function taggedValue(pdfTraits) {
+  if (pdfTraits.isTagged) return 'Yes';
+  if (pdfTraits.markedStatus === 'false') return 'Marked: false';
+  return 'No';
+}
+
+function displayDocTitleStatus(val) {
+  if (val === true) return 'pass';
+  if (val === false) return 'fail';
+  return 'neutral';
+}
+
+function displayDocTitleValue(val) {
+  if (val === true) return 'Enabled';
+  if (val === false) return 'Disabled';
+  return 'Not configured';
+}
+
+function truncate(str, max) {
+  if (!str || str.length <= max) return str;
+  return str.slice(0, max) + '\u2026';
+}
+
 function buildTraitChecklist(pdfTraits) {
   // Basic accessibility — red X when absent
   const basicRows = [
-    { label: 'Tagged PDF', status: pdfTraits.isTagged ? 'pass' : 'fail', value: pdfTraits.isTagged ? 'Yes' : 'No' },
+    { label: 'Tagged PDF', status: pdfTraits.isTagged ? 'pass' : 'fail', value: taggedValue(pdfTraits) },
     { label: 'Structure Tree', status: pdfTraits.hasStructTree ? 'pass' : 'fail', value: pdfTraits.hasStructTree ? 'Present' : 'Missing' },
+    { label: 'Document Title', status: pdfTraits.title ? 'pass' : 'fail', value: truncate(pdfTraits.title, 60) || 'Not set' },
+    { label: 'Display Title', status: displayDocTitleStatus(pdfTraits.displayDocTitle), value: displayDocTitleValue(pdfTraits.displayDocTitle) },
     { label: 'Document Language', status: pdfTraits.lang ? 'pass' : 'fail', value: pdfTraits.lang || 'Not set' },
   ];
 
@@ -150,6 +184,6 @@ export function buildAccessibilityPaletteContent(stats) {
 export function buildAccessibilityEmptyContent() {
   const container = document.createElement('div');
   container.className = 'a11y-panel';
-  container.innerHTML = `<div class="palette__empty">Drop a PDF to analyze accessibility</div>${buildValidatorLinks()}`;
+  container.innerHTML = `<div class="palette__empty">Drop a PDF to analyze accessibility</div>`;
   return container;
 }

@@ -199,6 +199,14 @@ All three audits use `context.enumerateIndirectObjects()` to scan the full objec
 - The `/Type` key on StructElem dicts is optional per the PDF spec. Filtering StructElems by `/Type /StructElem` will match correctly (objects with a different `/Type` are excluded, objects with no `/Type` pass through to the `/S` check), but this relies on the secondary `/S` filter to avoid false positives from non-StructElem dicts that happen to lack `/Type`.
 - `PDFStream` in pdf-lib does NOT extend `PDFDict` — it has a `.dict` property instead. Always use `obj.dict.get()` for stream objects, not `obj.get()` directly. The `instanceof PDFDict` check correctly distinguishes the two.
 
+### Additional Checks Inspired by PDFcheck
+
+[PDFcheck](https://github.com/jsnmrs/pdfcheck) by Jason Morris ([blog post](https://jasonmorris.com/code/pdfcheck/)) performs several lightweight accessibility checks using regex on raw PDF text. We adopted the most useful techniques using pdf-lib's typed object model instead:
+
+- **Document Title** — WCAG 2.x SC 2.4.2 requires a meaningful title. We check XMP `dc:title` first (via `parseTitleFromXmp()`), falling back to `pdfDoc.getTitle()` from the Info dict.
+- **DisplayDocTitle** — PDF/UA requires `/ViewerPreferences << /DisplayDocTitle true >>` so the viewer title bar shows the document title instead of the filename. We read this from the catalog and report true/false/null (not configured).
+- **Marked status nuance** — PDFcheck distinguishes "Marked explicitly false" from "no MarkInfo at all". We now report `markedStatus: 'true' | 'false' | 'missing'` alongside the existing `isTagged` boolean.
+
 ### `_pdfTraits` Detection and Flow
 
 `pipeline.js` calls `detectAccessibilityTraits(pdfDoc)` after loading, injects the result as `options._pdfTraits` (spread into a new options object, not mutation), and includes `pdfTraits` in the returned stats. Individual passes read `options._pdfTraits?.isPdfA` etc. to decide whether to skip.

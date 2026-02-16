@@ -788,6 +788,35 @@ export async function createMetadataBloatPdfWithLang() {
   return doc;
 }
 
+/**
+ * Create a PDF with XMP metadata containing dc:title.
+ * Used to verify title extraction from XMP metadata.
+ */
+export async function createPdfWithXmpTitle(titleText = 'XMP Document Title') {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  const xmpData = new TextEncoder().encode(
+    '<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>' +
+      '<x:xmpmeta xmlns:x="adobe:ns:meta/">' +
+      '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"' +
+      ' xmlns:dc="http://purl.org/dc/elements/1.1/">' +
+      '<rdf:Description rdf:about="">' +
+      '<dc:title><rdf:Alt><rdf:li xml:lang="x-default">' + titleText + '</rdf:li></rdf:Alt></dc:title>' +
+      '</rdf:Description>' +
+      '</rdf:RDF></x:xmpmeta><?xpacket end="w"?>',
+  );
+  const xmpDict = doc.context.obj({});
+  xmpDict.set(PDFName.of('Type'), PDFName.of('Metadata'));
+  xmpDict.set(PDFName.of('Subtype'), PDFName.of('XML'));
+  xmpDict.set(PDFName.of('Length'), doc.context.obj(xmpData.length));
+  const xmpStream = PDFRawStream.of(xmpDict, xmpData);
+  const xmpRef = doc.context.register(xmpStream);
+  doc.catalog.set(PDFName.of('Metadata'), xmpRef);
+
+  return doc;
+}
+
 // --- Accessibility / conformance test fixtures ---
 
 /**

@@ -4,6 +4,9 @@
  * Detects PDF/A conformance, tagged PDF structure, and PDF/UA from
  * the document catalog and XMP metadata. Used by the pipeline to
  * auto-disable passes that would break conformance.
+ *
+ * Additional checks inspired by PDFcheck by Jason Morris
+ * (https://github.com/jsnmrs/pdfcheck, MIT license).
  */
 import { PDFName, PDFRef, PDFRawStream, PDFDict, PDFArray, PDFStream } from 'pdf-lib';
 
@@ -47,16 +50,38 @@ export function parseConformanceFromXmp(xmpBytes) {
 }
 
 /**
+ * Extract dc:title from XMP metadata bytes.
+ *
+ * Handles the standard RDF structure:
+ *   <dc:title><rdf:Alt><rdf:li xml:lang="x-default">TEXT</rdf:li></rdf:Alt></dc:title>
+ *
+ * @param {Uint8Array} xmpBytes
+ * @returns {string|null}
+ */
+export function parseTitleFromXmp(xmpBytes) {
+  let xml;
+  try {
+    xml = new TextDecoder().decode(xmpBytes);
+  } catch {
+    return null;
+  }
+
+  const match = xml.match(/<dc:title>\s*<rdf:Alt>\s*<rdf:li[^>]*>([^<]+)<\/rdf:li>/);
+  return match ? match[1].trim() || null : null;
+}
+
+/**
  * Detect accessibility-related traits from a loaded PDFDocument.
  *
  * @param {PDFDocument} pdfDoc
- * @returns {{ isTagged: boolean, isPdfA: boolean, pdfALevel: string|null, isPdfUA: boolean, hasStructTree: boolean, lang: string|null }}
+ * @returns {{ isTagged: boolean, isPdfA: boolean, pdfALevel: string|null, isPdfUA: boolean, hasStructTree: boolean, lang: string|null, title: string|null, displayDocTitle: boolean|null, markedStatus: 'true'|'false'|'missing' }}
  */
 export function detectAccessibilityTraits(pdfDoc) {
   const catalog = pdfDoc.catalog;
 
   // Check /MarkInfo << /Marked true >>
   let isTagged = false;
+  let markedStatus = 'missing';
   const markInfo = catalog.get(PDFName.of('MarkInfo'));
   if (markInfo) {
     const resolved = markInfo instanceof PDFRef
@@ -66,6 +91,9 @@ export function detectAccessibilityTraits(pdfDoc) {
       const marked = resolved.get(PDFName.of('Marked'));
       if (marked && marked.toString() === 'true') {
         isTagged = true;
+        markedStatus = 'true';
+      } else {
+        markedStatus = 'false';
       }
     }
   }
@@ -77,10 +105,11 @@ export function detectAccessibilityTraits(pdfDoc) {
   const langObj = catalog.get(PDFName.of('Lang'));
   const lang = langObj ? langObj.decodeText() : null;
 
-  // Check XMP for PDF/A and PDF/UA
+  // Check XMP for PDF/A, PDF/UA, and dc:title
   let isPdfA = false;
   let pdfALevel = null;
   let isPdfUA = false;
+  let xmpTitle = null;
 
   const metadataRef = catalog.get(PDFName.of('Metadata'));
   if (metadataRef) {
@@ -98,10 +127,28 @@ export function detectAccessibilityTraits(pdfDoc) {
       if (pdfUAPart) {
         isPdfUA = true;
       }
+
+      xmpTitle = parseTitleFromXmp(metadataObj.contents);
     }
   }
 
-  return { isTagged, isPdfA, pdfALevel, isPdfUA, hasStructTree, lang };
+  // Document title — prefer XMP dc:title, fall back to Info dict
+  const title = xmpTitle || pdfDoc.getTitle() || null;
+
+  // ViewerPreferences → DisplayDocTitle
+  let displayDocTitle = null;
+  const vpRef = catalog.get(PDFName.of('ViewerPreferences'));
+  if (vpRef) {
+    const vp = vpRef instanceof PDFRef ? pdfDoc.context.lookup(vpRef) : vpRef;
+    if (vp instanceof PDFDict) {
+      const ddt = vp.get(PDFName.of('DisplayDocTitle'));
+      if (ddt) {
+        displayDocTitle = ddt.toString() === 'true';
+      }
+    }
+  }
+
+  return { isTagged, isPdfA, pdfALevel, isPdfUA, hasStructTree, lang, title, displayDocTitle, markedStatus };
 }
 
 /**
