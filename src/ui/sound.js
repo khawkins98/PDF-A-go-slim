@@ -306,6 +306,9 @@ export function buildSoundContent() {
           if (sel) sel.value = evt.default;
         }
       });
+      // Play the startup sound as confirmation
+      const startupSound = getLS('pdfa-sound-startup') || 'sosumi';
+      previewSound(startupSound);
     }
   });
 
