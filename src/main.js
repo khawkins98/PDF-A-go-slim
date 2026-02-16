@@ -4,6 +4,7 @@ import { collectOptions, initOptionsListeners } from './ui/options.js';
 import { buildResultsPaletteContent, buildInspectorPaletteContent } from './ui/result-card.js';
 import { buildDebugPanel } from './ui/stats.js';
 import { buildPreviewContent, destroyAllComparisons } from './ui/compare.js';
+import { buildAccessibilityPaletteContent, buildAccessibilityEmptyContent } from './ui/accessibility.js';
 import { initWindowManager, createPalette, initDrag, bringToFront } from './ui/palette.js';
 import { createControlStrip } from './ui/control-strip.js';
 import { buildAppearanceContent, initAppearance, playStartupChime, showHappyMac, showSadMac } from './ui/appearance.js';
@@ -150,6 +151,14 @@ const previewPalette = createPalette({
 // CSS resize:both lets the user adjust from here.
 previewPalette.element.style.height = '460px';
 
+const accessibilityPalette = createPalette({
+  id: 'accessibility',
+  title: 'Accessibility',
+  defaultPosition: { top: 380, right: 20 },
+  width: 300,
+});
+accessibilityPalette.setContent(buildAccessibilityEmptyContent());
+
 // Move #options-panel into Settings palette
 const optionsPanel = document.getElementById('options-panel');
 optionsPanel.hidden = false;
@@ -206,6 +215,7 @@ bringToFront(settingsPalette.element);
 bringToFront(resultsPalette.element);
 bringToFront(previewPalette.element);
 bringToFront(inspectorPalette.element);
+bringToFront(accessibilityPalette.element);
 
 function toggleAppearancePalette() {
   if (appearancePalette.element.hidden) {
@@ -376,6 +386,9 @@ function renderResults(results, options) {
     }
   }
 
+  // Accessibility palette
+  accessibilityPalette.setContent(buildAccessibilityPaletteContent(firstResult.stats));
+
   // Preview palette (single-file: auto-load, multi-file: first file)
   const previewResult = results[0];
   const blob = new Blob([previewResult.result], { type: 'application/pdf' });
@@ -405,6 +418,7 @@ function startOver() {
   inspectorPalette.showEmpty('Waiting for a PDF to dissect');
   previewPalette.showEmpty('No document loaded');
   if (debugPalette) debugPalette.showEmpty('Run optimization to see diagnostics');
+  accessibilityPalette.setContent(buildAccessibilityEmptyContent());
 
   mainActions.hidden = true;
   settingsActions.hidden = true;

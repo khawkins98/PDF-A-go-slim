@@ -1060,6 +1060,68 @@ export async function createPdfUAWithEmbeddedFont() {
   return doc;
 }
 
+/**
+ * Create a tagged PDF with two Figure StructElems: one with /Alt, one without.
+ * Also includes an image XObject so auditImageAltText can count totalImages.
+ */
+export async function createTaggedPdfWithFigureAlt() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  // Set /Lang
+  doc.catalog.set(PDFName.of('Lang'), PDFString.of('en-US'));
+
+  // Set /MarkInfo << /Marked true >>
+  const markInfo = doc.context.obj({});
+  markInfo.set(PDFName.of('Marked'), doc.context.obj(true));
+  doc.catalog.set(PDFName.of('MarkInfo'), markInfo);
+
+  // Add an image XObject so totalImages > 0
+  const imgData = new Uint8Array(300); // 10x10 RGB
+  imgData.fill(128);
+  const imgDict = doc.context.obj({});
+  imgDict.set(PDFName.of('Type'), PDFName.of('XObject'));
+  imgDict.set(PDFName.of('Subtype'), PDFName.of('Image'));
+  imgDict.set(PDFName.of('Width'), doc.context.obj(10));
+  imgDict.set(PDFName.of('Height'), doc.context.obj(10));
+  imgDict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
+  imgDict.set(PDFName.of('BitsPerComponent'), doc.context.obj(8));
+  imgDict.set(PDFName.of('Length'), doc.context.obj(imgData.length));
+  const imgStream = PDFRawStream.of(imgDict, imgData);
+  const imgRef = doc.context.register(imgStream);
+
+  const xobjectDict = doc.context.obj({});
+  xobjectDict.set(PDFName.of('Img0'), imgRef);
+  page.node.set(PDFName.of('Resources'), doc.context.obj({}));
+  page.node.get(PDFName.of('Resources')).set(PDFName.of('XObject'), xobjectDict);
+
+  // Figure with /Alt
+  const figureWithAlt = doc.context.obj({});
+  figureWithAlt.set(PDFName.of('Type'), PDFName.of('StructElem'));
+  figureWithAlt.set(PDFName.of('S'), PDFName.of('Figure'));
+  figureWithAlt.set(PDFName.of('Alt'), PDFString.of('A photo of a sunset'));
+  const figureWithAltRef = doc.context.register(figureWithAlt);
+
+  // Figure without /Alt
+  const figureWithoutAlt = doc.context.obj({});
+  figureWithoutAlt.set(PDFName.of('Type'), PDFName.of('StructElem'));
+  figureWithoutAlt.set(PDFName.of('S'), PDFName.of('Figure'));
+  const figureWithoutAltRef = doc.context.register(figureWithoutAlt);
+
+  // StructTreeRoot
+  const structTreeRoot = doc.context.obj({});
+  structTreeRoot.set(PDFName.of('Type'), PDFName.of('StructTreeRoot'));
+  structTreeRoot.set(PDFName.of('K'), doc.context.obj([figureWithAltRef, figureWithoutAltRef]));
+  const structTreeRootRef = doc.context.register(structTreeRoot);
+
+  figureWithAlt.set(PDFName.of('P'), structTreeRootRef);
+  figureWithoutAlt.set(PDFName.of('P'), structTreeRootRef);
+
+  doc.catalog.set(PDFName.of('StructTreeRoot'), structTreeRootRef);
+
+  return doc;
+}
+
 export async function createPdfWithNonStandardFont() {
   const doc = await PDFDocument.create();
   const page = doc.addPage([200, 200]);

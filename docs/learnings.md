@@ -177,6 +177,18 @@ PDF optimization can silently break accessibility. Key risks and mitigations:
 - **Object deduplication** only processes `PDFRawStream` objects. Structure tree elements (`/StructElem`) are plain `PDFDict` objects and are never merged.
 - **Font subsetting** reduces font size but keeps the font embedded. Safe for both PDF/A and PDF/UA.
 
+### Accessibility Auditing (Lightweight)
+
+The `auditAccessibility()` function in `accessibility-detect.js` runs three lightweight audits on the optimized document (post-pipeline, pre-save):
+
+**ToUnicode coverage:** Enumerates indirect objects with `Type: Font`, skips Type3 and CIDFont descendants (they're counted via their Type0 parent). Checks for `/ToUnicode` entry. Fonts without ToUnicode mappings can't be reliably extracted to text by screen readers or search indexers.
+
+**Image alt text:** Counts image XObjects (`Subtype: Image`), then walks StructElem objects with `/S /Figure` and checks for `/Alt`. If no StructTreeRoot exists, the `figures` field is `null` (alt text requires a tagged PDF). The audit reports both totalImages and figures separately — a PDF can have many images but no Figure StructElems if it's not tagged.
+
+**Structure tree depth:** Recursive walk from `/StructTreeRoot` through `/K` children. Uses a `visited` Set on ref tags to prevent cycles. Caps at depth 200. Reports element count, unique element types (sorted), and max depth. `null` if no structure tree exists.
+
+All three audits use `context.enumerateIndirectObjects()` to scan the full object graph. This is O(n) in object count but runs in <10ms for typical documents. The audit runs on the optimized document so the report reflects the downloadable output.
+
 ### `_pdfTraits` Detection and Flow
 
 `pipeline.js` calls `detectAccessibilityTraits(pdfDoc)` after loading, injects the result as `options._pdfTraits` (spread into a new options object, not mutation), and includes `pdfTraits` in the returned stats. Individual passes read `options._pdfTraits?.isPdfA` etc. to decide whether to skip.
