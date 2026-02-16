@@ -224,6 +224,12 @@ describe('Benchmark: Tagged accessible PDF', () => {
     expect(stats.pdfTraits.isTagged).toBe(true);
     expect(stats.pdfTraits.hasStructTree).toBe(true);
   });
+
+  it('reports accessibility audit with structure tree', () => {
+    expect(stats.accessibilityAudit).toBeDefined();
+    expect(stats.accessibilityAudit.structureTree).not.toBeNull();
+    expect(stats.accessibilityAudit.structureTree.elementCount).toBeGreaterThanOrEqual(1);
+  });
 });
 
 // --- Suite 4: PDF/A-1b document ---
@@ -286,6 +292,12 @@ describe('Benchmark: PDF/A-1b document', () => {
   it('stream recompression still works', () => {
     const streamsPass = findPass(stats, 'Recompressing streams');
     expect(streamsPass.recompressed).toBeGreaterThanOrEqual(1);
+  });
+
+  it('includes accessibility audit', () => {
+    expect(stats.accessibilityAudit).toBeDefined();
+    expect(stats.accessibilityAudit.toUnicode).toBeDefined();
+    expect(stats.accessibilityAudit.imageAlt).toBeDefined();
   });
 });
 

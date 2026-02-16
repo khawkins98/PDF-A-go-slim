@@ -788,6 +788,35 @@ export async function createMetadataBloatPdfWithLang() {
   return doc;
 }
 
+/**
+ * Create a PDF with XMP metadata containing dc:title.
+ * Used to verify title extraction from XMP metadata.
+ */
+export async function createPdfWithXmpTitle(titleText = 'XMP Document Title') {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  const xmpData = new TextEncoder().encode(
+    '<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>' +
+      '<x:xmpmeta xmlns:x="adobe:ns:meta/">' +
+      '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"' +
+      ' xmlns:dc="http://purl.org/dc/elements/1.1/">' +
+      '<rdf:Description rdf:about="">' +
+      '<dc:title><rdf:Alt><rdf:li xml:lang="x-default">' + titleText + '</rdf:li></rdf:Alt></dc:title>' +
+      '</rdf:Description>' +
+      '</rdf:RDF></x:xmpmeta><?xpacket end="w"?>',
+  );
+  const xmpDict = doc.context.obj({});
+  xmpDict.set(PDFName.of('Type'), PDFName.of('Metadata'));
+  xmpDict.set(PDFName.of('Subtype'), PDFName.of('XML'));
+  xmpDict.set(PDFName.of('Length'), doc.context.obj(xmpData.length));
+  const xmpStream = PDFRawStream.of(xmpDict, xmpData);
+  const xmpRef = doc.context.register(xmpStream);
+  doc.catalog.set(PDFName.of('Metadata'), xmpRef);
+
+  return doc;
+}
+
 // --- Accessibility / conformance test fixtures ---
 
 /**
@@ -1056,6 +1085,68 @@ export async function createPdfUAWithEmbeddedFont() {
   fontsDict.set(PDFName.of('F1'), fontRef);
   resources.set(PDFName.of('Font'), fontsDict);
   page.node.set(PDFName.of('Resources'), resources);
+
+  return doc;
+}
+
+/**
+ * Create a tagged PDF with two Figure StructElems: one with /Alt, one without.
+ * Also includes an image XObject so auditImageAltText can count totalImages.
+ */
+export async function createTaggedPdfWithFigureAlt() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+
+  // Set /Lang
+  doc.catalog.set(PDFName.of('Lang'), PDFString.of('en-US'));
+
+  // Set /MarkInfo << /Marked true >>
+  const markInfo = doc.context.obj({});
+  markInfo.set(PDFName.of('Marked'), doc.context.obj(true));
+  doc.catalog.set(PDFName.of('MarkInfo'), markInfo);
+
+  // Add an image XObject so totalImages > 0
+  const imgData = new Uint8Array(300); // 10x10 RGB
+  imgData.fill(128);
+  const imgDict = doc.context.obj({});
+  imgDict.set(PDFName.of('Type'), PDFName.of('XObject'));
+  imgDict.set(PDFName.of('Subtype'), PDFName.of('Image'));
+  imgDict.set(PDFName.of('Width'), doc.context.obj(10));
+  imgDict.set(PDFName.of('Height'), doc.context.obj(10));
+  imgDict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
+  imgDict.set(PDFName.of('BitsPerComponent'), doc.context.obj(8));
+  imgDict.set(PDFName.of('Length'), doc.context.obj(imgData.length));
+  const imgStream = PDFRawStream.of(imgDict, imgData);
+  const imgRef = doc.context.register(imgStream);
+
+  const xobjectDict = doc.context.obj({});
+  xobjectDict.set(PDFName.of('Img0'), imgRef);
+  page.node.set(PDFName.of('Resources'), doc.context.obj({}));
+  page.node.get(PDFName.of('Resources')).set(PDFName.of('XObject'), xobjectDict);
+
+  // Figure with /Alt
+  const figureWithAlt = doc.context.obj({});
+  figureWithAlt.set(PDFName.of('Type'), PDFName.of('StructElem'));
+  figureWithAlt.set(PDFName.of('S'), PDFName.of('Figure'));
+  figureWithAlt.set(PDFName.of('Alt'), PDFString.of('A photo of a sunset'));
+  const figureWithAltRef = doc.context.register(figureWithAlt);
+
+  // Figure without /Alt
+  const figureWithoutAlt = doc.context.obj({});
+  figureWithoutAlt.set(PDFName.of('Type'), PDFName.of('StructElem'));
+  figureWithoutAlt.set(PDFName.of('S'), PDFName.of('Figure'));
+  const figureWithoutAltRef = doc.context.register(figureWithoutAlt);
+
+  // StructTreeRoot
+  const structTreeRoot = doc.context.obj({});
+  structTreeRoot.set(PDFName.of('Type'), PDFName.of('StructTreeRoot'));
+  structTreeRoot.set(PDFName.of('K'), doc.context.obj([figureWithAltRef, figureWithoutAltRef]));
+  const structTreeRootRef = doc.context.register(structTreeRoot);
+
+  figureWithAlt.set(PDFName.of('P'), structTreeRootRef);
+  figureWithoutAlt.set(PDFName.of('P'), structTreeRootRef);
+
+  doc.catalog.set(PDFName.of('StructTreeRoot'), structTreeRootRef);
 
   return doc;
 }

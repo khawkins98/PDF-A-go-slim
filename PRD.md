@@ -103,7 +103,7 @@ src/
       metadata.js             # Strip XMP, Illustrator, Photoshop bloat keys
       unreferenced.js         # Remove unreachable objects via BFS traversal
     utils/
-      accessibility-detect.js # PDF/A, PDF/UA, tagged PDF detection
+      accessibility-detect.js # PDF/A, PDF/UA, tagged PDF detection + accessibility audits
       hash.js                 # Shared hashing (hashBytes) + font constants (FONT_FILE_KEYS)
       stream-decode.js        # Decoders: Flate, LZW, ASCII85, ASCIIHex, RunLength, PNG prediction
       pdf-traversal.js        # BFS graph walker from PDF trailer
@@ -167,7 +167,7 @@ npx pdf-a-go-slim ./input.pdf   # CLI usage
 
 ## UI Design
 
-Platinum-inspired floating palette desktop — four always-visible palettes (Settings, Results, Inspector, Preview) over a persistent drop zone, borrowing structural patterns from Mac OS 8 (beveled title bars, WindowShade collapse, warm cream surfaces, dense layouts). See `docs/UI.md` for detailed design decisions.
+Platinum-inspired floating palette desktop — five always-visible palettes (Settings, Results, Inspector, Preview, Accessibility) over a persistent drop zone, borrowing structural patterns from Mac OS 8 (beveled title bars, WindowShade collapse, warm cream surfaces, dense layouts). See `docs/UI.md` for detailed design decisions.
 
 ### Design Philosophy
 
@@ -251,8 +251,7 @@ Works on mobile for quick single-file optimization. Window chrome stacks/shrinks
 - [x] Credits & attribution (footer with package links)
 - [x] Font subsetting (harfbuzzjs WASM, Type1/TrueType + Type0/Identity-H, retain-gids)
 - [x] Benchmark test suite (reference PDFs, compression quality baselines, accessibility preservation verification)
-- [x] PDF preview (Preview palette with PDF-A-go-go viewer, lazy-loaded from CDN)
-- [x] Object inspector (before/after category grid with per-object size breakdown)
+- [x] Accessibility palette (trait checklist, lightweight audits, external validator links)
 - [ ] Linearization
 
 ### P2 — Power User
@@ -278,11 +277,19 @@ PDF optimization can degrade accessibility. The following mitigations are in pla
 - **PDF/A-1 object stream protection** — Pipeline conditionally disables `useObjectStreams` when `pdfALevel` starts with `1`, preserving strict PDF/A-1 conformance. PDF/A-2+ files still use object streams for better compression.
 - **PDF/UA font protection** — Font unembedding is blocked for PDF/UA documents (`isPdfUA` triggers skip), matching the PDF/A behavior. Ensures all fonts remain embedded as required by ISO 14289.
 
+### Accessibility palette (implemented)
+
+A dedicated Accessibility floating palette surfaces accessibility information after optimization:
+
+- **Trait checklist** — pass/fail rows for Tagged PDF, Structure Tree, Document Title, Display Title, Document Language, PDF/A, PDF/UA. Uses existing `stats.pdfTraits`. Additional checks (title, displayDocTitle, markedStatus) inspired by [PDFcheck](https://github.com/jsnmrs/pdfcheck) by Jason Morris.
+- **Lightweight audits** — three `<details>` sections: ToUnicode CMap coverage (text extractability), image alt text coverage (Figure StructElems with `/Alt`), structure tree depth/types. Runs on the optimized document via `auditAccessibility()` in `accessibility-detect.js`.
+- **External validator links** — Download: veraPDF (PDF/A), PAC (PDF/UA). Online: PDFcheck, PDFix, axes4, PAVE. Shown after optimization completes.
+
 ### Future work
 
 | Item | Priority | Description |
 |------|----------|-------------|
-| **UI accessibility warnings** | P3 | Surface `pdfTraits` in the results UI to warn users when they're optimizing tagged/PDF-A/PDF-UA documents. Show the detected conformance level (e.g., "PDF/A-1b detected — font unembedding and XMP removal disabled"). |
+| **Per-page accessibility drill-down** | P3 | Expand the Accessibility palette to show per-page structure tree and alt text coverage for large documents. |
 
 ## Learnings & Documentation
 
