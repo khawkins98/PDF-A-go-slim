@@ -1,4 +1,5 @@
 import { initDrag } from './palette.js';
+import { buildSoundContent } from './sound.js';
 
 // --- Desktop Patterns ---
 // Each pattern's `bg` is a function (dark: boolean) => CSS background-image string.
@@ -59,12 +60,27 @@ const PATTERNS = [
 ];
 
 const THEMES = [
-  { id: 'platinum', label: 'Platinum', swatch: '#c0c0c0' },
-  { id: 'dark', label: 'Dark', swatch: '#3a3a4e' },
-  { id: 'amber', label: 'Amber', swatch: '#ffb000' },
-  { id: 'ocean', label: 'Ocean', swatch: '#4090e0' },
-  { id: 'forest', label: 'Forest', swatch: '#40a040' },
+  { id: 'platinum',  label: 'Platinum',  swatch: '#dddde5' },
+  { id: 'sandstone', label: 'Sandstone', swatch: '#e8e0d0' },
+  { id: 'system7',   label: 'System 7',  swatch: '#ffffff' },
+  { id: 'dark',      label: 'Dark',      swatch: '#3a3a4e' },
+  { id: 'amber',     label: 'Amber',     swatch: '#ffb000' },
+  { id: 'ocean',     label: 'Ocean',     swatch: '#4090e0' },
+  { id: 'forest',    label: 'Forest',    swatch: '#40a040' },
 ];
+
+const FONTS = [
+  { id: 'system',    label: 'System',    stack: '' },
+  { id: 'georgia',   label: 'Georgia',   stack: "Georgia, 'Times New Roman', serif" },
+  { id: 'verdana',   label: 'Verdana',   stack: "Verdana, Geneva, sans-serif" },
+  { id: 'courier',   label: 'Courier',   stack: "'Courier New', Courier, monospace" },
+  { id: 'palatino',  label: 'Palatino',  stack: "Palatino, 'Book Antiqua', 'Palatino Linotype', serif" },
+];
+
+function applyFont(id) {
+  const font = FONTS.find(f => f.id === id);
+  document.body.style.fontFamily = font?.stack || '';
+}
 
 // --- localStorage helpers ---
 function getLS(key) {
@@ -258,21 +274,85 @@ export function buildAppearanceContent() {
 
   wrap.appendChild(themeSec);
 
-  // --- Section C: Easter Egg Toggles ---
-  const eggSec = buildSection('Easter Eggs');
-  eggSec.appendChild(buildCheckbox('Startup chime on first file drop', 'pdfa-easter-chime'));
-  eggSec.appendChild(buildCheckbox('Happy Mac on big savings', 'pdfa-easter-happy-mac'));
-  eggSec.appendChild(buildCheckbox('Sad Mac on zero savings', 'pdfa-easter-sad-mac'));
-  wrap.appendChild(eggSec);
+  // --- Section C: Font ---
+  const fontSec = buildSection('Font');
+  const fontBtns = document.createElement('div');
+  fontBtns.className = 'appearance-scheme-btns';
+  const currentFont = getLS('pdfa-font') || 'system';
+
+  FONTS.forEach((f) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'theme-btn' + (f.id === currentFont ? ' theme-btn--active' : '');
+    btn.title = f.label;
+    btn.dataset.font = f.id;
+    btn.textContent = f.label;
+    if (f.stack) btn.style.fontFamily = f.stack;
+    btn.addEventListener('click', () => {
+      fontBtns.querySelectorAll('.theme-btn').forEach((b) => b.classList.remove('theme-btn--active'));
+      btn.classList.add('theme-btn--active');
+      setLS('pdfa-font', f.id);
+      applyFont(f.id);
+    });
+    fontBtns.appendChild(btn);
+  });
+  fontSec.appendChild(fontBtns);
+  wrap.appendChild(fontSec);
+
+  // --- Section D: Sound ---
+  wrap.appendChild(buildSoundContent());
+
+  // --- Section E: Visual Effects ---
+  const effectsSec = buildSection('Visual Effects');
+  effectsSec.appendChild(buildCheckbox('Happy Mac on big savings', 'pdfa-easter-happy-mac'));
+  effectsSec.appendChild(buildCheckbox('Sad Mac on zero savings', 'pdfa-easter-sad-mac'));
+  wrap.appendChild(effectsSec);
+
+  // --- Reset to Defaults ---
+  const resetBtn = document.createElement('button');
+  resetBtn.type = 'button';
+  resetBtn.className = 'btn btn--small btn--secondary';
+  resetBtn.textContent = 'Reset to Defaults';
+  resetBtn.style.marginTop = '0.6rem';
+  resetBtn.addEventListener('click', () => {
+    resetAppearance();
+    // Rebuild panel UI to sync all buttons/checkboxes
+    const panel = wrap.closest('.palette__body') || wrap.parentElement;
+    if (panel) {
+      const fresh = buildAppearanceContent();
+      panel.replaceChildren(fresh);
+    }
+  });
+  wrap.appendChild(resetBtn);
 
   return wrap;
 }
 
+// --- Reset all appearance settings to defaults ---
+export function resetAppearance() {
+  const keys = [
+    'pdfa-theme', 'pdfa-pattern', 'pdfa-crt', 'pdfa-filter',
+    'pdfa-font', 'pdfa-easter-happy-mac', 'pdfa-easter-sad-mac',
+    'pdfa-sound-enabled', 'pdfa-sound-volume',
+    'pdfa-sound-startup', 'pdfa-sound-drop', 'pdfa-sound-success', 'pdfa-sound-error', 'pdfa-sound-ui',
+  ];
+  keys.forEach((k) => { try { localStorage.removeItem(k); } catch { /* */ } });
+  applyTheme('platinum');
+  applyPattern('solid');
+  applyFont('system');
+  applyCRT(false);
+  FILTER_CLASSES.forEach((c) => document.body.classList.remove(c));
+}
+
 // --- Init: apply saved state on startup ---
 export function initAppearance() {
+  // Migrate: old "platinum" was warm beige, now renamed to "sandstone"
+  if (getLS('pdfa-theme') === 'platinum') setLS('pdfa-theme', 'sandstone');
+
   applyPattern(getLS('pdfa-pattern') || 'solid');
   applyTheme(getLS('pdfa-theme') || 'platinum');
   applyCRT(getLS('pdfa-crt') === 'true');
+  applyFont(getLS('pdfa-font') || 'system');
   // Restore display filter (B&W / grayscale)
   const savedFilter = getLS('pdfa-filter');
   if (savedFilter && FILTER_CLASSES.includes(`filter-${savedFilter}`)) {
@@ -285,30 +365,6 @@ function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// Startup chime: synthesized Mac-like chord via Web Audio API
-export function playStartupChime() {
-  if (getLS('pdfa-easter-chime') !== 'true') return;
-  if (prefersReducedMotion()) return;
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const now = ctx.currentTime;
-    // Classic Mac startup chord: C major with harmonics
-    [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.12 - i * 0.02, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.8);
-    });
-    setTimeout(() => ctx.close(), 1200);
-  } catch { /* AudioContext not available */ }
-}
-
 // Classic Mac OS alert — icon strip on left, draggable, click close box to dismiss
 function showMacFace(title, svg, bodyHtml) {
   // Remove any existing alert first
@@ -316,7 +372,7 @@ function showMacFace(title, svg, bodyHtml) {
 
   const toast = document.createElement('div');
   toast.className = 'mac-face-toast';
-  toast.style.top = '20px';
+  toast.style.top = '30px';
   toast.style.right = '80px';
   toast.innerHTML = `
     <div class="mac-face-toast__title-bar">

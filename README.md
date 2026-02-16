@@ -101,11 +101,20 @@ For detailed technical notes on PDF internals, font handling, and stream decodin
 - [PostHog (2025 redesign)](https://posthog.com/) — a developer tools company that committed to a full desktop-OS metaphor for their site, built by [@ninepixelgrid](https://x.com/ninepixelgrid/status/1965618996990136539)
 - [98.css](https://jdan.github.io/98.css/) — the original CSS bevel technique; we borrowed the idea and simplified to thin 1px borders
 
+**CRT scanline overlay** (composite CSS technique assembled from):
+- [Alec Lownes](http://aleclownes.com/2017/02/01/crt-display.html) — documented Lucas Bebber's scanline + RGB sub-pixel gradients and pseudo-random flicker technique
+- [Remi Dubourgnoux](https://blogit.michelin.io/hack-it-go-crt/) — repeating-linear-gradient with explicit pixel stops
+- [Una Kravets](https://una.im/vignettes) — radial-gradient vignette technique
+- [Robert Bottomley](https://blog.webguy.pw/blog/simulating-a-crt-monitor-in-css/) — combined vignette + phosphor glow
+
 **Tools that informed the problem space:**
 - [Ghostscript](https://www.ghostscript.com/) — powerful CLI PDF optimizer (AGPL); great at compression, limited at content-level cleanup
 - [qpdf](https://github.com/qpdf/qpdf) — structural PDF optimization (Apache 2.0); fast and correct, but doesn't touch fonts or images
 - [iLovePDF](https://www.ilovepdf.com/) / [Smallpdf](https://smallpdf.com/) — effective online optimizers, but require file uploads and are paywalled for batch use
 - [Squoosh](https://squoosh.app/) — Google's client-side image optimizer; a benchmark for how browser-based tools should feel
+
+**Sound effects:**
+- [MacOS Classic Sound Pack v1.5](https://code.google.com/archive/p/stevenjaycohen/downloads) — curated by [Steven Jay Cohen](https://stevenjaycohen.com/journal/macos-classic-sound-pack-v1-4), with Karl Laurent and Ginger Lindsey
 
 **Accessibility checks inspired by:**
 - [PDFcheck](https://github.com/jsnmrs/pdfcheck) by Jason Morris ([blog post](https://jasonmorris.com/code/pdfcheck/)) — client-side PDF accessibility checker (MIT); our document title, display title, and marked-status checks were inspired by its approach

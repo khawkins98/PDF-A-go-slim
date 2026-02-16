@@ -5,9 +5,11 @@ import { buildResultsPaletteContent, buildInspectorPaletteContent } from './ui/r
 import { buildDebugPanel } from './ui/stats.js';
 import { buildPreviewContent, destroyAllComparisons } from './ui/compare.js';
 import { buildAccessibilityPaletteContent, buildAccessibilityEmptyContent } from './ui/accessibility.js';
-import { initWindowManager, createPalette, initDrag, bringToFront } from './ui/palette.js';
+import { initWindowManager, createPalette, initDrag, bringToFront, registerWindow } from './ui/palette.js';
 import { createControlStrip } from './ui/control-strip.js';
-import { buildAppearanceContent, initAppearance, playStartupChime, showHappyMac, showSadMac } from './ui/appearance.js';
+import { createMenuBar } from './ui/menu-bar.js';
+import { buildAppearanceContent, initAppearance, showHappyMac, showSadMac } from './ui/appearance.js';
+import { playSound, initSound } from './ui/sound.js';
 import readmeText from '../README.md?raw';
 
 // --- Sample PDFs (pdf.js test suite — CORS-accessible via GitHub raw) ---
@@ -102,11 +104,11 @@ const statusLeft = document.getElementById('status-left');
 // --- Initialize window manager ---
 initWindowManager();
 initAppearance();
+initSound();
 
 // Make main window draggable + shadable
 const mainWindow = document.getElementById('main-window');
 const mainTitleBar = mainWindow.querySelector('.title-bar');
-initDrag(mainWindow, mainTitleBar);
 
 const mainCollapseBox = mainTitleBar.querySelector('.title-bar__collapse-box');
 function toggleMainShade() {
@@ -120,25 +122,101 @@ if (mainCollapseBox) {
   });
 }
 
+// Main window zoom box
+const mainZoomBox = mainTitleBar.querySelector('.title-bar__zoom-box');
+let mainIsZoomed = false;
+let mainUserState = null;
+
+function clearMainZoomState() {
+  mainIsZoomed = false;
+  mainWindow.classList.remove('app-window--zoomed');
+}
+
+if (mainZoomBox) {
+  mainZoomBox.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (mainWindow.classList.contains('app-window--shaded')) return;
+
+    if (mainIsZoomed) {
+      if (mainUserState) {
+        mainWindow.style.width = `${mainUserState.width}px`;
+        mainWindow.style.height = mainUserState.height ? `${mainUserState.height}px` : '';
+        mainWindow.style.top = `${mainUserState.top}px`;
+        mainWindow.style.left = `${mainUserState.left}px`;
+        mainWindow.style.right = 'auto';
+        mainWindow.style.bottom = 'auto';
+      }
+      mainIsZoomed = false;
+      mainWindow.classList.remove('app-window--zoomed');
+    } else {
+      const rect = mainWindow.getBoundingClientRect();
+      mainUserState = {
+        width: rect.width,
+        height: mainWindow.style.height ? rect.height : null,
+        top: rect.top,
+        left: rect.left,
+      };
+
+      const appEl = document.getElementById('app');
+      const tbHeight = mainTitleBar.offsetHeight;
+      const sbEl = mainWindow.querySelector('.status-bar');
+      const sbHeight = sbEl ? sbEl.offsetHeight : 0;
+      const contentHeight = appEl.scrollHeight;
+      const totalHeight = tbHeight + contentHeight + sbHeight + 2;
+
+      const maxHeight = Math.round(window.innerHeight * 0.85) - 49;
+      const maxWidth = Math.round(window.innerWidth * 0.85);
+      const stdHeight = Math.max(80, Math.min(totalHeight, maxHeight));
+      const stdWidth = Math.min(rect.width, maxWidth);
+
+      let stdTop = rect.top;
+      let stdLeft = rect.left;
+      stdTop = Math.max(25, Math.min(stdTop, window.innerHeight - stdHeight - 32));
+      stdLeft = Math.max(4, Math.min(stdLeft, window.innerWidth - stdWidth - 4));
+
+      mainWindow.style.width = `${stdWidth}px`;
+      mainWindow.style.height = `${stdHeight}px`;
+      mainWindow.style.top = `${stdTop}px`;
+      mainWindow.style.left = `${stdLeft}px`;
+      mainWindow.style.right = 'auto';
+      mainWindow.style.bottom = 'auto';
+      mainIsZoomed = true;
+      mainWindow.classList.add('app-window--zoomed');
+    }
+  });
+}
+
+// Use drag callbacks to clear zoom state on 7+ px drag
+initDrag(mainWindow, mainTitleBar, { onDragMove: clearMainZoomState });
+
+// Register main window in the window registry
+registerWindow('main', 'PDF-A-go-slim', mainWindow, 'main');
+
+// Create menu bar
+createMenuBar({
+  onAbout: showAboutDialog,
+  onAppearance: toggleAppearancePalette,
+});
+
 // --- Create palettes ---
 const settingsPalette = createPalette({
   id: 'settings',
   title: 'Settings',
-  defaultPosition: { top: 20, right: 20 },
+  defaultPosition: { top: 41, right: 20 },
   width: 260,
 });
 
 const resultsPalette = createPalette({
   id: 'results',
   title: 'Results',
-  defaultPosition: { top: 20, left: 520 },
+  defaultPosition: { top: 41, left: 520 },
   width: 420,
 });
 
 const inspectorPalette = createPalette({
   id: 'inspector',
   title: 'Inspector',
-  defaultPosition: { top: 220, left: 20 },
+  defaultPosition: { top: 241, left: 20 },
   width: 480,
 });
 
@@ -155,7 +233,7 @@ previewPalette.element.style.height = '460px';
 const accessibilityPalette = createPalette({
   id: 'accessibility',
   title: 'Accessibility',
-  defaultPosition: { top: 380, right: 20 },
+  defaultPosition: { top: 401, right: 20 },
   width: 300,
 });
 accessibilityPalette.setContent(buildAccessibilityEmptyContent());
@@ -400,11 +478,16 @@ function renderResults(results, options) {
   mainActions.hidden = false;
   settingsActions.hidden = false;
 
-  // Easter egg hooks
+  // Easter egg hooks + sound feedback
   const savingsPct = totalOriginal > 0 ? (totalSaved / totalOriginal) * 100 : 0;
   const savingsInfo = { pct: totalPct, original: formatSize(totalOriginal), optimized: formatSize(totalOptimized), saved: formatSize(totalSaved), savedBytes: totalSaved };
   if (savingsPct >= 30) showHappyMac(savingsInfo);
-  if (savingsPct <= 0) showSadMac(savingsInfo);
+  if (savingsPct > 0) {
+    playSound('success');
+  } else {
+    showSadMac(savingsInfo);
+    playSound('error');
+  }
 }
 
 // --- Start over ---
@@ -439,17 +522,19 @@ async function handleFiles(files) {
   const skipped = allFiles.length - pdfFiles.length;
   if (skipped > 0) {
     showToast(`Only PDF files are supported. ${skipped} file${skipped > 1 ? 's' : ''} skipped.`);
+    playSound('error');
   }
   if (pdfFiles.length === 0) return;
 
   lastFiles = pdfFiles;
   cancelled = false;
 
-  // Easter egg: one-shot startup chime on first file drop
+  // Sound: one-shot startup sound on first file drop, drop sound every time
   if (!hasPlayedChime) {
     hasPlayedChime = true;
-    playStartupChime();
+    playSound('startup');
   }
+  playSound('drop');
 
   const options = collectOptions();
   lastRunOptions = JSON.stringify(options);
@@ -664,6 +749,7 @@ function showAboutDialog() {
         <div class="about-dialog__name">PDF-A-go-slim</div>
         <p>Reduce PDF file size entirely in your browser. No uploads, no server.</p>
         <p>Built with pdf-lib, fflate, harfbuzzjs, and jpeg-js.</p>
+        <p>Classic Mac sounds curated by Steven Jay Cohen, Karl Laurent, and Ginger Lindsey.</p>
         <p><a href="https://github.com/khawkins98/PDF-A-go-slim" target="_blank" rel="noopener">github.com/khawkins98/PDF-A-go-slim</a></p>
       </div>
       <div class="about-dialog__footer">

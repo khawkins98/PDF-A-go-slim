@@ -55,7 +55,8 @@ index.html → src/main.js (UI state machine, drag-and-drop, worker orchestratio
                options.js      — collectOptions(), applyPreset(), syncPresetIndicator(), getCurrentPresetLabel(), initOptionsListeners()
                accessibility.js — buildAccessibilityPaletteContent(), buildAccessibilityEmptyContent() (trait checklist + audits)
                control-strip.js — createControlStrip() (Mac OS 8 Control Strip toolbar)
-               appearance.js   — buildAppearanceContent(), initAppearance(), playStartupChime(), showHappyMac(), showSadMac() (desktop patterns, themes, easter egg toggles)
+               appearance.js   — buildAppearanceContent(), initAppearance(), showHappyMac(), showSadMac() (desktop patterns, themes, fonts, visual effects)
+               sound.js        — playSound(), previewSound(), initSound(), buildSoundContent() (classic Mac OS sound engine + UI)
                helpers.js      — formatSize(), escapeHtml(), renderMarkdown()
 
 scripts/
