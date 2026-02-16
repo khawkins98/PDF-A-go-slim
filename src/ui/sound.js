@@ -40,6 +40,7 @@ const SOUND_EVENTS = [
   { id: 'drop',    label: 'Drop',    default: 'droplet',  curated: ['droplet', 'single-click', 'bip', 'whit', 'pong2003'] },
   { id: 'success', label: 'Success', default: 'indigo',   curated: ['indigo', 'whit', 'pong2003', 'single-click', 'droplet', 'temple'] },
   { id: 'error',   label: 'Error',   default: 'wild-eep', curated: ['wild-eep', 'boing', 'uh-oh', 'monkey', 'quack', 'sosumi'] },
+  { id: 'ui',      label: 'UI',      default: 'whit',     curated: ['whit', 'single-click', 'bip', 'droplet', 'pong2003'] },
 ];
 
 // --- Audio engine (singleton AudioContext, buffer cache) ---

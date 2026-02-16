@@ -334,7 +334,7 @@ export function resetAppearance() {
     'pdfa-theme', 'pdfa-pattern', 'pdfa-crt', 'pdfa-filter',
     'pdfa-font', 'pdfa-easter-happy-mac', 'pdfa-easter-sad-mac',
     'pdfa-sound-enabled', 'pdfa-sound-volume',
-    'pdfa-sound-startup', 'pdfa-sound-drop', 'pdfa-sound-success', 'pdfa-sound-error',
+    'pdfa-sound-startup', 'pdfa-sound-drop', 'pdfa-sound-success', 'pdfa-sound-error', 'pdfa-sound-ui',
   ];
   keys.forEach((k) => { try { localStorage.removeItem(k); } catch { /* */ } });
   applyTheme('platinum');

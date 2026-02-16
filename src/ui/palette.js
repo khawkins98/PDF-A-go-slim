@@ -1,3 +1,5 @@
+import { playSound } from './sound.js';
+
 // --- Window manager: draggable palettes, WindowShade, z-index ---
 
 let zCounter = 10;
@@ -195,6 +197,7 @@ export function createPalette({ id, title, defaultPosition, width, closable = fa
   // WindowShade: double-click title bar or click collapse box
   let savedHeight = null;
   function toggleShade() {
+    playSound('ui');
     const willShade = !el.classList.contains('palette--shaded');
     if (willShade) {
       // Store explicit height before shading so we can restore it
@@ -219,6 +222,7 @@ export function createPalette({ id, title, defaultPosition, width, closable = fa
   if (closeBox) {
     closeBox.addEventListener('click', (e) => {
       e.stopPropagation();
+      playSound('ui');
       el.hidden = true;
     });
   }

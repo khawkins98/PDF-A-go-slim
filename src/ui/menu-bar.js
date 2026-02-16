@@ -1,4 +1,5 @@
 import { getWindowRegistry, bringToFront } from './palette.js';
+import { playSound } from './sound.js';
 
 /**
  * Create the Mac OS 8 menu bar — fixed at the top of the screen.
@@ -191,6 +192,7 @@ export function createMenuBar({ onAbout, onAppearance } = {}) {
 
   /** Activate a menu item (call its stored action). */
   function activateItem(itemEl) {
+    playSound('ui');
     if (itemEl._menuAction) {
       closeActive();
       itemEl._menuAction();
