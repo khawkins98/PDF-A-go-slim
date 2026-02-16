@@ -2,7 +2,28 @@
 
 Reference diagram for the PDF-A-go-slim interface. Documents the state model, screen layouts, component hierarchy, and data flow.
 
-**Visual style:** Classic desktop utility aesthetic with window chrome, floating palettes, and status bar. See `docs/UI.md` for design decisions.
+**Visual style:** [Web Desktop](https://en.wikipedia.org/wiki/Web_desktop) — a browser-based application using the desktop metaphor with floating windows, icons, and drag-and-drop. Specifically, a Mac OS 8 Platinum-inspired desktop utility with window chrome, floating palettes, and status bar.
+
+### Design Thesis
+
+Late-90s desktop paradigms (persistent tool palettes, dense information display, always-visible controls) may be a better fit for single-purpose browser utilities than the modern convention of progressive disclosure and minimal surfaces. Browser tools are used in focused bursts, not browsed casually — the same use pattern that floating palettes were designed for.
+
+Three principles guide visual decisions:
+
+1. **Structure over skin.** The Mac OS 8 reference is chosen for its spatial model (floating palettes, persistent tool windows, information always on screen) rather than for decoration. If a Platinum convention makes the tool harder to use, it gets dropped.
+2. **Utility, not decoration.** Every visual element — striped title bars, sunken panels, beveled borders — is borrowed because it communicates hierarchy or state, not because it looks retro.
+3. **Modern underneath.** System fonts, CSS custom properties, semantic HTML, responsive layout. The aesthetic is a styling layer; the app works without it.
+
+The patterns documented here (palette window manager, theme system, desktop patterns, control strip) are designed to be extractable — they have no dependency on the PDF optimization engine and could serve as the foundation for other web desktop projects, browser tools, or content sites.
+
+**References:**
+- Apple Macintosh Human Interface Guidelines (1995)
+- [Simone's Web Desktops](https://simone.computer/webdesktops/) — curated directory of 169+ web desktop projects
+- [desktops.zip](https://blog.simone.computer/desktops-zip) — history and context of the web desktop movement
+- [Toastytech GUI Gallery](http://toastytech.com/guis/index.html) — screenshots of historical desktop operating systems
+- [Poolsuite.net](https://poolsuite.net), PostHog (2025 redesign) — contemporary examples
+
+See `PRD.md` for the full rationale and origin story.
 
 ---
 
@@ -52,6 +73,10 @@ The app uses a simplified two-phase model: **idle/results** vs **processing**. T
 - `setProcessing(true/false)` toggles the processing section and dims/undims the drop zone
 - `renderResults()` populates palette content via `setContent()`
 - `startOver()` resets palettes to empty placeholders
+
+**Why this pattern?** Traditional SPAs use a `showState()` function that hides all sections then reveals one. This forces a blank-slate transition between states and requires careful DOM node management. The persistent-drop-zone approach avoids context switching: the user always sees where to drop files, palettes build up progressively, and "empty" palettes with personality text ("Nothing to report yet") make the interface feel alive rather than blank.
+
+**Minimum 800ms processing display time:** Fast files (under 100 KB) can optimize in <100ms. Showing the processing state for a fraction of a second creates a jarring flash — the user can't read the pass labels or register that work happened. The pipeline waits at least 800ms before transitioning to results, creating a deliberate "working" moment that feels intentional. This is a classic UX pattern borrowed from loading spinners (Slack, Stripe) that ensures perceived responsiveness matches actual responsiveness.
 
 ---
 
@@ -137,6 +162,10 @@ The app uses a simplified two-phase model: **idle/results** vs **processing**. T
 - Cancel → terminates worker, returns to idle
 - Error → shows friendly message + Retry button per file
 - Minimum 800ms display time before showing results
+
+**Under the hood — worker orchestration:**
+
+The main thread sends an `ArrayBuffer` to the Web Worker via transfer (not copy): `worker.postMessage({ type: 'optimize', buffer, options }, [buffer])`. The `[buffer]` transfer list moves ownership with zero-copy semantics — critical for large PDFs. The worker posts progress messages per pass, which the UI maps from internal names to friendly labels ("Subsetting fonts" → "Optimizing fonts...") via `PASS_LABELS` in `main.js`. Errors are similarly mapped to user-friendly text via `friendlyError()`.
 
 ---
 
@@ -253,6 +282,10 @@ Shown over any state (except processing) when files are dragged onto the page.
 ```
 
 Managed by `dragenter`/`dragleave` counter on `document`. Accepts both native `Files` drags and the custom `application/x-pdf-sample` type from sample PDF desktop icons. `pointer-events: none` — files fall through to the drop handler.
+
+**The dragenter/dragleave counter pattern:** A naive implementation that toggles the overlay on `dragenter`/`dragleave` will flicker as the cursor moves over child elements — each child fires its own enter/leave pair. The fix is a counter: increment on `dragenter`, decrement on `dragleave`, show when > 0, hide when === 0. This is a well-known pattern but easy to forget. See `main.js`.
+
+**Custom dataTransfer type system:** Sample PDF desktop icons use `application/x-pdf-sample` as a custom MIME type in `setData()`/`getData()`. This lets the drop handler distinguish "user dragged a sample PDF icon" from "user dragged a file from Finder" without ambiguity. The payload is JSON with `{ name, url }`. The overlay must check for *both* `types.includes('Files')` and `types.includes('application/x-pdf-sample')` — omitting the latter causes the overlay to not appear for internal drags.
 
 ---
 
@@ -441,7 +474,7 @@ main.js
 
 ---
 
-## Toast / Transient UI
+## Micro-Interactions & Visual Feedback
 
 | Element | Trigger | Duration | Notes |
 |---------|---------|----------|-------|
@@ -451,3 +484,104 @@ main.js
 | `.btn--stale` animation | Settings changed after results | 1x 2s pulse | On Re-optimize button |
 | Count-up animation | Results displayed | 600ms ease-out | On savings percentage |
 | Bar fill animation | Results displayed | 400ms ease | CSS transition on width |
+
+### Stale Results Detection
+
+After results render, the system watches for option changes. `renderResults()` stores `lastRunOptions = JSON.stringify(collectOptions())`. Every subsequent option change fires `checkStaleResults()`, which compares the current JSON against the stored snapshot. If different, the Re-optimize button gets a `.btn--stale` pulse animation. If the user reverts to the original settings, the indicator disappears. Simple JSON comparison — no diffing, no state management library.
+
+### Count-Up Animation
+
+The savings percentage animates from 0 to the target using `requestAnimationFrame` + `performance.now()` with cubic ease-out (`1 - (1-t)^3`) over 600ms. The progress bar width animates simultaneously via CSS transition (400ms).
+
+**The two-frame trick:** Both values are set to 0 on creation, then updated via `requestAnimationFrame` on the next frame. Setting both in the same frame doesn't trigger CSS transitions — the browser batches style changes. This is a general pattern for any "animate from initial state" scenario.
+
+---
+
+## Reusable UI Patterns
+
+The following patterns have no dependency on the PDF optimization engine. They're designed as extractable components that could serve other browser tools or content sites using a similar retro desktop aesthetic.
+
+### Floating Palette Window Manager
+
+**Why palettes?** The tool surfaces four categories of information simultaneously (settings, results, object breakdown, preview). Tabs force context switching. Stacked panels require scrolling. Floating palettes let users arrange by priority and keep everything visible — the same reason Photoshop, Illustrator, and classic Mac applications used this pattern.
+
+**API surface** (`palette.js`, ~200 lines, zero dependencies):
+- `createPalette({ title, id, closable, defaultPosition })` — factory that returns `{ element, setContent(), show(), hide() }`
+- `initDrag(element, handle)` — make any element draggable by its handle
+- `bringToFront(element)` — increment z-index counter, O(1), no collision risk
+- `isMobile()` — viewport < 768px check (disables drag on small screens)
+
+**Z-index management** is a simple counter:
+
+```js
+let zCounter = 100;
+export function bringToFront(el) { el.style.zIndex = ++zCounter; }
+```
+
+No z-index stack to maintain. Called on mousedown/touchstart of any palette.
+
+**WindowShade** (double-click title bar or click collapse box): stores explicit height before collapsing, restores on expand. Direct port of Mac OS 7's WindowShade behavior.
+
+**Touch support:** Both `mousedown` and `touchstart` handlers registered. `touchmove` uses `{ passive: false }` for `preventDefault()` (prevents scroll while dragging).
+
+### Desktop Pattern Generator
+
+Nine patterns generated entirely with CSS — no images, no canvas:
+
+| Pattern | CSS technique |
+|---------|--------------|
+| Tartan, diagonal, zigzag | `repeating-linear-gradient` |
+| Dots | `radial-gradient` |
+| Checkerboard | `conic-gradient` |
+| Bricks, weave, denim | Inline SVG `data:image/svg+xml` |
+
+Each pattern adapts to light/dark themes via a single helper function `c(dark, a)` that generates RGBA values based on the current theme. Light themes use dark strokes on cream; dark themes use light strokes on dark surfaces. The patterns and themes are **orthogonal** — any of 9 patterns × 5 themes works. All state persists to `localStorage`.
+
+### Theme System
+
+Five themes (Platinum, Dark, Amber, Ocean, Forest) applied by swapping CSS custom properties on the root element. B&W and Grayscale are CSS `filter` toggles on `<body>`, mutually exclusive. The theme switcher is a button in the Control Strip that cycles through themes, with the current theme name shown as a tooltip.
+
+### Control Strip
+
+A Mac OS 8-style collapsible toolbar fixed at bottom-left. Contains toggle buttons for visual modes (CRT scanlines, B&W, Grayscale), a theme cycle button, and navigation links (GitHub, About, Appearance). Collapses via a grab tab whose horizontal position is dynamically calculated from the strip width. Full-width on mobile.
+
+---
+
+## PDF-A-go-go Integration
+
+[PDF-A-go-go](https://github.com/khawkins98/PDF-A-go-go) is the sibling project — a lightweight, embeddable PDF viewer built on PDF.js with tile-based rendering. PDF-A-go-slim was born from trying to optimize demo PDFs for PDF-A-go-go's showcase page (see `PRD.md` origin story). The two projects share a design philosophy: no server, no framework, pure browser.
+
+### Lazy Loading
+
+PDF-A-go-go JS + CSS (~550 KB) are loaded from CDN only when the Preview palette is first populated. A shared `loadPromise` deduplicates concurrent load requests. This keeps PDF-A-go-slim's own bundle small — the heavy PDF.js rendering code is external and optional.
+
+### ResizeObserver Lifecycle
+
+PDF-A-go-go doesn't support dynamic resizing — viewers must be destroyed and recreated at new dimensions. When a user drags the palette resize grip, this creates a lifecycle conflict with ResizeObserver:
+
+1. **Observe the palette**, not the viewer container — PDF-A-go-go injects DOM that changes container size, creating a feedback loop
+2. **Freeze palette height** before removing the old viewer — prevents collapse when content disappears
+3. **Disconnect the observer** during reinit — prevents re-firing while rebuilding
+4. **Skip the first fire** — ResizeObserver fires on initial registration, which isn't a resize
+5. **400ms debounce** — grip dragging fires many events; only reinit after the user stops
+
+The core insight: ResizeObserver + destroy/recreate is fundamentally at odds with itself. The solution is aggressive lifecycle management.
+
+---
+
+## Personality Layer
+
+Small, discoverable surprises that reinforce the retro aesthetic without interfering with core function. All animated items respect `prefers-reduced-motion`. State persists via `localStorage`.
+
+### Startup Chime
+
+A 4-note C major chord synthesized with Web Audio API (`OscillatorNode` × 4 with harmonics). Plays once on the first file drop, never again in the same session. Togglable via Appearance palette.
+
+### Happy Mac / Sad Mac
+
+Pixel-art 16×16 SVG faces shown as brief floating palettes:
+
+- **Happy Mac** (savings >= 30%): green screen, smiley mouth, savings summary with "56K modem time saved" joke
+- **Sad Mac** (savings <= 0%): X eyes, frown, "already well-optimized" message
+
+Both are draggable and shadable — they're just palettes with personality.

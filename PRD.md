@@ -241,7 +241,7 @@ Works on mobile for quick single-file optimization. Window chrome stacks/shrinks
 - [x] Lossless by default
 - [x] Web Worker for off-main-thread processing
 
-### P1 — Enhanced (in progress)
+### P1 — Enhanced
 - [x] Image recompression (FlateDecode → JPEG via jpeg-js, lossy opt-in)
 - [x] Image downsampling (area-average box filter, DPI-aware via page map; Web=150, Print=300)
 - [x] Standard font unembedding (14 base fonts, Type1/TrueType only)
@@ -253,10 +253,8 @@ Works on mobile for quick single-file optimization. Window chrome stacks/shrinks
 - [x] Benchmark test suite (reference PDFs, compression quality baselines, accessibility preservation verification)
 - [x] Accessibility palette (trait checklist, lightweight audits, external validator links)
 - [ ] Linearization
-- [ ] Side-by-side preview (via PDF-A-go-go)
 
 ### P2 — Power User
-- [ ] Object inspector
 - [ ] Per-object control
 - [ ] CLI / Node.js mode
 - [ ] Watch mode (Node)
