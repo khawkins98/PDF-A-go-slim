@@ -316,7 +316,7 @@ export function buildSoundContent() {
   const attr = document.createElement('div');
   attr.className = 'sound-attribution';
   const attrLink = document.createElement('a');
-  attrLink.href = 'https://code.google.com/archive/p/stevenjaycohen/downloads';
+  attrLink.href = 'https://stevenjaycohen.com/journal/macos-classic-sound-pack-v1-4';
   attrLink.target = '_blank';
   attrLink.rel = 'noopener';
   attrLink.textContent = 'MacOS Classic Sound Pack v1.5';
