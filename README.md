@@ -24,11 +24,12 @@ Every optimization technique here is well-documented individually, but no tool p
 - **Optimization presets** — Lossless (default), Web (lossy, 75% quality), Print (lossy, 92% quality)
 - **Advanced controls** — lossy/lossless toggle, image quality slider, font unembedding and subsetting checkboxes
 - **Object inspector** — before/after breakdown of PDF objects by category with proportional size bars and per-item diffs
+- **Accessibility palette** — dedicated floating palette with pass/fail trait checklist (tagged, structure tree, document title, display title, language, PDF/A, PDF/UA), lightweight audits (ToUnicode coverage, image alt text, structure tree depth), and links to external validators
 - **PDF/A and accessibility aware** — auto-detects PDF/A conformance and tagged PDFs; preserves embedded fonts, XMP metadata, and structure trees that conformance requires
 - **Privacy-first** — files never leave your browser; all processing runs in a Web Worker
 - **Batch capable** — optimize multiple PDFs at once with individual or bulk download
 - **Debug mode** — add `?debug` to the URL for per-pass timing and image conversion details
-- **Benchmark tested** — 46 tests verify compression, asset stripping, and accessibility preservation ([results](docs/benchmark-results.md))
+- **Benchmark tested** — 57 tests verify compression, asset stripping, and accessibility preservation ([results](docs/benchmark-results.md))
 
 ## A note on accessibility
 
@@ -105,6 +106,9 @@ For detailed technical notes on PDF internals, font handling, and stream decodin
 - [qpdf](https://github.com/qpdf/qpdf) — structural PDF optimization (Apache 2.0); fast and correct, but doesn't touch fonts or images
 - [iLovePDF](https://www.ilovepdf.com/) / [Smallpdf](https://smallpdf.com/) — effective online optimizers, but require file uploads and are paywalled for batch use
 - [Squoosh](https://squoosh.app/) — Google's client-side image optimizer; a benchmark for how browser-based tools should feel
+
+**Accessibility checks inspired by:**
+- [PDFcheck](https://github.com/jsnmrs/pdfcheck) by Jason Morris ([blog post](https://jasonmorris.com/code/pdfcheck/)) — client-side PDF accessibility checker (MIT); our document title, display title, and marked-status checks were inspired by its approach
 
 ## Related projects
 

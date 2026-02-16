@@ -14,7 +14,7 @@ import { deduplicateFonts } from './optimize/fonts.js';
 import { stripMetadata } from './optimize/metadata.js';
 import { removeUnreferencedObjects } from './optimize/unreferenced.js';
 import { inspectDocument } from './inspect.js';
-import { detectAccessibilityTraits } from './utils/accessibility-detect.js';
+import { detectAccessibilityTraits, auditAccessibility } from './utils/accessibility-detect.js';
 
 /**
  * Lightweight post-pipeline integrity check.
@@ -102,6 +102,9 @@ export async function optimize(inputBytes, options = {}, onProgress) {
 
   const inspectAfter = inspectDocument(pdfDoc);
   stats.inspect = { before: inspectBefore, after: inspectAfter };
+
+  // Accessibility audit — runs on optimized document so report reflects downloadable output
+  stats.accessibilityAudit = auditAccessibility(pdfDoc);
 
   // Content integrity check — detect content-destructive bugs
   const contentWarnings = checkContentIntegrity(pdfDoc);

@@ -43,7 +43,7 @@ index.html → src/main.js (UI state machine, drag-and-drop, worker orchestratio
                unicode-mapper.js         — map char codes → Unicode codepoints
                glyph-list.js             — Adobe Glyph List + encoding tables
                harfbuzz-subsetter.js     — harfbuzzjs WASM wrapper for font subsetting
-               accessibility-detect.js   — PDF/A, PDF/UA, tagged PDF detection
+               accessibility-detect.js   — PDF/A, PDF/UA, tagged PDF detection + title/displayDocTitle/markedStatus + accessibility audits
                hash.js                   — shared djb2 hash + FONT_FILE_KEYS constant
 
              src/ui/  (UI modules, imported by main.js):
@@ -53,6 +53,7 @@ index.html → src/main.js (UI state machine, drag-and-drop, worker orchestratio
                stats.js        — buildStatsDetail(), buildDebugPanel(), formatPassStats()
                inspector.js    — buildInspectPanel() (object breakdown grid), initInspectorInteractions() ("Show more" delegation)
                options.js      — collectOptions(), applyPreset(), syncPresetIndicator(), getCurrentPresetLabel(), initOptionsListeners()
+               accessibility.js — buildAccessibilityPaletteContent(), buildAccessibilityEmptyContent() (trait checklist + audits)
                control-strip.js — createControlStrip() (Mac OS 8 Control Strip toolbar)
                appearance.js   — buildAppearanceContent(), initAppearance(), playStartupChime(), showHappyMac(), showSadMac() (desktop patterns, themes, easter egg toggles)
                helpers.js      — formatSize(), escapeHtml(), renderMarkdown()
@@ -74,8 +75,8 @@ test/
 ### Key design decisions
 
 - **Web Worker boundary:** `main.js` sends an `ArrayBuffer` to `worker.js` (transferred, not copied); the worker calls the pipeline and posts progress/results back. UI never touches pdf-lib directly. Worker message protocol: inbound `{ type: 'optimize', buffer, options }`, outbound `{ type: 'progress' | 'result' | 'error', ... }`.
-- **Floating palette desktop:** Main window has persistent drop zone (always visible, dimmed during processing). Four floating palettes (Settings, Results, Inspector, Preview) are always on screen — empty state placeholder until optimization completes. Palettes are draggable by title bar, shadable (double-click title bar collapses to title bar only), and have z-index management via `bringToFront()`. Mobile (<768px) stacks palettes vertically with no dragging.
-- **Sample PDF icons:** Desktop icons for 3 sample PDFs (tracemonkey, TAMReview, calrgb) from pdf.js test suite. Draggable onto drop zone via custom `application/x-pdf-sample` dataTransfer type, or clickable to fetch + optimize directly. Uses shared `fetchPdfAsFile()` helper. The inline "try an example" button also uses this helper.
+- **Floating palette desktop:** Main window has persistent drop zone (always visible, dimmed during processing). Five floating palettes (Settings, Results, Inspector, Preview, Accessibility) are always on screen — empty state placeholder until optimization completes. Palettes are draggable by title bar, shadable (double-click title bar collapses to title bar only), and have z-index management via `bringToFront()`. Mobile (<768px) stacks palettes vertically with no dragging.
+- **Sample PDF icons:** Desktop icons for 4 sample PDFs (tracemonkey, TAMReview, calrgb, pdfjs_wikipedia) from pdf.js test suite. Draggable onto drop zone via custom `application/x-pdf-sample` dataTransfer type, or clickable to fetch + optimize directly. Uses shared `fetchPdfAsFile()` helper. The inline "try an example" button also uses this helper.
 - **Size guard:** The pipeline never returns an optimized PDF larger than the input — it falls back to the original bytes.
 - **Image filters preserved:** JPEG, JPEG2000, CCITT, and JBIG2 streams are intentionally skipped (already optimal).
 - **All optimization passes** receive the same `(pdfDoc, options)` signature and mutate the PDFDocument in place. The pipeline `await`s each pass (font-subset is async due to WASM).

@@ -177,6 +177,36 @@ PDF optimization can silently break accessibility. Key risks and mitigations:
 - **Object deduplication** only processes `PDFRawStream` objects. Structure tree elements (`/StructElem`) are plain `PDFDict` objects and are never merged.
 - **Font subsetting** reduces font size but keeps the font embedded. Safe for both PDF/A and PDF/UA.
 
+### Accessibility Auditing (Lightweight)
+
+The `auditAccessibility()` function in `accessibility-detect.js` runs three lightweight audits on the optimized document (post-pipeline, pre-save):
+
+**ToUnicode coverage:** Enumerates indirect objects with `Type: Font`, skips Type3 and CIDFont descendants (they're counted via their Type0 parent). Checks for `/ToUnicode` entry. Fonts without ToUnicode mappings can't be reliably extracted to text by screen readers or search indexers.
+
+**Image alt text:** Counts image XObjects (`Subtype: Image`), then walks StructElem objects with `/S /Figure` and checks for `/Alt`. If no StructTreeRoot exists, the `figures` field is `null` (alt text requires a tagged PDF). The audit reports both totalImages and figures separately — a PDF can have many images but no Figure StructElems if it's not tagged.
+
+**Structure tree depth:** Recursive walk from `/StructTreeRoot` through `/K` children. Uses a `visited` Set on ref tags to prevent cycles. Caps at depth 200. Reports element count, unique element types (sorted), and max depth. `null` if no structure tree exists.
+
+All three audits use `context.enumerateIndirectObjects()` to scan the full object graph. This is O(n) in object count but runs in <10ms for typical documents. The audit runs on the optimized document so the report reflects the downloadable output.
+
+**Real-world accessibility patterns observed across pdf.js test corpus:**
+
+- Most tagged PDFs lack PDF/A and PDF/UA conformance metadata even when well-structured. These are separate authoring concerns — a PDF can be fully tagged with rich structure trees yet have no XMP conformance claims.
+- Document-level `/Lang` is often missing even in tagged PDFs. Some producers set language only at the StructElem level, which doesn't satisfy the catalog-level `/Lang` check that PDF/UA requires.
+- ToUnicode coverage varies even in PDF/UA-conformant files — standard fonts like Helvetica and ZapfDingbats sometimes lack ToUnicode CMaps.
+- Figure StructElems with `/Alt` are uncommon. Even the best-tagged test PDF (`pdfjs_wikipedia.pdf` — 285 struct elements, 13 types) only has 1 of 3 figures with alt text.
+- Image XObject count and Figure StructElem count are independent metrics. A document can have many image XObjects but zero Figure elements (untagged), or Figure elements that reference non-image content.
+- The `/Type` key on StructElem dicts is optional per the PDF spec. Filtering StructElems by `/Type /StructElem` will match correctly (objects with a different `/Type` are excluded, objects with no `/Type` pass through to the `/S` check), but this relies on the secondary `/S` filter to avoid false positives from non-StructElem dicts that happen to lack `/Type`.
+- `PDFStream` in pdf-lib does NOT extend `PDFDict` — it has a `.dict` property instead. Always use `obj.dict.get()` for stream objects, not `obj.get()` directly. The `instanceof PDFDict` check correctly distinguishes the two.
+
+### Additional Checks Inspired by PDFcheck
+
+[PDFcheck](https://github.com/jsnmrs/pdfcheck) by Jason Morris ([blog post](https://jasonmorris.com/code/pdfcheck/)) performs several lightweight accessibility checks using regex on raw PDF text. We adopted the most useful techniques using pdf-lib's typed object model instead:
+
+- **Document Title** — WCAG 2.x SC 2.4.2 requires a meaningful title. We check XMP `dc:title` first (via `parseTitleFromXmp()`), falling back to `pdfDoc.getTitle()` from the Info dict.
+- **DisplayDocTitle** — PDF/UA requires `/ViewerPreferences << /DisplayDocTitle true >>` so the viewer title bar shows the document title instead of the filename. We read this from the catalog and report true/false/null (not configured).
+- **Marked status nuance** — PDFcheck distinguishes "Marked explicitly false" from "no MarkInfo at all". We now report `markedStatus: 'true' | 'false' | 'missing'` alongside the existing `isTagged` boolean.
+
 ### `_pdfTraits` Detection and Flow
 
 `pipeline.js` calls `detectAccessibilityTraits(pdfDoc)` after loading, injects the result as `options._pdfTraits` (spread into a new options object, not mutation), and includes `pdfTraits` in the returned stats. Individual passes read `options._pdfTraits?.isPdfA` etc. to decide whether to skip.
