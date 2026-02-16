@@ -19,26 +19,36 @@ function buildValidatorLinks() {
   </div>`;
 }
 
-function checkIcon(pass) {
-  const cls = pass ? 'a11y-check__icon--pass' : 'a11y-check__icon--fail';
-  const symbol = pass ? '\u2713' : '\u2717';
-  return `<span class="a11y-check__icon ${cls}">${symbol}</span>`;
+/**
+ * Render a pass/fail/neutral status icon.
+ * @param {'pass'|'fail'|'neutral'} status
+ */
+function checkIcon(status) {
+  if (status === 'pass') return `<span class="a11y-check__icon a11y-check__icon--pass">\u2713</span>`;
+  if (status === 'fail') return `<span class="a11y-check__icon a11y-check__icon--fail">\u2717</span>`;
+  return `<span class="a11y-check__icon a11y-check__icon--neutral">\u2014</span>`;
 }
 
 function buildTraitChecklist(pdfTraits) {
-  const rows = [
-    { label: 'Tagged PDF', pass: pdfTraits.isTagged, value: pdfTraits.isTagged ? 'Yes' : 'No' },
-    { label: 'Structure Tree', pass: pdfTraits.hasStructTree, value: pdfTraits.hasStructTree ? 'Present' : 'Missing' },
-    { label: 'Document Language', pass: !!pdfTraits.lang, value: pdfTraits.lang || 'Not set' },
-    { label: 'PDF/A', pass: pdfTraits.isPdfA, value: pdfTraits.isPdfA ? pdfTraits.pdfALevel : 'No' },
-    { label: 'PDF/UA', pass: pdfTraits.isPdfUA, value: pdfTraits.isPdfUA ? 'Yes' : 'No' },
+  // Basic accessibility — red X when absent
+  const basicRows = [
+    { label: 'Tagged PDF', status: pdfTraits.isTagged ? 'pass' : 'fail', value: pdfTraits.isTagged ? 'Yes' : 'No' },
+    { label: 'Structure Tree', status: pdfTraits.hasStructTree ? 'pass' : 'fail', value: pdfTraits.hasStructTree ? 'Present' : 'Missing' },
+    { label: 'Document Language', status: pdfTraits.lang ? 'pass' : 'fail', value: pdfTraits.lang || 'Not set' },
   ];
 
-  const gridRows = rows.map(r =>
-    `${checkIcon(r.pass)}<span class="a11y-checklist__label">${escapeHtml(r.label)}</span><span class="a11y-checklist__value">${escapeHtml(r.value)}</span>`
+  // Conformance standards — neutral dash when absent (not a defect)
+  const standardRows = [
+    { label: 'PDF/A', status: pdfTraits.isPdfA ? 'pass' : 'neutral', value: pdfTraits.isPdfA ? pdfTraits.pdfALevel : 'Not declared' },
+    { label: 'PDF/UA', status: pdfTraits.isPdfUA ? 'pass' : 'neutral', value: pdfTraits.isPdfUA ? 'Yes' : 'Not declared' },
+  ];
+
+  const renderRows = rows => rows.map(r =>
+    `${checkIcon(r.status)}<span class="a11y-checklist__label">${escapeHtml(r.label)}</span><span class="a11y-checklist__value">${escapeHtml(r.value)}</span>`
   ).join('');
 
-  return `<div class="a11y-checklist">${gridRows}</div>`;
+  return `<div class="a11y-checklist">${renderRows(basicRows)}</div>
+    <div class="a11y-checklist a11y-checklist--standards">${renderRows(standardRows)}</div>`;
 }
 
 function buildAuditResults(audit) {
@@ -94,6 +104,11 @@ function buildAuditResults(audit) {
     sections.push(`<details class="a11y-audit">
       <summary class="a11y-audit__header"><span class="a11y-audit__title">Structure Tree</span><span class="a11y-audit__summary">${summary}</span></summary>
       <div class="a11y-audit__body"><p class="a11y-audit__note">Element types: ${types}</p></div>
+    </details>`);
+  } else {
+    sections.push(`<details class="a11y-audit">
+      <summary class="a11y-audit__header"><span class="a11y-audit__title">Structure Tree</span><span class="a11y-audit__summary">N/A</span></summary>
+      <div class="a11y-audit__body"><p class="a11y-audit__note">Requires tagged PDF with structure tree.</p></div>
     </details>`);
   }
 

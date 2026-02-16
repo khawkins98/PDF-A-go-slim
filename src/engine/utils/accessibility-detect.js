@@ -167,12 +167,11 @@ function auditImageAltText(pdfDoc) {
   // Count image XObjects
   let totalImages = 0;
   context.enumerateIndirectObjects().forEach(([, obj]) => {
-    if (obj instanceof PDFStream) {
-      const dict = obj instanceof PDFDict ? obj : obj.dict;
-      if (!dict) return;
-      const subtype = dict.get(PDFName.of('Subtype'));
-      if (subtype && subtype.toString() === '/Image') totalImages++;
-    }
+    if (!(obj instanceof PDFStream)) return;
+    const dict = obj instanceof PDFDict ? obj : obj.dict;
+    if (!dict) return;
+    const subtype = dict.get(PDFName.of('Subtype'));
+    if (subtype && subtype.toString() === '/Image') totalImages++;
   });
 
   // Check for StructTreeRoot

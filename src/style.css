@@ -2508,6 +2508,15 @@ body.crt-overlay::after {
   color: var(--color-error);
 }
 
+.a11y-check__icon--neutral {
+  color: var(--color-text-muted);
+}
+
+.a11y-checklist--standards {
+  border-top: none;
+  padding-top: 0;
+}
+
 .a11y-checklist__label {
   font-weight: 600;
   color: var(--color-text-muted);
@@ -2540,6 +2549,11 @@ body.crt-overlay::after {
 
 .a11y-audit__header::-webkit-details-marker {
   display: none;
+}
+
+.a11y-audit__header::marker {
+  display: none;
+  content: '';
 }
 
 .a11y-audit__header:hover {

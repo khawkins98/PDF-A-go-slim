@@ -189,6 +189,16 @@ The `auditAccessibility()` function in `accessibility-detect.js` runs three ligh
 
 All three audits use `context.enumerateIndirectObjects()` to scan the full object graph. This is O(n) in object count but runs in <10ms for typical documents. The audit runs on the optimized document so the report reflects the downloadable output.
 
+**Real-world accessibility patterns observed across pdf.js test corpus:**
+
+- Most tagged PDFs lack PDF/A and PDF/UA conformance metadata even when well-structured. These are separate authoring concerns — a PDF can be fully tagged with rich structure trees yet have no XMP conformance claims.
+- Document-level `/Lang` is often missing even in tagged PDFs. Some producers set language only at the StructElem level, which doesn't satisfy the catalog-level `/Lang` check that PDF/UA requires.
+- ToUnicode coverage varies even in PDF/UA-conformant files — standard fonts like Helvetica and ZapfDingbats sometimes lack ToUnicode CMaps.
+- Figure StructElems with `/Alt` are uncommon. Even the best-tagged test PDF (`pdfjs_wikipedia.pdf` — 285 struct elements, 13 types) only has 1 of 3 figures with alt text.
+- Image XObject count and Figure StructElem count are independent metrics. A document can have many image XObjects but zero Figure elements (untagged), or Figure elements that reference non-image content.
+- The `/Type` key on StructElem dicts is optional per the PDF spec. Filtering StructElems by `/Type /StructElem` will match correctly (objects with a different `/Type` are excluded, objects with no `/Type` pass through to the `/S` check), but this relies on the secondary `/S` filter to avoid false positives from non-StructElem dicts that happen to lack `/Type`.
+- `PDFStream` in pdf-lib does NOT extend `PDFDict` — it has a `.dict` property instead. Always use `obj.dict.get()` for stream objects, not `obj.get()` directly. The `instanceof PDFDict` check correctly distinguishes the two.
+
 ### `_pdfTraits` Detection and Flow
 
 `pipeline.js` calls `detectAccessibilityTraits(pdfDoc)` after loading, injects the result as `options._pdfTraits` (spread into a new options object, not mutation), and includes `pdfTraits` in the returned stats. Individual passes read `options._pdfTraits?.isPdfA` etc. to decide whether to skip.

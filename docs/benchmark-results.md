@@ -1,6 +1,6 @@
 # Benchmark Results
 
-Generated: 2026-02-15 22:17:18 UTC  
+Generated: 2026-02-16 08:12:52 UTC  
 Node: v22.14.0  
 Platform: darwin arm64
 
@@ -8,28 +8,28 @@ Platform: darwin arm64
 
 | Benchmark | Input | Output | Saved | Time |
 |-----------|-------|--------|-------|------|
-| Illustrator-style bloat | 13.4 KB | 1.2 KB | 90.9% | 14ms |
-| Photo-heavy (lossless) | 380.0 KB | 378.2 KB | 0.5% | 20ms |
-| Photo-heavy (lossy q=75) | 380.0 KB | 30.9 KB | 91.9% | 101ms |
-| Photo-heavy (lossy q=75, 150dpi) | 380.0 KB | 23.0 KB | 93.9% | 57ms |
+| Illustrator-style bloat | 13.4 KB | 1.2 KB | 90.9% | 15ms |
+| Photo-heavy (lossless) | 380.0 KB | 378.2 KB | 0.5% | 22ms |
+| Photo-heavy (lossy q=75) | 380.0 KB | 30.9 KB | 91.9% | 82ms |
+| Photo-heavy (lossy q=75, 150dpi) | 380.0 KB | 23.0 KB | 93.9% | 53ms |
 | Tagged accessible PDF | 5.8 KB | 1.2 KB | 79.8% | 2ms |
 | PDF/A-1b document | 10.2 KB | 3.1 KB | 69.3% | 1ms |
-| Multi-font duplicates | 8.2 KB | 1.6 KB | 80.2% | 7ms |
+| Multi-font duplicates | 8.2 KB | 1.6 KB | 80.2% | 6ms |
 | Kitchen sink (lossless) | 156.0 KB | 139.7 KB | 10.4% | 7ms |
-| Kitchen sink (lossy q=75) | 156.0 KB | 20.0 KB | 87.2% | 38ms |
+| Kitchen sink (lossy q=75) | 156.0 KB | 20.0 KB | 87.2% | 29ms |
 
 ## Illustrator-style bloat
 
-**Input:** 13.4 KB | **Output:** 1.2 KB | **Saved:** 90.9% (12.2 KB) | **Time:** 14ms
+**Input:** 13.4 KB | **Output:** 1.2 KB | **Saved:** 90.9% (12.2 KB) | **Time:** 15ms
 **Detected traits:** None
 
 ### Pass results
 
 | Pass | Result | Time |
 |------|--------|------|
-| Recompressing streams | 9 recompressed, 18 skipped | 5ms |
-| Recompressing images | 0 converted | 1ms |
-| Unembedding standard fonts | 2 unembedded | 0ms |
+| Recompressing streams | 9 recompressed, 18 skipped | 6ms |
+| Recompressing images | 0 converted | 0ms |
+| Unembedding standard fonts | 2 unembedded | 1ms |
 | Subsetting fonts | 0 subsetted | 0ms |
 | Deduplicating objects | 3 deduplicated | 0ms |
 | Deduplicating fonts | 0 deduplicated | 0ms |
@@ -49,14 +49,14 @@ Platform: darwin arm64
 
 ## Photo-heavy (lossless)
 
-**Input:** 380.0 KB | **Output:** 378.2 KB | **Saved:** 0.5% (1.8 KB) | **Time:** 20ms
+**Input:** 380.0 KB | **Output:** 378.2 KB | **Saved:** 0.5% (1.8 KB) | **Time:** 22ms
 **Detected traits:** None
 
 ### Pass results
 
 | Pass | Result | Time |
 |------|--------|------|
-| Recompressing streams | 3 recompressed, 8 skipped | 17ms |
+| Recompressing streams | 3 recompressed, 8 skipped | 18ms |
 | Recompressing images | 0 converted | 0ms |
 | Unembedding standard fonts | 0 unembedded | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
@@ -77,17 +77,17 @@ Platform: darwin arm64
 
 ## Photo-heavy (lossy q=75)
 
-**Input:** 380.0 KB | **Output:** 30.9 KB | **Saved:** 91.9% (349.1 KB) | **Time:** 101ms
+**Input:** 380.0 KB | **Output:** 30.9 KB | **Saved:** 91.9% (349.1 KB) | **Time:** 82ms
 **Detected traits:** None
 
 ### Pass results
 
 | Pass | Result | Time |
 |------|--------|------|
-| Recompressing streams | 3 recompressed, 8 skipped | 13ms |
-| Recompressing images | 4 converted | 86ms |
+| Recompressing streams | 3 recompressed, 8 skipped | 8ms |
+| Recompressing images | 4 converted | 70ms |
 | Unembedding standard fonts | 0 unembedded | 0ms |
-| Subsetting fonts | 0 subsetted | 0ms |
+| Subsetting fonts | 0 subsetted | 1ms |
 | Deduplicating objects | 0 deduplicated | 0ms |
 | Deduplicating fonts | 0 deduplicated | 0ms |
 | Stripping metadata | 0 stripped | 0ms |
@@ -105,15 +105,15 @@ Platform: darwin arm64
 
 ## Photo-heavy (lossy q=75, 150dpi)
 
-**Input:** 380.0 KB | **Output:** 23.0 KB | **Saved:** 93.9% (356.9 KB) | **Time:** 57ms
+**Input:** 380.0 KB | **Output:** 23.0 KB | **Saved:** 93.9% (356.9 KB) | **Time:** 53ms
 **Detected traits:** None
 
 ### Pass results
 
 | Pass | Result | Time |
 |------|--------|------|
-| Recompressing streams | 3 recompressed, 8 skipped | 16ms |
-| Recompressing images | 4 converted, 1 downsampled | 39ms |
+| Recompressing streams | 3 recompressed, 8 skipped | 14ms |
+| Recompressing images | 4 converted, 1 downsampled | 38ms |
 | Unembedding standard fonts | 0 unembedded | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
 | Deduplicating objects | 0 deduplicated | 0ms |
@@ -140,7 +140,7 @@ Platform: darwin arm64
 
 | Pass | Result | Time |
 |------|--------|------|
-| Recompressing streams | 3 recompressed, 13 skipped | 1ms |
+| Recompressing streams | 3 recompressed, 13 skipped | 0ms |
 | Recompressing images | 0 converted | 0ms |
 | Unembedding standard fonts | 1 unembedded | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
@@ -168,7 +168,7 @@ Platform: darwin arm64
 
 | Pass | Result | Time |
 |------|--------|------|
-| Recompressing streams | 5 recompressed, 10 skipped | 1ms |
+| Recompressing streams | 5 recompressed, 10 skipped | 0ms |
 | Recompressing images | 0 converted | 0ms |
 | Unembedding standard fonts | 0 unembedded, PDF/A skipped | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
@@ -190,18 +190,18 @@ Platform: darwin arm64
 
 ## Multi-font duplicates
 
-**Input:** 8.2 KB | **Output:** 1.6 KB | **Saved:** 80.2% (6.6 KB) | **Time:** 7ms
+**Input:** 8.2 KB | **Output:** 1.6 KB | **Saved:** 80.2% (6.6 KB) | **Time:** 6ms
 **Detected traits:** None
 
 ### Pass results
 
 | Pass | Result | Time |
 |------|--------|------|
-| Recompressing streams | 1 recompressed, 28 skipped | 5ms |
+| Recompressing streams | 1 recompressed, 28 skipped | 2ms |
 | Recompressing images | 0 converted | 0ms |
 | Unembedding standard fonts | 1 skipped, 6 unembedded | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
-| Deduplicating objects | 0 deduplicated | 0ms |
+| Deduplicating objects | 0 deduplicated | 2ms |
 | Deduplicating fonts | 0 deduplicated | 0ms |
 | Stripping metadata | 1 stripped | 0ms |
 | Removing unreferenced objects | 0 removed | 0ms |
@@ -226,12 +226,12 @@ Platform: darwin arm64
 
 | Pass | Result | Time |
 |------|--------|------|
-| Recompressing streams | 15 recompressed, 34 skipped | 5ms |
+| Recompressing streams | 15 recompressed, 34 skipped | 4ms |
 | Recompressing images | 0 converted | 0ms |
 | Unembedding standard fonts | 4 unembedded | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
-| Deduplicating objects | 8 deduplicated | 0ms |
-| Deduplicating fonts | 0 deduplicated | 1ms |
+| Deduplicating objects | 8 deduplicated | 1ms |
+| Deduplicating fonts | 0 deduplicated | 0ms |
 | Stripping metadata | 13 stripped | 0ms |
 | Removing unreferenced objects | 8 removed | 0ms |
 
@@ -249,19 +249,19 @@ Platform: darwin arm64
 
 ## Kitchen sink (lossy q=75)
 
-**Input:** 156.0 KB | **Output:** 20.0 KB | **Saved:** 87.2% (136.0 KB) | **Time:** 38ms
+**Input:** 156.0 KB | **Output:** 20.0 KB | **Saved:** 87.2% (136.0 KB) | **Time:** 29ms
 **Detected traits:** Tagged, StructTree, Lang=en-US
 
 ### Pass results
 
 | Pass | Result | Time |
 |------|--------|------|
-| Recompressing streams | 15 recompressed, 34 skipped | 5ms |
-| Recompressing images | 2 converted | 29ms |
+| Recompressing streams | 15 recompressed, 34 skipped | 4ms |
+| Recompressing images | 2 converted | 23ms |
 | Unembedding standard fonts | 4 unembedded | 0ms |
 | Subsetting fonts | 0 subsetted | 0ms |
-| Deduplicating objects | 8 deduplicated | 0ms |
-| Deduplicating fonts | 0 deduplicated | 2ms |
+| Deduplicating objects | 8 deduplicated | 1ms |
+| Deduplicating fonts | 0 deduplicated | 0ms |
 | Stripping metadata | 13 stripped | 0ms |
 | Removing unreferenced objects | 8 removed | 0ms |
 

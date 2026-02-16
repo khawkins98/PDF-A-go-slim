@@ -16,6 +16,7 @@ const SAMPLE_PDFS = [
   { name: 'tracemonkey.pdf', label: 'Research Paper', url: `${SAMPLE_PDF_BASE}tracemonkey.pdf` },
   { name: 'TAMReview.pdf', label: 'TAM Review', url: `${SAMPLE_PDF_BASE}TAMReview.pdf` },
   { name: 'calrgb.pdf', label: 'Color Graphics', url: `${SAMPLE_PDF_BASE}calrgb.pdf` },
+  { name: 'pdfjs_wikipedia.pdf', label: 'Tagged (A11y)', url: `${SAMPLE_PDF_BASE}pdfjs_wikipedia.pdf` },
 ];
 
 async function fetchPdfAsFile(url, name) {
@@ -386,7 +387,7 @@ function renderResults(results, options) {
     }
   }
 
-  // Accessibility palette
+  // Accessibility palette (batch: shows first file only, matching Inspector/Preview)
   accessibilityPalette.setContent(buildAccessibilityPaletteContent(firstResult.stats));
 
   // Preview palette (single-file: auto-load, multi-file: first file)
