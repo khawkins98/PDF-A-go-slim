@@ -130,6 +130,10 @@ For detailed technical notes on PDF internals, font handling, and stream decodin
 - [Technical learnings](docs/learnings.md) — PDF internals, font subsetting, stream decoding notes
 - [UX improvements](docs/ux-improvements.md) — prioritized backlog of UI/accessibility work
 
+## Disclaimer
+
+This tool is provided "as is", without warranty of any kind, express or implied. PDF-A-go-slim creates a **new, optimized copy** of your PDF — it never modifies your original file. However, the optimized copy may have rendering differences, missing content, or other issues caused by recompressing streams, removing fonts, stripping metadata, or deduplicating objects. If you overwrite your original with the optimized version, **that data may be unrecoverable**. The authors are not liable for any damage or loss resulting from the use of this tool. See [LICENSE](LICENSE) for the full terms.
+
 ## License
 
 [MIT](LICENSE)
