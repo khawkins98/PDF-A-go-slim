@@ -108,9 +108,12 @@ Hash-based dedup using djb2. Surprisingly common in real PDFs — fonts and imag
 
 The PDF spec guarantees that all conforming readers provide the 14 base fonts (Helvetica, Courier, Times-Roman, Symbol, ZapfDingbats, and their bold/italic variants). Many tools (Illustrator, InDesign) embed full copies anyway — often 50–200 KB per font.
 
-**Safe to unembed:** Type1 and TrueType simple fonts with standard or no custom encoding.
+**Safe to unembed:** Type1 and TrueType simple fonts with standard or no custom encoding, and without a subset prefix (or with a subset prefix only if they have an explicit standard encoding like WinAnsiEncoding).
 
-**Not safe to unembed:** Type0/CIDFont composites (use 2-byte Identity-H encoding; unembedding would require rewriting content stream text operators) and fonts with custom `/Encoding << /Differences [...] >>` arrays (the differences might reference glyphs not present in the reader's built-in font).
+**Not safe to unembed:**
+- **Subset-prefixed fonts without explicit encoding** (e.g. `ABCDEF+ArialMT` with no `/Encoding`). These fonts use compact char codes (e.g. FirstChar 33) whose mapping depends on the embedded font program's cmap table. Removing the font program and defaulting to WinAnsiEncoding causes char code 33 to render as `!` instead of the intended glyph — garbled text. This is common in PDFs from Word, signed PDFs, and other tools that subset-embed standard fonts.
+- **Type0/CIDFont composites** (use 2-byte Identity-H encoding; unembedding would require rewriting content stream text operators).
+- **Fonts with custom `/Encoding << /Differences [...] >>`** arrays (the differences might reference glyphs not present in the reader's built-in font).
 
 ### Image Recompression
 
@@ -149,7 +152,9 @@ Strips unused glyph outlines from embedded font programs. Typical savings: 50–
 
 **Surrogate pair handling in ToUnicode:** CMap values longer than 4 hex characters are split into 4-char chunks and checked for UTF-16 surrogate pairs (high 0xD800–0xDBFF followed by low 0xDC00–0xDFFF). Surrogate pairs are decoded to their full Unicode codepoint via `0x10000 + ((hi - 0xD800) << 10) + (lo - 0xDC00)`. This handles CJK characters and emoji in the Supplementary Multilingual Plane. See `unicode-mapper.js` `parseUnicodeHex()`.
 
-**V1 scope:** Only Type1/TrueType (simple) and Type0 with Identity-H + Identity CIDToGIDMap are supported. Type0 with non-Identity CMaps, Type3 fonts, fonts < 10 KB, and fonts without `/ToUnicode` or recognizable encoding are skipped.
+**Already-subsetted simple fonts must be skipped:** Fonts with a subset prefix (e.g. `ABCDEF+Calibri`) use compact renumbered char codes (FirstChar 33) whose glyph mapping lives in the embedded font's cmap table. Re-subsetting via Unicode codepoints from ToUnicode uses a different lookup path — Unicode → cmap → glyph ID — which may not match the PDF's char code → cmap → glyph ID mapping. This causes harfbuzz to drop glyphs the PDF actually references, producing invisible text. Type0/Identity-H fonts are safe because the retain-gids flag preserves the CID=GID identity mapping.
+
+**V1 scope:** Only Type1/TrueType (simple, non-subset) and Type0 with Identity-H + Identity CIDToGIDMap are supported. Already-subsetted simple fonts (detected by `ABCDEF+` prefix), Type0 with non-Identity CMaps, Type3 fonts, fonts < 10 KB, and fonts without `/ToUnicode` or recognizable encoding are skipped.
 
 **Pass ordering matters:** font-subset runs after font-unembed (no point subsetting fonts we'll remove) and before dedup (so dedup can catch fonts that become identical after subsetting).
 

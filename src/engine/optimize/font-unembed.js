@@ -87,6 +87,29 @@ function hasCustomDifferences(dict) {
 }
 
 /**
+ * Check if a font dict declares an explicit standard encoding (WinAnsi or MacRoman).
+ * Subset fonts without this are unsafe to unembed — their char codes depend on the
+ * embedded font program's cmap table.
+ */
+function hasExplicitStandardEncoding(dict) {
+  const encoding = dict.get(PDFName.of('Encoding'));
+  if (!encoding) return false;
+  if (encoding instanceof PDFName) {
+    const name = encoding.decodeText();
+    return name === 'WinAnsiEncoding' || name === 'MacRomanEncoding';
+  }
+  // Encoding dict with a standard BaseEncoding is also acceptable
+  if (encoding instanceof PDFDict) {
+    const base = encoding.get(PDFName.of('BaseEncoding'));
+    if (base instanceof PDFName) {
+      const name = base.decodeText();
+      return name === 'WinAnsiEncoding' || name === 'MacRomanEncoding';
+    }
+  }
+  return false;
+}
+
+/**
  * Remove embedded copies of the 14 standard PDF fonts.
  * @param {PDFDocument} pdfDoc
  * @param {object} [options]
@@ -141,6 +164,17 @@ export function unembedStandardFonts(pdfDoc, options = {}) {
     // Check if it's a standard font
     const canonicalName = STANDARD_FONT_MAP.get(cleanName);
     if (!canonicalName) {
+      skipped++;
+      continue;
+    }
+
+    // Skip subset fonts that lack an explicit standard encoding.
+    // Subset-prefixed fonts (e.g. ABCDEF+ArialMT) may use compact char codes
+    // (FirstChar 33) whose mapping depends on the embedded font program's cmap.
+    // Without an explicit encoding like WinAnsiEncoding, removing the font
+    // program causes the reader to misinterpret char codes → garbled text.
+    // Fonts WITH explicit WinAnsiEncoding are safe: char codes are standard.
+    if (/^[A-Z]{6}\+/.test(rawName) && !hasExplicitStandardEncoding(obj)) {
       skipped++;
       continue;
     }

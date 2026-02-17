@@ -85,6 +85,20 @@ function collectFontInfos(context, usedCharCodes) {
     const fontType = getFontType(fontDict);
     if (!fontType) continue;
 
+    // Skip already-subsetted simple fonts (subset prefix like ABCDEF+).
+    // These fonts use compact renumbered char codes (e.g. FirstChar 33) whose
+    // cmap maps those codes to glyph IDs internally. Re-subsetting via Unicode
+    // codepoints from ToUnicode uses a different mapping path, which can remove
+    // glyphs that the PDF's char codes actually reference — causing invisible text.
+    // Type0/Identity-H fonts are safe: their CID=GID identity mapping is preserved
+    // by the retain-gids flag.
+    if (fontType === 'simple') {
+      const baseFont = fontDict.get(PDFName.of('BaseFont'));
+      if (baseFont instanceof PDFName && /^[A-Z]{6}\+/.test(baseFont.decodeText())) {
+        continue;
+      }
+    }
+
     // Find the font descriptor and font file
     const descriptorInfo = findFontFile(context, fontDict);
     if (!descriptorInfo) continue;

@@ -68,22 +68,26 @@ describe('unembedStandardFonts', () => {
     expect(result.skipped).toBeGreaterThan(0);
   });
 
-  it('handles subset-prefixed names (ABCDEF+Helvetica)', async () => {
+  it('skips subset-prefixed fonts (ABCDEF+Helvetica) — char codes are renumbered', async () => {
     const doc = await createPdfWithSubsetPrefixedFont();
     const result = unembedStandardFonts(doc);
 
-    expect(result.unembedded).toBe(1);
+    // Subset fonts must NOT be unembedded — their char codes are compact-renumbered
+    // and only meaningful with the embedded font program
+    expect(result.unembedded).toBe(0);
+    expect(result.skipped).toBeGreaterThan(0);
 
-    // Verify the BaseFont is now the canonical name without prefix
-    let found = false;
+    // Font should retain its subset prefix and FontDescriptor
+    let foundSubset = false;
     for (const [, obj] of doc.context.enumerateIndirectObjects()) {
       if (!(obj instanceof PDFDict)) continue;
       const baseFont = obj.get(PDFName.of('BaseFont'));
-      if (baseFont instanceof PDFName && baseFont.decodeText() === 'Helvetica') {
-        found = true;
+      if (baseFont instanceof PDFName && baseFont.decodeText() === 'ABCDEF+Helvetica') {
+        expect(obj.get(PDFName.of('FontDescriptor'))).toBeDefined();
+        foundSubset = true;
       }
     }
-    expect(found).toBe(true);
+    expect(foundSubset).toBe(true);
   });
 
   it('preserves ToUnicode CMap when unembedding', async () => {
