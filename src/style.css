@@ -822,6 +822,19 @@ body {
   color: var(--color-text);
 }
 
+.control-disclaimer {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  margin: 2px 0 0 1.4rem;
+  line-height: 1.4;
+}
+
+.control-disclaimer a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .mode-toggle {
   display: inline-flex;
   margin-top: 0.25rem;

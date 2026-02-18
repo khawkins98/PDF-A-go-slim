@@ -1,15 +1,17 @@
 // --- Presets ---
 export const PRESETS = {
-  lossless: { lossy: false, imageQuality: 0.85, unembedStandardFonts: true, subsetFonts: true },
-  web:      { lossy: true,  imageQuality: 0.75, unembedStandardFonts: true, subsetFonts: true, maxImageDpi: 150 },
-  print:    { lossy: true,  imageQuality: 0.92, unembedStandardFonts: true, subsetFonts: true, maxImageDpi: 300 },
+  lossless:       { lossy: false, imageQuality: 0.85, unembedStandardFonts: true, subsetFonts: false },
+  web:            { lossy: true,  imageQuality: 0.75, unembedStandardFonts: true, subsetFonts: false, maxImageDpi: 150 },
+  print:          { lossy: true,  imageQuality: 0.92, unembedStandardFonts: true, subsetFonts: false, maxImageDpi: 300 },
+  supercompress:  { lossy: true,  imageQuality: 0.50, unembedStandardFonts: true, subsetFonts: false, maxImageDpi: 72 },
 };
 
 const PRESET_HINTS = {
-  lossless: 'No quality loss \u2014 recompress, deduplicate, subset fonts',
-  web:      'Lossy JPEG at 75% quality, 150 DPI cap \u2014 best for screens',
-  print:    'Lossy JPEG at 92% quality, 300 DPI cap \u2014 best for print',
-  custom:   'Custom settings',
+  lossless:       'No quality loss \u2014 recompress, deduplicate, clean up',
+  web:            'Lossy JPEG at 75% quality, 150 DPI cap \u2014 best for screens',
+  print:          'Lossy JPEG at 92% quality, 300 DPI cap \u2014 best for print',
+  supercompress:  'Maximum compression \u2014 50% quality, 72 DPI \u2014 ideal for AI ingestion',
+  custom:         'Custom settings',
 };
 
 // --- DOM refs (private to this module) ---
@@ -73,6 +75,13 @@ export function syncPresetIndicator() {
   if (presetHint) presetHint.textContent = PRESET_HINTS.custom;
 }
 
+const PRESET_LABELS = {
+  lossless: 'Lossless',
+  web: 'Web',
+  print: 'Print',
+  supercompress: 'Super Compress',
+};
+
 /** Return the human-readable label for the currently active preset. */
 export function getCurrentPresetLabel() {
   const current = collectOptions();
@@ -82,7 +91,7 @@ export function getCurrentPresetLabel() {
         current.subsetFonts === p.subsetFonts &&
         (!current.lossy || (current.imageQuality === p.imageQuality &&
                             current.maxImageDpi === p.maxImageDpi))) {
-      return name.charAt(0).toUpperCase() + name.slice(1);
+      return PRESET_LABELS[name] || name.charAt(0).toUpperCase() + name.slice(1);
     }
   }
   return 'Custom';

@@ -778,5 +778,53 @@ if (new URLSearchParams(window.location.search).has('debug')) {
   appWindow.insertBefore(banner, appWindow.firstChild);
 }
 
+// --- Startup notice (font subsetting) ---
+function showStartupNotice() {
+  const dismissed = sessionStorage.getItem('pdfslim-notice-dismissed');
+  if (dismissed) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'about-overlay';
+  overlay.innerHTML = `
+    <div class="about-dialog" style="width:360px">
+      <div class="about-dialog__title-bar">
+        <div class="about-dialog__close-box" data-action="close"></div>
+        <div class="about-dialog__stripes"></div>
+        <span class="about-dialog__title">Notice</span>
+        <div class="about-dialog__stripes"></div>
+      </div>
+      <div class="about-dialog__body">
+        <div class="about-dialog__name">Font Subsetting Disabled</div>
+        <p>As of mid-February 2025, font subsetting has been disabled by default while we investigate a rendering issue that can cause text to become visually invisible in some PDFs (the text is still present and copyable, but not visible).</p>
+        <p>You can still enable font subsetting manually in Advanced Settings if needed. We are actively working on a fix.</p>
+        <p>New in this release: <strong>Super Compress</strong> preset \u2014 aggressive compression (50% quality, 72 DPI) ideal for feeding PDFs to AI tools.</p>
+      </div>
+      <div class="about-dialog__footer">
+        <button class="btn btn--default" data-action="close">OK</button>
+      </div>
+    </div>`;
+
+  function close() {
+    sessionStorage.setItem('pdfslim-notice-dismissed', '1');
+    overlay.remove();
+  }
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay || e.target.closest('[data-action="close"]')) close();
+  });
+  document.addEventListener('keydown', function onKey(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+  });
+  document.body.appendChild(overlay);
+}
+
+// "Learn more" link in the subset-fonts disclaimer opens the notice
+document.getElementById('subset-fonts-learn-more')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  sessionStorage.removeItem('pdfslim-notice-dismissed');
+  showStartupNotice();
+});
+
+showStartupNotice();
+
 // --- Initial state ---
 statusLeft.textContent = 'Ready \u2014 files never leave your device';
