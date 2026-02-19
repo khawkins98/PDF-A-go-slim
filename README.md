@@ -21,7 +21,7 @@ Every optimization technique here is well-documented individually, but no tool p
 
 - **Drag-and-drop** — drop one or more PDFs, use the file picker, or drag a sample PDF icon from the desktop
 - **8 optimization passes** — stream recompression, image recompression, standard font unembedding, font subsetting, object deduplication, font deduplication, metadata stripping, unreferenced object removal
-- **Optimization presets** — Lossless (default), Web (lossy, 75% quality), Print (lossy, 92% quality)
+- **Optimization presets** — Lossless (default), Web (lossy, 75% quality), Print (lossy, 92% quality), Max Compress (lossy, 50% quality, 72 DPI — smallest file size)
 - **Advanced controls** — lossy/lossless toggle, image quality slider, font unembedding and subsetting checkboxes
 - **Object inspector** — before/after breakdown of PDF objects by category with proportional size bars and per-item diffs
 - **Accessibility palette** — dedicated floating palette with pass/fail trait checklist (tagged, structure tree, document title, display title, language, PDF/A, PDF/UA), lightweight audits (ToUnicode coverage, image alt text, structure tree depth), and links to external validators
@@ -30,6 +30,10 @@ Every optimization technique here is well-documented individually, but no tool p
 - **Batch capable** — optimize multiple PDFs at once with individual or bulk download
 - **Debug mode** — add `?debug` to the URL for per-pass timing and image conversion details
 - **Benchmark tested** — 57 tests verify compression, asset stripping, and accessibility preservation ([results](docs/benchmark-results.md))
+
+## A note on font subsetting
+
+Font subsetting is **off by default**. We fixed a rendering issue where subsetting could cause text to become invisible in certain fonts (cmap-less CIDFontType2 and already-subsetted simple fonts), but we continue to monitor for edge cases. You can enable font subsetting in the Advanced Settings panel.
 
 ## A note on accessibility
 

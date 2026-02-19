@@ -57,7 +57,7 @@ index.html → src/main.js (UI state machine, drag-and-drop, worker orchestratio
                control-strip.js — createControlStrip() (Mac OS 8 Control Strip toolbar)
                appearance.js   — buildAppearanceContent(), initAppearance(), showHappyMac(), showSadMac() (desktop patterns, themes, fonts, visual effects)
                sound.js        — playSound(), previewSound(), initSound(), buildSoundContent() (classic Mac OS sound engine + UI)
-               helpers.js      — formatSize(), escapeHtml(), renderMarkdown()
+               helpers.js      — formatSize(), escapeHtml(), renderMarkdown(), buildDownloadName()
 
 scripts/
   benchmark-report.js     — generates docs/benchmark-results.md from reference PDFs
@@ -81,7 +81,7 @@ test/
 - **Size guard:** The pipeline never returns an optimized PDF larger than the input — it falls back to the original bytes.
 - **Image filters preserved:** JPEG, JPEG2000, CCITT, and JBIG2 streams are intentionally skipped (already optimal).
 - **All optimization passes** receive the same `(pdfDoc, options)` signature and mutate the PDFDocument in place. The pipeline `await`s each pass (font-subset is async due to WASM).
-- **Options/presets:** `collectOptions()` reads UI state → options object. Three presets (lossless/web/print) map to option combinations. `syncPresetIndicator()` highlights the matching preset when manual settings change.
+- **Options/presets:** `collectOptions()` reads UI state → options object. Four presets (lossless/web/print/maxcompress) map to option combinations. `syncPresetIndicator()` highlights the matching preset when manual settings change. Font subsetting is off by default across all presets (rendering fixes applied, monitoring for edge cases).
 - **Utils layer discipline:** If more than one optimization pass needs a function, it belongs in `utils/`. Passes should not import from each other.
 - **Options panel:** `#options-panel` lives in HTML (so `options.js` module-level querySelectorAll finds elements on import), then physically moved into the Settings palette body on init. Event listeners survive DOM relocation.
 - **Stale results detection:** After results render, changing any option triggers `checkStaleResults()` which compares current options JSON vs last-run options. Adds `.btn--stale` to Re-optimize button inside the Settings palette. Re-optimize re-runs `handleFiles(lastFiles)` with current options.

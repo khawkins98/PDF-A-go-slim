@@ -418,6 +418,65 @@ body {
   padding: 0.5rem 1.2rem 0.8rem;
 }
 
+/* --- Warning dialog (startup disclaimer) --- */
+.warning-dialog {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  width: 380px;
+  max-width: 90vw;
+}
+
+.warning-dialog__content {
+  display: flex;
+  gap: 0.8rem;
+  padding: 1rem 1.2rem 0.6rem;
+  align-items: flex-start;
+}
+
+.warning-dialog__icon {
+  flex-shrink: 0;
+  font-size: 28px;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.warning-dialog__text {
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.warning-dialog__text p {
+  margin: 0 0 0.4rem;
+  color: var(--color-text-muted);
+}
+
+.warning-dialog__text p:first-child {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.warning-dialog__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1.2rem 0.8rem;
+}
+
+.warning-dialog__dismiss {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.warning-dialog__dismiss input {
+  margin: 0;
+}
+
 /* --- Floating palette chrome --- */
 .palette {
   position: absolute;
@@ -820,6 +879,19 @@ body {
   font-size: 0.78rem;
   font-weight: 500;
   color: var(--color-text);
+}
+
+.control-disclaimer {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  margin: 2px 0 0 1.4rem;
+  line-height: 1.4;
+}
+
+.control-disclaimer a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .mode-toggle {

@@ -1,3 +1,21 @@
+export function buildDownloadName(originalName, options) {
+  const base = originalName.replace(/\.pdf$/i, '');
+
+  let tag;
+  if (options.lossy) {
+    const q = options.imageQuality != null ? Math.round(options.imageQuality * 100) : 85;
+    const dpi = options.maxImageDpi || '';
+    tag = `lossy-q${q}${dpi ? `-${dpi}dpi` : ''}`;
+  } else {
+    tag = 'lossless';
+  }
+
+  const now = new Date();
+  const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+
+  return `${base}_${tag}_${date}.pdf`;
+}
+
 export function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;

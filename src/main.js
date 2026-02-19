@@ -751,6 +751,7 @@ function showAboutDialog() {
         <p>Built with pdf-lib, fflate, harfbuzzjs, and jpeg-js.</p>
         <p>Classic Mac sounds curated by Steven Jay Cohen, Karl Laurent, and Ginger Lindsey.</p>
         <p><a href="https://github.com/khawkins98/PDF-A-go-slim" target="_blank" rel="noopener">github.com/khawkins98/PDF-A-go-slim</a></p>
+        <p style="margin-top:0.4rem;font-size:0.7rem;opacity:0.6">Last updated: ${__BUILD_DATE__}</p>
       </div>
       <div class="about-dialog__footer">
         <button class="btn btn--default" data-action="close">OK</button>
@@ -777,6 +778,68 @@ if (new URLSearchParams(window.location.search).has('debug')) {
   const appWindow = document.querySelector('.app-window');
   appWindow.insertBefore(banner, appWindow.firstChild);
 }
+
+// --- Startup warning dialog ---
+const WARNING_DISMISSED_KEY = 'pdfagoslim-warning-dismissed';
+
+function showWarningDialog() {
+  if (localStorage.getItem(WARNING_DISMISSED_KEY)) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'about-overlay';
+  overlay.innerHTML = `
+    <div class="warning-dialog">
+      <div class="about-dialog__title-bar">
+        <div class="about-dialog__stripes"></div>
+        <span class="about-dialog__title">Warning</span>
+        <div class="about-dialog__stripes"></div>
+      </div>
+      <div class="warning-dialog__content">
+        <div class="warning-dialog__icon">\u26A0\uFE0F</div>
+        <div class="warning-dialog__text">
+          <p>This tool is experimental</p>
+          <p>PDF-A-go-slim creates a new, optimized copy of your PDF. Your original file is never modified.</p>
+          <p>However, the optimized copy may have rendering differences or missing content. If you overwrite your original with the optimized version, that data may be unrecoverable.</p>
+          <p><strong>Font subsetting</strong> is off by default. A rendering issue with certain fonts has been fixed, but we continue to monitor for edge cases. You can enable it in Advanced Settings.</p>
+          <p>This tool is provided "as is", without warranty of any kind.</p>
+          <p style="margin-top:0.6rem;font-size:0.7rem;opacity:0.6">Last updated: ${__BUILD_DATE__}</p>
+        </div>
+      </div>
+      <div class="warning-dialog__footer">
+        <label class="warning-dialog__dismiss">
+          <input type="checkbox" id="warning-dismiss-check" />
+          Don\u2019t show this again
+        </label>
+        <button class="btn btn--default" data-action="close">OK</button>
+      </div>
+    </div>`;
+
+  function close() {
+    if (document.getElementById('warning-dismiss-check')?.checked) {
+      localStorage.setItem(WARNING_DISMISSED_KEY, '1');
+    }
+    overlay.remove();
+  }
+
+  overlay.querySelector('[data-action="close"]').addEventListener('click', close);
+  document.addEventListener('keydown', function onKey(e) {
+    if (e.key === 'Escape' || e.key === 'Enter') {
+      close();
+      document.removeEventListener('keydown', onKey);
+    }
+  });
+
+  document.body.appendChild(overlay);
+}
+
+// "Learn more" link in the subset-fonts disclaimer opens the warning
+document.getElementById('subset-fonts-learn-more')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  localStorage.removeItem(WARNING_DISMISSED_KEY);
+  showWarningDialog();
+});
+
+showWarningDialog();
 
 // --- Initial state ---
 statusLeft.textContent = 'Ready \u2014 files never leave your device';

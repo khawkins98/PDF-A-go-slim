@@ -135,6 +135,16 @@ DPI estimation uses a page map built by walking all pages' `Resources → XObjec
 
 **How the box filter handles fractional boundaries:** Each destination pixel maps to a rectangular region of source pixels. When that region doesn't align to pixel boundaries, the overlapping source pixels are weighted by their fractional coverage area (`wx * wy`). This produces smooth, artifact-free downscaling without the blocky artifacts of nearest-neighbor or the blur of naive bilinear. The algorithm is ~40 lines of JavaScript with no dependencies — a weighted average over a variable-size kernel. See `images.js` `downsampleArea()`.
 
+### Aggressive Compression vs AI/OCR Readability
+
+The Max Compress preset (50% JPEG, 72 DPI) achieves the smallest file size but is counterproductive for AI/LLM vision model ingestion:
+
+- **72 DPI makes small text unreadable.** At 72 DPI, text below ~16pt renders too few pixels per character for reliable OCR or vision model recognition. Most body text (10–12pt) becomes a smudge. 150 DPI is the practical minimum for machine-readable text.
+- **50% JPEG degrades OCR accuracy.** JPEG artifacts at low quality blur character edges and introduce ringing. Published benchmarks show OCR accuracy dropping from ~99% at quality 85+ to ~85% at quality 50, especially for serif fonts and small sizes.
+- **The Web preset (75% quality, 150 DPI) is the better choice for AI pipelines.** It preserves text readability while still achieving significant size reduction on photo-heavy documents.
+
+This is why Max Compress is positioned as "smallest file size" rather than "ideal for AI ingestion" — the two goals conflict at these settings.
+
 ### Font Subsetting
 
 Strips unused glyph outlines from embedded font programs. Typical savings: 50–98% per font. Lossless — only removes glyphs the document doesn't reference.
@@ -150,6 +160,16 @@ Strips unused glyph outlines from embedded font programs. Typical savings: 50–
 **Surrogate pair handling in ToUnicode:** CMap values longer than 4 hex characters are split into 4-char chunks and checked for UTF-16 surrogate pairs (high 0xD800–0xDBFF followed by low 0xDC00–0xDFFF). Surrogate pairs are decoded to their full Unicode codepoint via `0x10000 + ((hi - 0xD800) << 10) + (lo - 0xDC00)`. This handles CJK characters and emoji in the Supplementary Multilingual Plane. See `unicode-mapper.js` `parseUnicodeHex()`.
 
 **V1 scope:** Only Type1/TrueType (simple) and Type0 with Identity-H + Identity CIDToGIDMap are supported. Type0 with non-Identity CMaps, Type3 fonts, fonts < 10 KB, and fonts without `/ToUnicode` or recognizable encoding are skipped.
+
+**GID-based subsetting for cmap-less fonts:** Many already-subsetted Type0/CIDFontType2 fonts have their `cmap` table stripped by the original PDF producer. This is normal — with Identity-H encoding and Identity CIDToGIDMap, the PDF viewer maps CID directly to GID without needing a Unicode lookup inside the font program. However, harfbuzzjs's Unicode-based subsetting (`hb_subset_input_unicode_set`) internally uses the font's `cmap` to resolve Unicode → GID. If no `cmap` exists, harfbuzz finds zero matching glyphs and outputs a font with only `.notdef` — rendering all text invisible. **Fix:** detect cmap-less fonts by parsing the TrueType table directory (12-byte header + 16-byte table records, look for the `cmap` tag). When a Type0/Identity-H font lacks a `cmap`, extract raw CIDs from the content stream and pass them directly as GIDs via `hb_subset_input_glyph_set()`, bypassing the Unicode mapping entirely. This works because Identity CIDToGIDMap means CID=GID. See `font-subset.js` `fontHasCmap()` and `harfbuzz-subsetter.js` `useGlyphIds` option. Discovered via UNDRR-Work-Programme-2026-2027.pdf where the `AAAAAF+Roboto-Light` Type0 font was reduced to 1 glyph (broken) instead of retaining all 1,836 used GID slots.
+
+**Correctness guards vs configurable options:** The font subsetting pass has several safety guards that might look like they could be exposed as advanced configuration. They cannot — they are correctness requirements, not trade-offs:
+
+- **Cmap-less GID-based subsetting** — When a font has no cmap table, Unicode-based subsetting *cannot work* (harfbuzz resolves every glyph to `.notdef`). GID-based subsetting is the only correct algorithm. There's no user scenario where forcing Unicode-based subsetting would help.
+- **Skip simple fonts with subset prefix (`ABCDEF+`)** — These fonts have renumbered char codes (FirstChar 33+) that only make sense through the embedded cmap. Unicode-based re-subsetting uses a different mapping path, always producing invisible or wrong text. No trade-off here.
+- **Skip subset-prefixed fonts for unembedding** (in `font-unembed.js`) — Unembedding a subset font without explicit encoding always corrupts glyph mapping. The compact char codes depend on the embedded cmap table; switching to WinAnsiEncoding maps them to wrong glyphs.
+
+What *could* be useful advanced options in the future: (1) minimum font size threshold (currently 10 KB), (2) subset scope — "only Type0 fonts" vs "Type0 + simple fonts" — since Type0/Identity-H is the safer, more battle-tested path.
 
 **Pass ordering matters:** font-subset runs after font-unembed (no point subsetting fonts we'll remove) and before dedup (so dedup can catch fonts that become identical after subsetting).
 

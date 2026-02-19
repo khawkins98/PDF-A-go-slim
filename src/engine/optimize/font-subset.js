@@ -14,6 +14,23 @@
  * - Type3 fonts
  * - Fonts < 10 KB (not worth subsetting)
  * - Fonts without ToUnicode or recognizable encoding
+ *
+ * Correctness guards (not configurable — these prevent broken output):
+ *
+ * 1. Cmap-less CIDFontType2: Already-subsetted Type0 fonts often have their
+ *    cmap table stripped. Harfbuzz's Unicode-based subsetting needs cmap to
+ *    resolve Unicode→GID; without it, every glyph resolves to .notdef. We
+ *    detect this and switch to GID-based subsetting (hb_subset_input_glyph_set),
+ *    passing CIDs directly as GIDs since Identity CIDToGIDMap means CID=GID.
+ *
+ * 2. Already-subsetted simple fonts (ABCDEF+ prefix): These use renumbered
+ *    char codes (FirstChar 33+) with cmap-based glyph lookup. Unicode-based
+ *    re-subsetting uses a different mapping path, dropping glyphs the PDF
+ *    actually needs. Handled upstream in content-stream-parser.js which skips
+ *    subset-prefixed simple fonts.
+ *
+ * These guards are correctness requirements, not trade-offs. Disabling them
+ * would produce corrupt text output. See docs/learnings.md for details.
  */
 import { PDFName, PDFDict, PDFRef, PDFRawStream, PDFArray } from 'pdf-lib';
 import { zlibSync } from 'fflate';
@@ -167,6 +184,39 @@ function findFontFile(context, fontDict) {
 }
 
 /**
+ * Check if a TrueType/OpenType font binary has a 'cmap' table.
+ * Parses the table directory from the font header.
+ */
+function fontHasCmap(fontBytes) {
+  if (fontBytes.length < 12) return false;
+  const view = new DataView(fontBytes.buffer, fontBytes.byteOffset, fontBytes.byteLength);
+  const numTables = view.getUint16(4);
+  for (let i = 0; i < numTables; i++) {
+    const offset = 12 + i * 16;
+    if (offset + 4 > fontBytes.length) break;
+    const tag = String.fromCharCode(
+      fontBytes[offset], fontBytes[offset + 1],
+      fontBytes[offset + 2], fontBytes[offset + 3],
+    );
+    if (tag === 'cmap') return true;
+  }
+  return false;
+}
+
+/**
+ * Extract raw CIDs from Type0 char code buffers (2-byte big-endian).
+ */
+function extractCids(charCodeBuffers) {
+  const cids = new Set();
+  for (const buf of charCodeBuffers) {
+    for (let i = 0; i + 1 < buf.length; i += 2) {
+      cids.add((buf[i] << 8) | buf[i + 1]);
+    }
+  }
+  return cids;
+}
+
+/**
  * Process a single font: subset it and replace the stream if smaller.
  * Returns true if the font was successfully subsetted and replaced.
  */
@@ -189,9 +239,15 @@ async function processFont(context, info) {
   // Skip small fonts
   if (originalSize < MIN_FONT_SIZE) return false;
 
-  // Map char codes to Unicode
-  const unicodeCodepoints = charCodesToUnicode(fontDict, charCodes, context);
-  if (unicodeCodepoints.size === 0) return false;
+  // Skip already-subsetted simple fonts (ABCDEF+Name pattern).
+  // Their renumbered char codes depend on the embedded cmap; re-subsetting
+  // via Unicode drops the glyphs the PDF actually needs, causing invisible text.
+  if (fontType === 'simple') {
+    const baseFont = fontDict.get(PDFName.of('BaseFont'));
+    if (baseFont instanceof PDFName && /^[A-Z]{6}\+/.test(baseFont.decodeText())) {
+      return false;
+    }
+  }
 
   // Determine if we need retain-gids (for Type0/Identity-H)
   const retainGids = fontType === 'type0' && isIdentityHFont(fontDict, context);
@@ -199,10 +255,28 @@ async function processFont(context, info) {
   // Type0 without Identity-H is not supported
   if (fontType === 'type0' && !retainGids) return false;
 
+  // CORRECTNESS GUARD: GID-based subsetting for cmap-less fonts.
+  // Already-subsetted CIDFontType2 fonts often lack a cmap table (stripped by
+  // the original producer). Harfbuzz's Unicode path needs cmap to resolve
+  // Unicode→GID; without it, it produces only .notdef (invisible text).
+  // This is not a configurable trade-off — Unicode subsetting *cannot work*
+  // without a cmap. We pass CIDs directly as GIDs instead (safe because
+  // Identity CIDToGIDMap means CID=GID).
+  const hasCmap = fontHasCmap(fontBytes);
+  const useGlyphIds = retainGids && !hasCmap;
+
+  let subsetInput;
+  if (useGlyphIds) {
+    subsetInput = extractCids(charCodes);
+  } else {
+    subsetInput = charCodesToUnicode(fontDict, charCodes, context);
+  }
+  if (subsetInput.size === 0) return false;
+
   // Call harfbuzzjs subsetter
   let subsetBytes;
   try {
-    subsetBytes = await subsetFont(fontBytes, unicodeCodepoints, { retainGids });
+    subsetBytes = await subsetFont(fontBytes, subsetInput, { retainGids, useGlyphIds });
   } catch {
     return false;
   }
