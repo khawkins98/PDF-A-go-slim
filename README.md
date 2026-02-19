@@ -23,7 +23,6 @@ Every optimization technique here is well-documented individually, but no tool p
 - **8 optimization passes** — stream recompression, image recompression, standard font unembedding, font subsetting, object deduplication, font deduplication, metadata stripping, unreferenced object removal
 - **Optimization presets** — Lossless (default), Web (lossy, 75% quality), Print (lossy, 92% quality), Super Compress (lossy, 50% quality, 72 DPI — ideal for AI ingestion)
 - **Advanced controls** — lossy/lossless toggle, image quality slider, font unembedding and subsetting checkboxes
-- **Optimization metadata** — optimized PDFs carry provenance metadata (tool name, settings used, timestamp) in the PDF Info dictionary
 - **Object inspector** — before/after breakdown of PDF objects by category with proportional size bars and per-item diffs
 - **Accessibility palette** — dedicated floating palette with pass/fail trait checklist (tagged, structure tree, document title, display title, language, PDF/A, PDF/UA), lightweight audits (ToUnicode coverage, image alt text, structure tree depth), and links to external validators
 - **PDF/A and accessibility aware** — auto-detects PDF/A conformance and tagged PDFs; preserves embedded fonts, XMP metadata, and structure trees that conformance requires

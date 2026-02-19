@@ -239,6 +239,16 @@ async function processFont(context, info) {
   // Skip small fonts
   if (originalSize < MIN_FONT_SIZE) return false;
 
+  // Skip already-subsetted simple fonts (ABCDEF+Name pattern).
+  // Their renumbered char codes depend on the embedded cmap; re-subsetting
+  // via Unicode drops the glyphs the PDF actually needs, causing invisible text.
+  if (fontType === 'simple') {
+    const baseFont = fontDict.get(PDFName.of('BaseFont'));
+    if (baseFont instanceof PDFName && /^[A-Z]{6}\+/.test(baseFont.decodeText())) {
+      return false;
+    }
+  }
+
   // Determine if we need retain-gids (for Type0/Identity-H)
   const retainGids = fontType === 'type0' && isIdentityHFont(fontDict, context);
 
