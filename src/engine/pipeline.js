@@ -4,7 +4,7 @@
  * Loads a PDF, runs optimization passes in order, saves with compact settings.
  * Returns original bytes if output is not smaller (size guard).
  */
-import { PDFDocument, PDFName, PDFRef, PDFArray, PDFString, PDFDict } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFRef, PDFArray } from 'pdf-lib';
 import { recompressStreams } from './optimize/streams.js';
 import { recompressImages } from './optimize/images.js';
 import { unembedStandardFonts } from './optimize/font-unembed.js';
@@ -38,42 +38,6 @@ function checkContentIntegrity(pdfDoc) {
     }
   }
   return warnings;
-}
-
-/**
- * Embed optimization settings as custom Info dictionary entries.
- * Records the tool name, settings used, and a timestamp so the output
- * PDF carries provenance metadata about how it was optimized.
- */
-function embedOptimizationMetadata(pdfDoc, options) {
-  const parts = [];
-  parts.push(options.lossy ? 'lossy' : 'lossless');
-  if (options.lossy && options.imageQuality != null) {
-    parts.push(`quality=${Math.round(options.imageQuality * 100)}%`);
-  }
-  if (options.lossy && options.maxImageDpi != null) {
-    parts.push(`maxDPI=${options.maxImageDpi}`);
-  }
-  if (options.subsetFonts) parts.push('font-subset=on');
-  if (options.unembedStandardFonts) parts.push('unembed-std-fonts=on');
-
-  const settingsStr = parts.join(', ');
-  const timestamp = new Date().toISOString();
-
-  // Use the Info dictionary to store optimization provenance
-  const infoRef = pdfDoc.context.trailerInfo.Info;
-  let infoDict;
-  if (infoRef) {
-    infoDict = pdfDoc.context.lookup(infoRef);
-  }
-  if (!infoDict || !(infoDict instanceof PDFDict)) {
-    infoDict = pdfDoc.context.obj({});
-    pdfDoc.context.trailerInfo.Info = pdfDoc.context.register(infoDict);
-  }
-
-  infoDict.set(PDFName.of('OptimizedBy'), PDFString.of('PDF-A-go-slim'));
-  infoDict.set(PDFName.of('OptimizationSettings'), PDFString.of(settingsStr));
-  infoDict.set(PDFName.of('OptimizationDate'), PDFString.of(timestamp));
 }
 
 const PASSES = [
@@ -152,9 +116,6 @@ export async function optimize(inputBytes, options = {}, onProgress) {
       stats: { ...stats, outputSize: inputSize, savedBytes: 0, savedPercent: 0, contentGuard: true },
     };
   }
-
-  // Embed optimization settings metadata into the PDF Info dictionary
-  embedOptimizationMetadata(pdfDoc, options);
 
   const outputBytes = await pdfDoc.save({
     useObjectStreams: !(pdfTraits.isPdfA && pdfTraits.pdfALevel?.startsWith('1')),

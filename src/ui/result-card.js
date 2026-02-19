@@ -1,4 +1,4 @@
-import { formatSize, escapeHtml } from './helpers.js';
+import { formatSize, escapeHtml, buildDownloadName } from './helpers.js';
 import { buildStatsDetail } from './stats.js';
 import { buildInspectPanel, initInspectorInteractions } from './inspector.js';
 import { applyPreset } from './options.js';
@@ -113,7 +113,7 @@ export function buildSingleFileCard(result, blob, blobUrl, options, animateCount
   // Download button in right column
   const downloadLink = document.createElement('a');
   downloadLink.href = blobUrl;
-  downloadLink.download = result.name;
+  downloadLink.download = buildDownloadName(result.name, options);
   downloadLink.className = 'btn btn--primary btn--default result-card__download';
   downloadLink.textContent = 'Download';
   heroEl.appendChild(downloadLink);
@@ -136,7 +136,7 @@ export function buildSingleFileCard(result, blob, blobUrl, options, animateCount
  * @param {Function} animateCountUp - Count-up animation function
  * @returns {HTMLElement}
  */
-export function buildSummaryCard(results, animateCountUp) {
+export function buildSummaryCard(results, animateCountUp, options) {
   const totalOriginal = results.reduce((s, r) => s + r.original, 0);
   const totalOptimized = results.reduce((s, r) => s + r.result.byteLength, 0);
 
@@ -162,7 +162,7 @@ export function buildSummaryCard(results, animateCountUp) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = r.name;
+      a.download = buildDownloadName(r.name, options);
       a.click();
       URL.revokeObjectURL(url);
     }
@@ -234,7 +234,7 @@ export function buildFileCard(result, blob, blobUrl, options, onStaleCheck) {
 
   const downloadLink = document.createElement('a');
   downloadLink.href = blobUrl;
-  downloadLink.download = result.name;
+  downloadLink.download = buildDownloadName(result.name, options);
   downloadLink.className = 'btn btn--primary btn--small result-table__cell--dl';
   downloadLink.textContent = 'Download';
   downloadLink.addEventListener('click', (e) => e.stopPropagation());
@@ -261,7 +261,7 @@ export function buildResultsPaletteContent(results, blobUrls, options, { animate
     const card = buildSingleFileCard(r, blob, url, options, animateCountUp, onStaleCheck);
     container.appendChild(card);
   } else {
-    const summaryCard = buildSummaryCard(results, animateCountUp);
+    const summaryCard = buildSummaryCard(results, animateCountUp, options);
     container.appendChild(summaryCard);
 
     const table = document.createElement('div');
