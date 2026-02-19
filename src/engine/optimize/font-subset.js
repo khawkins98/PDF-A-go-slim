@@ -14,6 +14,23 @@
  * - Type3 fonts
  * - Fonts < 10 KB (not worth subsetting)
  * - Fonts without ToUnicode or recognizable encoding
+ *
+ * Correctness guards (not configurable — these prevent broken output):
+ *
+ * 1. Cmap-less CIDFontType2: Already-subsetted Type0 fonts often have their
+ *    cmap table stripped. Harfbuzz's Unicode-based subsetting needs cmap to
+ *    resolve Unicode→GID; without it, every glyph resolves to .notdef. We
+ *    detect this and switch to GID-based subsetting (hb_subset_input_glyph_set),
+ *    passing CIDs directly as GIDs since Identity CIDToGIDMap means CID=GID.
+ *
+ * 2. Already-subsetted simple fonts (ABCDEF+ prefix): These use renumbered
+ *    char codes (FirstChar 33+) with cmap-based glyph lookup. Unicode-based
+ *    re-subsetting uses a different mapping path, dropping glyphs the PDF
+ *    actually needs. Handled upstream in content-stream-parser.js which skips
+ *    subset-prefixed simple fonts.
+ *
+ * These guards are correctness requirements, not trade-offs. Disabling them
+ * would produce corrupt text output. See docs/learnings.md for details.
  */
 import { PDFName, PDFDict, PDFRef, PDFRawStream, PDFArray } from 'pdf-lib';
 import { zlibSync } from 'fflate';
@@ -228,11 +245,13 @@ async function processFont(context, info) {
   // Type0 without Identity-H is not supported
   if (fontType === 'type0' && !retainGids) return false;
 
-  // For Type0/Identity-H fonts without a cmap table, use GID-based subsetting.
-  // These fonts have already been subsetted by the original producer — the cmap
-  // was stripped because Identity CIDToGIDMap means CID maps directly to GID.
-  // Harfbuzz's Unicode-based subsetting requires a cmap to resolve Unicode → GID,
-  // so it produces an empty font (only .notdef). Instead, pass CIDs directly as GIDs.
+  // CORRECTNESS GUARD: GID-based subsetting for cmap-less fonts.
+  // Already-subsetted CIDFontType2 fonts often lack a cmap table (stripped by
+  // the original producer). Harfbuzz's Unicode path needs cmap to resolve
+  // Unicode→GID; without it, it produces only .notdef (invisible text).
+  // This is not a configurable trade-off — Unicode subsetting *cannot work*
+  // without a cmap. We pass CIDs directly as GIDs instead (safe because
+  // Identity CIDToGIDMap means CID=GID).
   const hasCmap = fontHasCmap(fontBytes);
   const useGlyphIds = retainGids && !hasCmap;
 

@@ -72,7 +72,9 @@ async function getExports() {
  * @param {Set<number>|number[]} codepoints - Unicode codepoints (or glyph IDs if useGlyphIds is set)
  * @param {object} [options]
  * @param {boolean} [options.retainGids=false] - Preserve glyph IDs (for CID fonts)
- * @param {boolean} [options.useGlyphIds=false] - Treat codepoints as glyph IDs instead of Unicode
+ * @param {boolean} [options.useGlyphIds=false] - Treat codepoints as glyph IDs instead of Unicode.
+ *   Required for cmap-less fonts where Unicode-based subsetting cannot work.
+ *   This is a correctness guard, not a preference — see font-subset.js header.
  * @returns {Promise<Uint8Array>} The subset font bytes
  */
 export async function subsetFont(fontBytes, codepoints, options = {}) {
