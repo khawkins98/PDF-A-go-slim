@@ -66,16 +66,17 @@ async function getExports() {
 }
 
 /**
- * Subset a font to only include the given Unicode codepoints.
+ * Subset a font to only include the given Unicode codepoints (or glyph IDs).
  *
  * @param {Uint8Array} fontBytes - The raw font file bytes (TrueType/OpenType)
- * @param {Set<number>|number[]} unicodeCodepoints - Unicode codepoints to retain
+ * @param {Set<number>|number[]} codepoints - Unicode codepoints (or glyph IDs if useGlyphIds is set)
  * @param {object} [options]
  * @param {boolean} [options.retainGids=false] - Preserve glyph IDs (for CID fonts)
+ * @param {boolean} [options.useGlyphIds=false] - Treat codepoints as glyph IDs instead of Unicode
  * @returns {Promise<Uint8Array>} The subset font bytes
  */
-export async function subsetFont(fontBytes, unicodeCodepoints, options = {}) {
-  const { retainGids = false } = options;
+export async function subsetFont(fontBytes, codepoints, options = {}) {
+  const { retainGids = false, useGlyphIds = false } = options;
   const exports = await getExports();
 
   // Allocate memory for the font blob
@@ -102,14 +103,21 @@ export async function subsetFont(fontBytes, unicodeCodepoints, options = {}) {
       exports.hb_subset_input_set_flags(input, HB_SUBSET_FLAGS_RETAIN_GIDS);
     }
 
-    // Add Unicode codepoints
-    const unicodeSet = exports.hb_subset_input_unicode_set(input);
-    const codepoints = unicodeCodepoints instanceof Set
-      ? unicodeCodepoints
-      : new Set(unicodeCodepoints);
+    // Add codepoints to the appropriate set
+    const cpSet = codepoints instanceof Set ? codepoints : new Set(codepoints);
 
-    for (const cp of codepoints) {
-      exports.hb_set_add(unicodeSet, cp);
+    if (useGlyphIds) {
+      // GID-based: populate the glyph set directly (bypasses cmap lookup)
+      const glyphSet = exports.hb_subset_input_glyph_set(input);
+      for (const gid of cpSet) {
+        exports.hb_set_add(glyphSet, gid);
+      }
+    } else {
+      // Unicode-based: harfbuzz uses the font's cmap to resolve GIDs
+      const unicodeSet = exports.hb_subset_input_unicode_set(input);
+      for (const cp of cpSet) {
+        exports.hb_set_add(unicodeSet, cp);
+      }
     }
 
     // Perform subsetting

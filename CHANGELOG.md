@@ -6,12 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- **Font subsetting disabled by default** — Font subsetting has been temporarily disabled across all presets due to a rendering issue that can cause text to become visually invisible in some PDFs. The text remains present and copyable but may not render visually. Users can still enable font subsetting manually via Advanced Settings. We are actively investigating a fix.
+- **Font subsetting off by default** — Font subsetting is off by default across all presets. A rendering issue with cmap-less CIDFontType2 fonts and already-subsetted simple fonts has been fixed (GID-based subsetting for cmap-less fonts, skip re-subsetting simple fonts with subset prefixes), but we continue to monitor for edge cases. Users can enable font subsetting in Advanced Settings.
 - **Preset hint text updated** — Lossless preset hint no longer references font subsetting.
 
 ### Added
 
 - **Super Compress preset** — New optimization preset designed for maximum file size reduction, ideal for feeding PDFs to AI tools. Uses lossy JPEG at 50% quality with a 72 DPI cap. Available as a fourth tab alongside Lossless, Web, and Print.
-- **Optimization metadata in output PDFs** — Optimized PDFs now carry provenance metadata in the PDF Info dictionary: tool name (`OptimizedBy`), settings used (`OptimizationSettings`), and processing timestamp (`OptimizationDate`). This allows downstream consumers to identify how a PDF was optimized.
-- **Startup notice dialog** — A one-time notice dialog informs users that font subsetting is disabled by default and introduces the Super Compress preset. Dismissed per session; accessible via "Learn more" link in the Advanced Settings panel.
+- **Settings encoded in download filename** — Download filenames now include the optimization settings and date (e.g. `report_lossless_20260219.pdf` or `report_lossy-q75-150dpi_20260219.pdf`), replacing the previous in-PDF metadata approach.
+- **Startup warning dialog** — A one-time warning dialog explains the tool is experimental and that font subsetting is off by default. Includes "Don't show this again" checkbox (localStorage). Accessible via "Learn more" link in Advanced Settings.
+- **Font subsetting fixes** — Fixed invisible text when re-subsetting Type0/CIDFontType2 fonts that lack a `cmap` table (uses GID-based subsetting via `hb_subset_input_glyph_set`). Simple fonts with subset prefixes (`ABCDEF+`) are skipped to prevent glyph corruption.
 - **CHANGELOG.md** — This file, tracking notable changes going forward.

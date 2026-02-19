@@ -151,6 +151,8 @@ Strips unused glyph outlines from embedded font programs. Typical savings: 50–
 
 **V1 scope:** Only Type1/TrueType (simple) and Type0 with Identity-H + Identity CIDToGIDMap are supported. Type0 with non-Identity CMaps, Type3 fonts, fonts < 10 KB, and fonts without `/ToUnicode` or recognizable encoding are skipped.
 
+**GID-based subsetting for cmap-less fonts:** Many already-subsetted Type0/CIDFontType2 fonts have their `cmap` table stripped by the original PDF producer. This is normal — with Identity-H encoding and Identity CIDToGIDMap, the PDF viewer maps CID directly to GID without needing a Unicode lookup inside the font program. However, harfbuzzjs's Unicode-based subsetting (`hb_subset_input_unicode_set`) internally uses the font's `cmap` to resolve Unicode → GID. If no `cmap` exists, harfbuzz finds zero matching glyphs and outputs a font with only `.notdef` — rendering all text invisible. **Fix:** detect cmap-less fonts by parsing the TrueType table directory (12-byte header + 16-byte table records, look for the `cmap` tag). When a Type0/Identity-H font lacks a `cmap`, extract raw CIDs from the content stream and pass them directly as GIDs via `hb_subset_input_glyph_set()`, bypassing the Unicode mapping entirely. This works because Identity CIDToGIDMap means CID=GID. See `font-subset.js` `fontHasCmap()` and `harfbuzz-subsetter.js` `useGlyphIds` option. Discovered via UNDRR-Work-Programme-2026-2027.pdf where the `AAAAAF+Roboto-Light` Type0 font was reduced to 1 glyph (broken) instead of retaining all 1,836 used GID slots.
+
 **Pass ordering matters:** font-subset runs after font-unembed (no point subsetting fonts we'll remove) and before dedup (so dedup can catch fonts that become identical after subsetting).
 
 ### Metadata Stripping

@@ -34,7 +34,7 @@ Every optimization technique here is well-documented individually, but no tool p
 
 ## A note on font subsetting
 
-As of mid-February 2025, font subsetting is **disabled by default**. We identified a rendering issue where subsetting can cause text to become visually invisible in some PDFs (the text remains present and copyable, but is not displayed). Font subsetting can still be enabled manually via the Advanced Settings panel. We are actively investigating a fix.
+Font subsetting is **off by default**. We fixed a rendering issue where subsetting could cause text to become invisible in certain fonts (cmap-less CIDFontType2 and already-subsetted simple fonts), but we continue to monitor for edge cases. You can enable font subsetting in the Advanced Settings panel.
 
 ## A note on accessibility
 

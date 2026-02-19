@@ -800,7 +800,7 @@ function showWarningDialog() {
           <p>This tool is experimental</p>
           <p>PDF-A-go-slim creates a new, optimized copy of your PDF. Your original file is never modified.</p>
           <p>However, the optimized copy may have rendering differences or missing content. If you overwrite your original with the optimized version, that data may be unrecoverable.</p>
-          <p><strong>Font subsetting</strong> has been disabled by default while we investigate a rendering issue that can cause text to become invisible. You can re-enable it in Advanced Settings.</p>
+          <p><strong>Font subsetting</strong> is off by default. A rendering issue with certain fonts has been fixed, but we continue to monitor for edge cases. You can enable it in Advanced Settings.</p>
           <p>This tool is provided "as is", without warranty of any kind.</p>
           <p style="margin-top:0.6rem;font-size:0.7rem;opacity:0.6">Last updated: ${__BUILD_DATE__}</p>
         </div>

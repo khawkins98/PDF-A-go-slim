@@ -167,6 +167,39 @@ function findFontFile(context, fontDict) {
 }
 
 /**
+ * Check if a TrueType/OpenType font binary has a 'cmap' table.
+ * Parses the table directory from the font header.
+ */
+function fontHasCmap(fontBytes) {
+  if (fontBytes.length < 12) return false;
+  const view = new DataView(fontBytes.buffer, fontBytes.byteOffset, fontBytes.byteLength);
+  const numTables = view.getUint16(4);
+  for (let i = 0; i < numTables; i++) {
+    const offset = 12 + i * 16;
+    if (offset + 4 > fontBytes.length) break;
+    const tag = String.fromCharCode(
+      fontBytes[offset], fontBytes[offset + 1],
+      fontBytes[offset + 2], fontBytes[offset + 3],
+    );
+    if (tag === 'cmap') return true;
+  }
+  return false;
+}
+
+/**
+ * Extract raw CIDs from Type0 char code buffers (2-byte big-endian).
+ */
+function extractCids(charCodeBuffers) {
+  const cids = new Set();
+  for (const buf of charCodeBuffers) {
+    for (let i = 0; i + 1 < buf.length; i += 2) {
+      cids.add((buf[i] << 8) | buf[i + 1]);
+    }
+  }
+  return cids;
+}
+
+/**
  * Process a single font: subset it and replace the stream if smaller.
  * Returns true if the font was successfully subsetted and replaced.
  */
@@ -189,20 +222,32 @@ async function processFont(context, info) {
   // Skip small fonts
   if (originalSize < MIN_FONT_SIZE) return false;
 
-  // Map char codes to Unicode
-  const unicodeCodepoints = charCodesToUnicode(fontDict, charCodes, context);
-  if (unicodeCodepoints.size === 0) return false;
-
   // Determine if we need retain-gids (for Type0/Identity-H)
   const retainGids = fontType === 'type0' && isIdentityHFont(fontDict, context);
 
   // Type0 without Identity-H is not supported
   if (fontType === 'type0' && !retainGids) return false;
 
+  // For Type0/Identity-H fonts without a cmap table, use GID-based subsetting.
+  // These fonts have already been subsetted by the original producer — the cmap
+  // was stripped because Identity CIDToGIDMap means CID maps directly to GID.
+  // Harfbuzz's Unicode-based subsetting requires a cmap to resolve Unicode → GID,
+  // so it produces an empty font (only .notdef). Instead, pass CIDs directly as GIDs.
+  const hasCmap = fontHasCmap(fontBytes);
+  const useGlyphIds = retainGids && !hasCmap;
+
+  let subsetInput;
+  if (useGlyphIds) {
+    subsetInput = extractCids(charCodes);
+  } else {
+    subsetInput = charCodesToUnicode(fontDict, charCodes, context);
+  }
+  if (subsetInput.size === 0) return false;
+
   // Call harfbuzzjs subsetter
   let subsetBytes;
   try {
-    subsetBytes = await subsetFont(fontBytes, unicodeCodepoints, { retainGids });
+    subsetBytes = await subsetFont(fontBytes, subsetInput, { retainGids, useGlyphIds });
   } catch {
     return false;
   }
