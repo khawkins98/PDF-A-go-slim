@@ -3,6 +3,9 @@ export const PRESETS = {
   lossless:       { lossy: false, imageQuality: 0.85, unembedStandardFonts: true, subsetFonts: false },
   web:            { lossy: true,  imageQuality: 0.75, unembedStandardFonts: true, subsetFonts: false, maxImageDpi: 150 },
   print:          { lossy: true,  imageQuality: 0.92, unembedStandardFonts: true, subsetFonts: false, maxImageDpi: 300 },
+  // "Max Compress" — maximum size reduction, NOT suitable for AI/OCR pipelines.
+  // 72 DPI makes text <16pt unreadable to vision models; 50% JPEG drops OCR accuracy.
+  // For AI ingestion, use the "web" preset (75% quality, 150 DPI) instead.
   supercompress:  { lossy: true,  imageQuality: 0.50, unembedStandardFonts: true, subsetFonts: false, maxImageDpi: 72 },
 };
 
@@ -10,7 +13,7 @@ const PRESET_HINTS = {
   lossless:       'No quality loss \u2014 recompress, deduplicate, clean up',
   web:            'Lossy JPEG at 75% quality, 150 DPI cap \u2014 best for screens',
   print:          'Lossy JPEG at 92% quality, 300 DPI cap \u2014 best for print',
-  supercompress:  'Maximum compression \u2014 50% quality, 72 DPI \u2014 ideal for AI ingestion',
+  supercompress:  'Maximum compression \u2014 50% quality, 72 DPI \u2014 smallest file size',
   custom:         'Custom settings',
 };
 
@@ -79,7 +82,7 @@ const PRESET_LABELS = {
   lossless: 'Lossless',
   web: 'Web',
   print: 'Print',
-  supercompress: 'Super Compress',
+  supercompress: 'Max Compress',
 };
 
 /** Return the human-readable label for the currently active preset. */

@@ -135,6 +135,16 @@ DPI estimation uses a page map built by walking all pages' `Resources → XObjec
 
 **How the box filter handles fractional boundaries:** Each destination pixel maps to a rectangular region of source pixels. When that region doesn't align to pixel boundaries, the overlapping source pixels are weighted by their fractional coverage area (`wx * wy`). This produces smooth, artifact-free downscaling without the blocky artifacts of nearest-neighbor or the blur of naive bilinear. The algorithm is ~40 lines of JavaScript with no dependencies — a weighted average over a variable-size kernel. See `images.js` `downsampleArea()`.
 
+### Aggressive Compression vs AI/OCR Readability
+
+The Max Compress preset (50% JPEG, 72 DPI) achieves the smallest file size but is counterproductive for AI/LLM vision model ingestion:
+
+- **72 DPI makes small text unreadable.** At 72 DPI, text below ~16pt renders too few pixels per character for reliable OCR or vision model recognition. Most body text (10–12pt) becomes a smudge. 150 DPI is the practical minimum for machine-readable text.
+- **50% JPEG degrades OCR accuracy.** JPEG artifacts at low quality blur character edges and introduce ringing. Published benchmarks show OCR accuracy dropping from ~99% at quality 85+ to ~85% at quality 50, especially for serif fonts and small sizes.
+- **The Web preset (75% quality, 150 DPI) is the better choice for AI pipelines.** It preserves text readability while still achieving significant size reduction on photo-heavy documents.
+
+This is why Max Compress is positioned as "smallest file size" rather than "ideal for AI ingestion" — the two goals conflict at these settings.
+
 ### Font Subsetting
 
 Strips unused glyph outlines from embedded font programs. Typical savings: 50–98% per font. Lossless — only removes glyphs the document doesn't reference.

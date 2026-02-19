@@ -21,7 +21,7 @@ Every optimization technique here is well-documented individually, but no tool p
 
 - **Drag-and-drop** — drop one or more PDFs, use the file picker, or drag a sample PDF icon from the desktop
 - **8 optimization passes** — stream recompression, image recompression, standard font unembedding, font subsetting, object deduplication, font deduplication, metadata stripping, unreferenced object removal
-- **Optimization presets** — Lossless (default), Web (lossy, 75% quality), Print (lossy, 92% quality), Super Compress (lossy, 50% quality, 72 DPI — ideal for AI ingestion)
+- **Optimization presets** — Lossless (default), Web (lossy, 75% quality), Print (lossy, 92% quality), Max Compress (lossy, 50% quality, 72 DPI — smallest file size)
 - **Advanced controls** — lossy/lossless toggle, image quality slider, font unembedding and subsetting checkboxes
 - **Object inspector** — before/after breakdown of PDF objects by category with proportional size bars and per-item diffs
 - **Accessibility palette** — dedicated floating palette with pass/fail trait checklist (tagged, structure tree, document title, display title, language, PDF/A, PDF/UA), lightweight audits (ToUnicode coverage, image alt text, structure tree depth), and links to external validators
