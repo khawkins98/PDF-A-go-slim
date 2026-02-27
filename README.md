@@ -1,3 +1,5 @@
+<p align="center"><img src="public/favicon.svg" width="80" height="80" alt="PDF-A-go-slim icon"></p>
+
 # PDF-A-go-slim
 
 A browser-based PDF optimization tool that reduces file size entirely client-side. No uploads, no accounts, no file size limits beyond available RAM.
