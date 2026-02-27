@@ -26,10 +26,10 @@ Every optimization technique here is well-documented individually, but no tool p
 - **Object inspector** — before/after breakdown of PDF objects by category with proportional size bars and per-item diffs
 - **Accessibility palette** — dedicated floating palette with pass/fail trait checklist (tagged, structure tree, document title, display title, language, PDF/A, PDF/UA), lightweight audits (ToUnicode coverage, image alt text, structure tree depth), and links to external validators
 - **PDF/A and accessibility aware** — auto-detects PDF/A conformance and tagged PDFs; preserves embedded fonts, XMP metadata, and structure trees that conformance requires
-- **Privacy-first** — files never leave your browser; all processing runs in a Web Worker
+- **Private** — files never leave your browser; all processing runs in a Web Worker
 - **Batch capable** — optimize multiple PDFs at once with individual or bulk download
 - **Debug Console** — per-pass timing and image conversion details, accessible from the Window menu (or auto-shown with `?debug` URL param)
-- **Benchmark tested** — 265 tests verify compression, asset stripping, accessibility preservation, and UI output ([results](docs/benchmark-results.md))
+- **265 tests** — verify compression, asset stripping, accessibility preservation, and UI output ([results](docs/benchmark-results.md))
 
 ## A note on font subsetting
 
@@ -97,12 +97,12 @@ For detailed technical notes on PDF internals, font handling, and stream decodin
 - [Vite](https://vitejs.dev/) — build tooling
 - [Vitest](https://vitest.dev/) — test runner
 
-## Inspirations and references
+## Inspirations
 
 **Design:**
 - [Apple Macintosh Human Interface Guidelines (1995)](http://interface.free.fr/Archives/Apple_HIGOS8_Guidelines.pdf) — the structural model for floating palettes, title bar chrome, and WindowShade
-- [Poolsuite.net](https://poolsuite.net/) — demonstrated that retro charm works with thin borders, warm colors, and generous spacing rather than heavy 3D bevels
-- [PostHog (2025 redesign)](https://posthog.com/) — a developer tools company that committed to a full desktop-OS metaphor for their site, built by [@ninepixelgrid](https://x.com/ninepixelgrid/status/1965618996990136539)
+- [Poolsuite.net](https://poolsuite.net/) — showed us that retro charm comes from thin borders and warm colors, not heavy 3D bevels
+- [PostHog (2025 redesign)](https://posthog.com/) — a developer tools company that went all-in on a desktop-OS metaphor for their site, built by [@ninepixelgrid](https://x.com/ninepixelgrid/status/1965618996990136539)
 - [98.css](https://jdan.github.io/98.css/) — the original CSS bevel technique; we borrowed the idea and simplified to thin 1px borders
 
 **CRT scanline overlay** (composite CSS technique assembled from):

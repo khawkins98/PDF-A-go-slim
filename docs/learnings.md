@@ -1,4 +1,4 @@
-# PDF-A-go-slim — Learnings & Technical Notes
+# PDF-A-go-slim — learnings and technical notes
 
 Technical knowledge accumulated during development. Updated as we go.
 
@@ -8,9 +8,9 @@ This project grew out of [PDF-A-go-go](https://github.com/khawkins98/PDF-A-go-go
 
 ---
 
-## PDF Internals
+## PDF internals
 
-### How Fonts Are Embedded
+### How fonts are embedded
 
 PDF fonts come in several flavors, each stored differently:
 
@@ -20,16 +20,16 @@ PDF fonts come in several flavors, each stored differently:
 
 A single embedded font can easily be 50 KB–several MB. CJK fonts can exceed 10 MB.
 
-### Simple vs Composite Fonts
+### Simple vs composite fonts
 
 - **Simple fonts** (Type1, TrueType): Single-byte character codes (0–255), mapped to glyphs via `/Encoding` + optional `/Differences` array.
 - **Composite fonts** (Type0/CIDFont): Multi-byte character codes. A CMap maps codes → CIDs, then `/CIDToGIDMap` maps CIDs → GIDs. Much more complex to manipulate safely.
 
-### DPI Is Not Stored in PDFs
+### DPI is not stored in PDFs
 
 PDFs don't have a DPI field. Effective DPI must be estimated from image pixel dimensions vs the containing page size in points: `effectiveDpi = imagePixels * 72 / pageSizeInPoints`. This is a conservative lower-bound estimate (assumes image fills the page).
 
-### Content Streams and Text Operators
+### Content streams and text operators
 
 PDF content streams use postfix notation. Text-showing operators:
 - `Tj` — show a single string
@@ -47,7 +47,7 @@ The strings are **not Unicode** — they're character codes whose meaning depend
 - Font names in content streams (e.g., `/F1` in `Tf`) must be resolved through the page's `/Resources/Font` dict to find the actual font object ref
 - **Inline font dicts** (rare): some PDFs define font dictionaries inline rather than as indirect refs. The parser creates synthetic ref keys (`inline:{fontName}`) to track these without crashing. See `content-stream-parser.js`.
 
-### Building a Content Stream Parser
+### Building a content stream parser
 
 The content stream parser (`content-stream-parser.js`) is a ~500-line stack-based tokenizer that processes PDF postfix notation. It handles:
 
@@ -63,7 +63,7 @@ The operator dispatch table maps PDF text operators (`Tf`, `Tj`, `TJ`, `'`, `"`)
 
 ---
 
-## Tooling & Libraries
+## Tooling and libraries
 
 ### pdf-lib
 
@@ -96,13 +96,15 @@ Pure JS zlib, faster and smaller than pako. Used for `zlibSync`/`inflateSync`/`d
 
 ---
 
-## Optimization Techniques
+## Optimization techniques
 
-### Stream Recompression
+### Stream recompression
 
 Many PDF producers (especially Illustrator, older tools) use Flate level 1–6 or even leave streams uncompressed. Recompressing everything at level 9 is a safe, lossless win. Typical savings: 5–15% on streams alone.
 
-### Object Deduplication
+**DecodeParms with Predictor must be preserved.** Some streams (especially large vector content streams) use PNG row prediction (`Predictor 10-15`) before Flate compression to improve ratios. Our decode path inflates but does NOT reverse the prediction — the prediction bytes remain in the data. After re-deflating at level 9, the `DecodeParms` must stay on the dict so the viewer knows to undo the prediction. Deleting `DecodeParms` (as we originally did for all streams) causes the viewer to interpret raw predicted bytes as content, producing blank pages. Streams without Predictor (or with `Predictor 1`) can safely have their DecodeParms deleted since there's nothing to reverse.
+
+### Object deduplication
 
 Hash-based dedup using a fast non-cryptographic hash (53-bit djb2 variant). Surprisingly common in real PDFs — fonts and images are often embedded multiple times (e.g., TrueType + Type1 copies of the same font). Our implementation hashes the raw stream bytes + serialized dict entries and replaces all duplicate refs with a single canonical copy.
 
@@ -112,7 +114,7 @@ Hash-based dedup using a fast non-cryptographic hash (53-bit djb2 variant). Surp
 - **The content integrity guard can't catch it.** The guard in `pipeline.js` checks for dangling `/Contents` refs after all passes. But dedup relinks refs *before* deleting — the page's `/Contents` now validly points to the canonical (wrong) stream, so the dangling-ref check passes.
 - **Non-cryptographic hash.** The 53-bit hash space makes collisions unlikely (~10^-7 for a large PDF) but not impossible. For images and fonts, a collision merely causes a display glitch in one element; for content streams, it blanks an entire page.
 
-### Standard Font Unembedding
+### Standard font unembedding
 
 The PDF spec guarantees that all conforming readers provide the 14 base fonts (Helvetica, Courier, Times-Roman, Symbol, ZapfDingbats, and their bold/italic variants). Many tools (Illustrator, InDesign) embed full copies anyway — often 50–200 KB per font.
 
@@ -120,7 +122,7 @@ The PDF spec guarantees that all conforming readers provide the 14 base fonts (H
 
 **Not safe to unembed:** Type0/CIDFont composites (use 2-byte Identity-H encoding; unembedding would require rewriting content stream text operators) and fonts with custom `/Encoding << /Differences [...] >>` arrays (the differences might reference glyphs not present in the reader's built-in font).
 
-### Image Recompression
+### Image recompression
 
 Two paths for lossy image optimization:
 
@@ -135,7 +137,7 @@ Key considerations:
 - **Skip small images** — below 10 KB decoded RGBA data, the overhead isn't worth it.
 - **Size guard per image** — only replace if JPEG output is smaller than the original compressed stream. This prevents quality degradation when re-encoding at a similar or higher quality than the original.
 
-### Image Downsampling
+### Image downsampling
 
 Area-average (box filter) resampling before JPEG encoding. For each destination pixel, averages all source pixels that map to it — simple, no dependencies, good quality for downscaling.
 
@@ -143,7 +145,7 @@ DPI estimation uses a page map built by walking all pages' `Resources → XObjec
 
 **How the box filter handles fractional boundaries:** Each destination pixel maps to a rectangular region of source pixels. When that region doesn't align to pixel boundaries, the overlapping source pixels are weighted by their fractional coverage area (`wx * wy`). This produces smooth, artifact-free downscaling without the blocky artifacts of nearest-neighbor or the blur of naive bilinear. The algorithm is ~40 lines of JavaScript with no dependencies — a weighted average over a variable-size kernel. See `images.js` `downsampleArea()`.
 
-### Aggressive Compression vs AI/OCR Readability
+### Aggressive compression vs AI/OCR readability
 
 The Max Compress preset (50% JPEG, 72 DPI) achieves the smallest file size but is counterproductive for AI/LLM vision model ingestion:
 
@@ -153,7 +155,7 @@ The Max Compress preset (50% JPEG, 72 DPI) achieves the smallest file size but i
 
 This is why Max Compress is positioned as "smallest file size" rather than "ideal for AI ingestion" — the two goals conflict at these settings.
 
-### Font Subsetting
+### Font subsetting
 
 Strips unused glyph outlines from embedded font programs. Typical savings: 50–98% per font. Lossless — only removes glyphs the document doesn't reference.
 
@@ -181,11 +183,11 @@ What *could* be useful advanced options in the future: (1) minimum font size thr
 
 **Pass ordering matters:** font-subset runs after font-unembed (no point subsetting fonts we'll remove) and before dedup (so dedup can catch fonts that become identical after subsetting).
 
-### Metadata Stripping
+### Metadata stripping
 
 Application-private data is surprisingly large. Illustrator's `AIPrivateData` can be hundreds of KB. XMP metadata, `PieceInfo`, Photoshop IRB — all safe to strip without affecting the visual output or user-facing metadata (title, author, subject are preserved separately in `/Info`).
 
-### PDF/A Conformance Levels and What's Safe to Optimize
+### PDF/A conformance levels and what's safe to optimize
 
 PDF/A is an ISO standard (19005) for long-term archival of PDF documents. Several conformance levels exist:
 
@@ -210,7 +212,7 @@ Within each level, conformance 'a' requires tagged structure (StructTreeRoot, Ma
 
 **Object streams and PDF/A-1 (resolved):** PDF/A-1 (based on PDF 1.4) prohibits object streams. The pipeline now conditionally disables `useObjectStreams` when `pdfALevel` starts with `1`. PDF/A-2+ files still benefit from object stream compression.
 
-### PDF/UA Requirements
+### PDF/UA requirements
 
 PDF/UA (ISO 14289) governs universal accessibility. Key requirements:
 - All meaningful content must be tagged and in the structure tree
@@ -221,7 +223,7 @@ PDF/UA (ISO 14289) governs universal accessibility. Key requirements:
 
 Font unembedding is blocked for PDF/UA documents, matching the PDF/A behavior. The pass returns `pdfuaSkipped: true` when `_pdfTraits.isPdfUA` is set.
 
-### Accessibility Impact of Optimization
+### Accessibility impact of optimization
 
 PDF optimization can silently break accessibility. Key risks and mitigations:
 
@@ -236,7 +238,7 @@ PDF optimization can silently break accessibility. Key risks and mitigations:
 - **Object deduplication** only processes `PDFRawStream` objects (excluding page content streams). Structure tree elements (`/StructElem`) are plain `PDFDict` objects and are never merged.
 - **Font subsetting** reduces font size but keeps the font embedded. Safe for both PDF/A and PDF/UA.
 
-### Accessibility Auditing (Lightweight)
+### Accessibility auditing (lightweight)
 
 The `auditAccessibility()` function in `accessibility-detect.js` runs three lightweight audits on the optimized document (post-pipeline, pre-save):
 
@@ -258,7 +260,7 @@ All three audits use `context.enumerateIndirectObjects()` to scan the full objec
 - The `/Type` key on StructElem dicts is optional per the PDF spec. Filtering StructElems by `/Type /StructElem` will match correctly (objects with a different `/Type` are excluded, objects with no `/Type` pass through to the `/S` check), but this relies on the secondary `/S` filter to avoid false positives from non-StructElem dicts that happen to lack `/Type`.
 - `PDFStream` in pdf-lib does NOT extend `PDFDict` — it has a `.dict` property instead. Always use `obj.dict.get()` for stream objects, not `obj.get()` directly. The `instanceof PDFDict` check correctly distinguishes the two.
 
-### Additional Checks Inspired by PDFcheck
+### Additional checks inspired by PDFcheck
 
 [PDFcheck](https://github.com/jsnmrs/pdfcheck) by Jason Morris ([blog post](https://jasonmorris.com/code/pdfcheck/)) performs several lightweight accessibility checks using regex on raw PDF text. We adopted the most useful techniques using pdf-lib's typed object model instead:
 
@@ -266,7 +268,7 @@ All three audits use `context.enumerateIndirectObjects()` to scan the full objec
 - **DisplayDocTitle** — PDF/UA requires `/ViewerPreferences << /DisplayDocTitle true >>` so the viewer title bar shows the document title instead of the filename. We read this from the catalog and report true/false/null (not configured).
 - **Marked status nuance** — PDFcheck distinguishes "Marked explicitly false" from "no MarkInfo at all". We now report `markedStatus: 'true' | 'false' | 'missing'` alongside the existing `isTagged` boolean.
 
-### `_pdfTraits` Detection and Flow
+### `_pdfTraits` detection and flow
 
 `pipeline.js` calls `detectAccessibilityTraits(pdfDoc)` after loading, injects the result as `options._pdfTraits` (spread into a new options object, not mutation), and includes `pdfTraits` in the returned stats. Individual passes read `options._pdfTraits?.isPdfA` etc. to decide whether to skip.
 
@@ -274,19 +276,19 @@ All three audits use `context.enumerateIndirectObjects()` to scan the full objec
 
 ---
 
-## Testing Patterns
+## Testing patterns
 
-### Test Fixture Image Data
+### Test fixture image data
 
 **Use sine-wave patterns, not random noise.** Random noise (`Math.random()`) has high entropy that deflates poorly — but it *also* compresses poorly as JPEG. This means the JPEG output can end up *larger* than the deflated random data, causing the size guard to skip the image and making the test meaningless.
 
 Smooth sine-wave patterns (`Math.sin(x * freq)`) are photo-like: they compress poorly with lossless Flate (no exact byte repeats) but excellently with JPEG (smooth gradients). This correctly exercises the "JPEG is smaller" path.
 
-### PDF Number Value Extraction in Tests
+### PDF number value extraction in tests
 
 When reading numeric values from pdf-lib dicts in tests, `Number(val.toString())` works reliably across all PDFNumber creation methods. The `.numberValue()` / `.value()` accessors return `NaN` or `undefined` in some cases depending on whether the number came from parsing or `context.obj()`.
 
-### Object Classification for Inspection
+### Object classification for inspection
 
 Classifying PDF objects by semantic type requires multiple pre-passes because many objects lack self-identifying `/Type` entries:
 
@@ -300,7 +302,7 @@ Classifying PDF objects by semantic type requires multiple pre-passes because ma
 
 **Size measurement:** Stream `contents.length` (compressed bytes) is the meaningful size metric for understanding where bytes go. Non-stream objects (dicts, arrays, numbers) contribute negligible overhead compared to streams and can be summarized rather than listed individually.
 
-### Sub-categorizing "Other" Objects
+### Sub-categorizing "Other" objects
 
 The "Other" (now "Other Data") bucket in the object inspector is a massive dumping ground without further classification. Most objects in it can be identified by checking for characteristic dictionary keys:
 
@@ -314,7 +316,7 @@ The "Other" (now "Other Data") bucket in the object inspector is a massive dumpi
 
 Objects that don't match any of these heuristics fall into "Miscellaneous" (generic streams/dicts). Showing individual items for Miscellaneous adds visual noise without insight — a summary count + total size is sufficient.
 
-### Benchmark Fixture Design
+### Benchmark fixture design
 
 Reference PDFs for benchmark testing need to be more complex than unit-test fixtures. Key patterns:
 
@@ -324,13 +326,13 @@ Reference PDFs for benchmark testing need to be more complex than unit-test fixt
 - **`beforeAll` for pipeline tests.** Run `optimize()` once in `beforeAll`, then assert many properties from the returned `stats` and reloaded `PDFDocument`. This avoids re-running the full pipeline (8 passes) for each assertion.
 - **Verification utility layer.** Functions like `getEmbeddedFonts()`, `getMetadataStatus()`, and `getStructureTreeInfo()` inspect a loaded `PDFDocument` and return structured results, keeping test assertions clean and reusable across suites.
 
-### Font Subset Prefix Stripping
+### Font subset prefix stripping
 
 PDF font names often carry a 6-letter subset prefix (e.g., `ABCDEF+Helvetica`). This prefix is an artifact of subsetting and meaningless to end users. The prefix always follows the pattern `[A-Z]{6}+` and can be safely stripped for display purposes using `/^[A-Z]{6}\+/`.
 
 ---
 
-## Code Architecture
+## Code architecture
 
 ### Debug Console
 
@@ -356,37 +358,37 @@ export function myPass(pdfDoc, options = {}) {
 
 The `_debug` field is optional — passes that don't return it are simply displayed with their timing. The UI auto-discovers `_debug` arrays and renders them in the debug panel.
 
-### Layer Discipline: Utils Should Not Import from Optimize Passes
+### Layer discipline: utils should not import from optimize passes
 
 During initial development, `getFilterNames()` ended up in `streams.js` (an optimization pass) even though it's a general utility for reading PDF stream filter dictionaries. Four other modules — including two utils — imported it from there, creating a cross-layer dependency (utils → optimize). This was refactored: `getFilterNames()` now lives in `stream-decode.js` alongside other filter-related utilities (`hasImageFilter`, `allFiltersDecodable`). `streams.js` re-exports it for backward compatibility.
 
 **Rule of thumb:** if more than one optimization pass needs a function, it belongs in `utils/`. If a util needs a function from a pass, that function is in the wrong place.
 
-### Shared Constants and Functions
+### Shared constants and functions
 
 `hashBytes()` (djb2 hash) and `FONT_FILE_KEYS` (`['FontFile', 'FontFile2', 'FontFile3']`) were independently duplicated across `dedup.js`, `fonts.js`, and `font-subset.js`. Extracted into `utils/hash.js`. When adding new passes that need hashing or font-file traversal, import from there rather than copying.
 
-### Custom LZW Decoder
+### Custom LZW decoder
 
 We had to write our own LZW decoder because PDF's variant has non-standard behavior: **early code size change**. Standard LZW (GIF, TIFF) waits until code `N` is emitted before widening the code size, but PDF's variant widens one code earlier. Getting this wrong produces garbage output from otherwise-valid streams. No off-the-shelf JS LZW library handles this correctly.
 
 The decoder (`stream-decode.js` `decodeLZW()`, ~65 lines) also differs from GIF's LZW in bit ordering — PDF uses MSB-first (big-endian) within bytes, while GIF is LSB-first. Encountering LZW in the wild is rare (mostly older PDF producers), but when it appears, there's no fallback — the stream is unreadable without a correct decoder.
 
-### PNG Row Prediction in PDF Streams
+### PNG row prediction in PDF streams
 
 Some PDF producers apply PNG row prediction (Predictor 10–15) before Flate compression to improve compression ratios on image-like data. After Flate decompression, this prediction must be reversed to recover the original bytes. We encountered this in real-world PDFs with embedded raster images using FlateDecode + DecodeParms.
 
 The reversal handles five filter types (None, Sub, Up, Average, Paeth). The Paeth predictor is the most interesting — it approximates linear interpolation in 2D using only the left, above, and upper-left neighbors. Six lines of code, but the math is non-obvious. See `stream-decode.js` `undoPngPrediction()` and `paethPredictor()`.
 
-### ASCII85 Encoding Gotcha
+### ASCII85 encoding gotcha
 
 ASCII85 encodes 4 bytes into 5 ASCII characters. A 5-character group always decodes to 4 bytes — there's no 3-byte output from a full 5-char group. Short final groups (fewer than 5 chars) produce fewer bytes (count - 1), but a complete group like `9jqo^` decodes to 4 bytes (`Man ` with trailing space), not 3.
 
 ---
 
-## UI Patterns
+## UI patterns
 
-### Custom dataTransfer Types for Internal Drag-and-Drop
+### Custom dataTransfer types for internal drag-and-drop
 
 Native HTML5 drag-and-drop uses `e.dataTransfer.types.includes('Files')` to detect file drags from the OS. To support dragging internal elements (like sample PDF icons) onto the same drop zone, use a custom MIME type (e.g., `application/x-pdf-sample`) via `setData()`/`getData()`. This lets drop handlers distinguish internal drags from native file drags without ambiguity.
 
@@ -394,9 +396,9 @@ Native HTML5 drag-and-drop uses `e.dataTransfer.types.includes('Files')` to dete
 
 ---
 
-## Browser Constraints
+## Browser constraints
 
-### Web Worker Boundary
+### Web Worker boundary
 
 All PDF processing runs in a Web Worker. The main thread sends an `ArrayBuffer` (transferred, not copied) and receives progress messages + the final result. UI never touches pdf-lib directly. This keeps the UI responsive during heavy processing.
 
@@ -406,7 +408,7 @@ WASM modules (like harfbuzzjs for font subsetting) can be instantiated inside We
 
 ---
 
-## Font Subsetting Libraries (Evaluated)
+## Font subsetting libraries (evaluated)
 
 | Library | Bundle | TrueType | CFF/OpenType | Maintained | Verdict |
 |---------|--------|----------|-------------|------------|---------|
@@ -420,13 +422,13 @@ WASM modules (like harfbuzzjs for font subsetting) can be instantiated inside We
 
 **Key trade-off:** harfbuzzjs's API is Unicode-based (you pass codepoints to keep), so PDF character codes must be reverse-mapped to Unicode via the font's `/ToUnicode` CMap or `/Encoding`.
 
-### harfbuzzjs CJS/ESM Interop
+### harfbuzzjs CJS/ESM interop
 
 harfbuzzjs's `index.js` does `module.exports = new Promise(...)`. When Vitest transforms this CJS module into ESM, the Promise's `.then` method leaks onto the module namespace object, making it look like a thenable. `await import('harfbuzzjs')` then tries to call `.then()` on the module, causing `TypeError: Method Promise.prototype.then called on incompatible receiver [object Module]`.
 
 **Fix:** Don't import the harfbuzzjs JS wrapper at all. Load `hb-subset.wasm` directly via `require.resolve('harfbuzzjs/hb-subset.wasm')` (Node) or `new URL('harfbuzzjs/hb-subset.wasm', import.meta.url)` (browser) and call `WebAssembly.instantiate()` ourselves. The JS wrapper is for the shaping API; we only need the subsetting C API exports.
 
-### pdf-lib Lazy Object Creation
+### pdf-lib lazy object creation
 
 pdf-lib creates font dict objects lazily — after `embedFont()` + `drawText()`, the actual PDF objects (FontDescriptor, FontFile2, CIDFont, etc.) don't exist in `context` until `save()` is called. Testing font subsetting requires a save/reload cycle: `doc.save({ useObjectStreams: false })` then `PDFDocument.load(saved)`.
 
@@ -446,24 +448,26 @@ PDF's FlateDecode (ISO 32000, section 7.4.4) references both RFC 1950 (zlib) and
 
 **Why it wasn't caught earlier:** All test fixtures use fflate's `deflateSync` to create FlateDecode streams. The decode path (`inflateSync`/`decompressSync`) handles both formats. Tests only verify data integrity via pdf-lib reload, not actual rendering. The bug only manifests when a PDF viewer renders the output.
 
-### BFS Traversal and PDFStream Subclasses
+### BFS traversal and PDFStream subclasses
 
 The BFS traversal in `pdf-traversal.js` should use `instanceof PDFStream` (the base class), not `instanceof PDFRawStream`. pdf-lib has multiple stream subclasses (`PDFRawStream`, `PDFFlateStream`, `PDFContentStream`). Using the base class is defensive against edge cases where streams aren't `PDFRawStream` instances.
 
-**Defense in depth:** A `checkContentIntegrity()` function in `pipeline.js` runs after all passes and before `save()`. It checks each page's `/Contents` ref to ensure it resolves to an actual object — a dangling ref means an optimization pass incorrectly deleted a live content stream. If any page has a dangling ref, the pipeline falls back to original bytes (like the size guard). This catches bugs that would otherwise produce silently blank pages.
+**Defense in depth:** A `checkContentIntegrity()` function in `pipeline.js` runs after all passes and before `save()`. It checks each page's `/Contents` ref **and** resource refs (`/Resources` → XObject, Font, ExtGState) to ensure they resolve to live objects. A dangling content stream ref means an optimization pass deleted live drawing commands; a dangling resource ref means a Form XObject, font, or graphics state was removed. Either triggers fallback to original bytes. This catches bugs that would otherwise produce silently blank pages — including cases where the page content stream is intact but its referenced resources are gone.
 
-### Pipeline Safety: Two-Layer Guard + Per-Pass Error Isolation
+**Per-pass resource tracking (debug mode):** When `options.debug` is true, the pipeline snapshots every page's content and resource refs before each pass, then diffs after. Newly dangling refs are recorded as `_danglingAfterPass` on the pass stats and surfaced in the Debug Console under "Resource integrity warnings". This pinpoints exactly which pass breaks which page — critical for diagnosing content-loss bugs in large real-world PDFs where the issue only manifests in the full document (not when the affected page is extracted alone).
+
+### Pipeline safety: two-layer guard + per-pass error isolation
 
 The pipeline has three safety mechanisms:
 
 1. **Per-pass error isolation.** Each of the 8 optimization passes runs inside a try/catch. If one pass throws (e.g., a font with an unusual encoding causes the subsetter to fail), the pipeline continues with the remaining passes. The error is logged in stats but doesn't abort the entire optimization. This is critical because real-world PDFs contain surprising structures — a pass that works on 99% of PDFs shouldn't block the other passes when it encounters the 1%.
 
-2. **Content integrity check.** After all passes complete but before `save()`, `checkContentIntegrity()` walks every page and verifies each `/Contents` ref (or array of refs) still resolves to a live object. Dangling refs → fallback to original bytes.
+2. **Content integrity check.** After all passes complete but before `save()`, `checkContentIntegrity()` walks every page and verifies each `/Contents` ref (or array of refs) still resolves to a live object — plus checks that XObject, Font, and ExtGState resource refs still resolve. Dangling refs → fallback to original bytes.
 
 3. **Size guard.** After `save()`, the pipeline compares output bytes against input bytes. If output >= input, it returns the original bytes unchanged. This prevents the edge case where optimization overhead (e.g., pdf-lib rewriting cross-references) makes the file larger.
 
 The guards are ordered intentionally: integrity check catches corruption, size guard catches bloat regression. Both are invisible to the user — the optimized file is simply returned unchanged, with `stats.sizeGuard: true` or `stats.contentWarnings` flagging what happened.
 
-### Node.js fetch() Detection
+### Node.js fetch() detection
 
 Node.js 18+ has a global `fetch()`, so `typeof fetch === 'function'` is true in both browser and Node. For environment detection, use `typeof process !== 'undefined' && process.versions?.node` to identify Node.js before checking for `fetch`.

@@ -17,6 +17,9 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - **Page content streams excluded from deduplication** — Object dedup no longer merges page content streams. The non-cryptographic hash used for dedup has a small but non-zero collision risk; a collision on a content stream would silently blank a page, and the content integrity guard cannot catch it because dedup relinks refs before deleting (so the dangling-ref check passes). Images, fonts, and other supporting objects are still deduplicated normally.
+- **Stream recompression preserves DecodeParms with Predictor** — Streams using PNG/TIFF row prediction (`Predictor 10-15` in DecodeParms) were being corrupted: the pass inflated the data but did not reverse the prediction, then deleted DecodeParms. The viewer couldn't undo the prediction, producing blank pages. DecodeParms is now preserved when the stream uses Predictor, so the viewer can correctly decode the re-deflated data. This was the primary cause of blank pages on large vector-heavy PDFs.
+- **Content integrity guard now checks page resources** — The post-pipeline integrity check now verifies that each page's XObject, Font, and ExtGState resource refs still resolve, not just content stream refs. Dangling resource refs (e.g., a removed Form XObject) trigger fallback to original bytes, preventing blank pages from missing vector drawings or fonts.
+- **Per-pass resource tracking in Debug Console** — When the Debug Console is active, the pipeline snapshots each page's resource refs before and after every pass, reporting which pass introduced dangling refs. Surfaces as "Resource integrity warnings" in the Debug Console.
 
 ### Changed
 

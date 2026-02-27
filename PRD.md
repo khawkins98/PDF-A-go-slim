@@ -4,7 +4,7 @@
 
 A browser-based PDF optimization tool that reduces file size without requiring server-side processing. Runs entirely in the browser using JavaScript/WebAssembly. No uploads, no accounts, no file size limits beyond available RAM.
 
-## Origin Story
+## Origin story
 
 This project grew out of [PDF-A-go-go](https://github.com/khawkins98/PDF-A-go-go), an embeddable PDF viewer for the web. While building a 3-page showcase PDF for the project's demo page, we hit a problem that turns out to be universal:
 
@@ -18,7 +18,7 @@ We tried the obvious tools:
 
 This is a solved problem in theory — every optimization technique is well-documented — but there's no tool that puts them all together in the browser where your files stay private and the tool is free.
 
-## The Problem
+## The problem
 
 PDF bloat is everywhere and nobody has a good answer:
 
@@ -27,16 +27,16 @@ PDF bloat is everywhere and nobody has a good answer:
 - **Online services** (iLovePDF, Smallpdf) work but require uploading your files to a third party. They're paywalled for batch or large files. For institutional users with sensitive documents, uploading isn't an option.
 - **Command-line tools** (qpdf, mutool) need installation and only handle structural optimization, not content-level cleanup like font deduplication or image recompression.
 
-There's no open-source, privacy-first, in-browser option that handles the full range of optimizations.
+Nothing open-source and browser-based does all of this.
 
-## Core Value Proposition
+## What it offers
 
 - **No upload** — files never leave the browser
 - **No install** — works in any modern browser tab
 - **Free and open source** — MIT licensed
 - **Batch capable** — drag in multiple PDFs, optimize all at once
 
-## Target Users
+## Target users
 
 1. **Content publishers** — bloggers, documentation writers who need lean PDFs for the web
 2. **Developers** — embedding PDFs in apps, need to minimize transfer size
@@ -73,7 +73,7 @@ There's no open-source, privacy-first, in-browser option that handles the full r
 | **Optimization summary** | Show a human-readable summary of what was done (e.g., "3 images recompressed, 1 font unembedded, 12 metadata entries stripped") |
 | **Credits & attribution** | Footer or about section crediting open-source packages used (pdf-lib, fflate, jpeg-js, PDF-A-go-go) and linking to source |
 
-### P2 — Power User
+### P2 — Power user
 
 | Feature | Description |
 |---------|-------------|
@@ -83,9 +83,9 @@ There's no open-source, privacy-first, in-browser option that handles the full r
 | **Watch mode (Node)** | Watch a directory and auto-optimize PDFs on save |
 | **WASM Ghostscript fallback** | For operations that can't be done with pure JS parsing, use a WASM-compiled Ghostscript |
 
-## Technical Architecture
+## Technical architecture
 
-### Core Engine (as built)
+### Core engine (as built)
 
 ```
 src/
@@ -113,7 +113,7 @@ src/
       harfbuzz-subsetter.js   # harfbuzzjs WASM wrapper for font subsetting
 ```
 
-### Options Schema
+### Options schema
 
 All passes receive an `options` object. Each pass checks its own flags and ignores unknown options, making the schema forward-compatible with presets and per-pass configurability.
 
@@ -127,7 +127,7 @@ All passes receive an `options` object. Each pass checks its own flags and ignor
 }
 ```
 
-### Key Technical Decisions
+### Key technical decisions
 
 **PDF Parsing**: [pdf-lib](https://github.com/Hopding/pdf-lib) for low-level PDF object access (PDFDocument, PDFDict, PDFArray, PDFRawStream, etc.). Provides cross-reference tables, object streams, and incremental updates. We operate directly on its internal context objects for optimization.
 
@@ -143,7 +143,7 @@ All passes receive an `options` object. Each pass checks its own flags and ignor
 
 **WASM Option**: For maximum compression, compile [QPDF](https://github.com/qpdf/qpdf) (Apache 2.0) to WASM. MuPDF and Ghostscript are AGPL — licensing concerns for bundling. Ship as an optional heavy module (~5MB).
 
-### Browser Constraints
+### Browser constraints
 
 | Constraint | Mitigation |
 |------------|------------|
@@ -152,7 +152,7 @@ All passes receive an `options` object. Each pass checks its own flags and ignor
 | **Single thread** | Offload compression to Web Workers; use `SharedArrayBuffer` where available for zero-copy transfer |
 | **No native zlib** | pako is ~95% as fast as native zlib; CompressionStream API (Chrome 80+) is native-speed alternative |
 
-### Node.js Mode
+### Node.js mode
 
 The same core engine runs in Node.js with:
 - `fs` instead of File API for I/O
@@ -165,11 +165,11 @@ npm install pdf-a-go-slim       # Core engine (browser + Node)
 npx pdf-a-go-slim ./input.pdf   # CLI usage
 ```
 
-## UI Design
+## UI design
 
 Platinum-inspired floating palette desktop — five always-visible palettes (Settings, Results, Inspector, Preview, Accessibility) over a persistent drop zone, borrowing structural patterns from Mac OS 8 (beveled title bars, WindowShade collapse, warm cream surfaces, dense layouts). See `docs/UI.md` for detailed design decisions.
 
-### Design Philosophy
+### Design philosophy
 
 Three principles guide visual decisions:
 
@@ -206,7 +206,7 @@ Single-page app framed as a desktop utility window:
 
 Works on mobile for quick single-file optimization. Window chrome stacks/shrinks gracefully. Batch features are desktop-focused.
 
-## Success Metrics
+## Success metrics
 
 | Metric | Target |
 |--------|--------|
@@ -216,7 +216,7 @@ Works on mobile for quick single-file optimization. Window chrome stacks/shrinks
 | Bundle size (with WASM) | < 5MB |
 | Browser support | Chrome 80+, Firefox 90+, Safari 15+, Edge 80+ |
 
-## Competitive Landscape
+## Competitive landscape
 
 | Tool | Runs locally | Free | Open source | Batch | Font optimization |
 |------|:---:|:---:|:---:|:---:|:---:|
@@ -254,13 +254,13 @@ Works on mobile for quick single-file optimization. Window chrome stacks/shrinks
 - [x] Accessibility palette (trait checklist, lightweight audits, external validator links)
 - [ ] Linearization
 
-### P2 — Power User
+### P2 — Power user
 - [ ] Per-object control
 - [ ] CLI / Node.js mode
 - [ ] Watch mode (Node)
 - [ ] WASM Ghostscript fallback
 
-## Accessibility & PDF/A Considerations
+## Accessibility and PDF/A considerations
 
 PDF optimization can degrade accessibility. The following mitigations are in place and planned:
 
@@ -277,9 +277,9 @@ PDF optimization can degrade accessibility. The following mitigations are in pla
 - **PDF/A-1 object stream protection** — Pipeline conditionally disables `useObjectStreams` when `pdfALevel` starts with `1`, preserving strict PDF/A-1 conformance. PDF/A-2+ files still use object streams for better compression.
 - **PDF/UA font protection** — Font unembedding is blocked for PDF/UA documents (`isPdfUA` triggers skip), matching the PDF/A behavior. Ensures all fonts remain embedded as required by ISO 14289.
 
-### Accessibility palette (implemented)
+### Accessibility palette
 
-A dedicated Accessibility floating palette surfaces accessibility information after optimization:
+A floating palette that shows accessibility information after optimization:
 
 - **Trait checklist** — pass/fail rows for Tagged PDF, Structure Tree, Document Title, Display Title, Document Language, PDF/A, PDF/UA. Uses existing `stats.pdfTraits`. Additional checks (title, displayDocTitle, markedStatus) inspired by [PDFcheck](https://github.com/jsnmrs/pdfcheck) by Jason Morris.
 - **Lightweight audits** — three `<details>` sections: ToUnicode CMap coverage (text extractability), image alt text coverage (Figure StructElems with `/Alt`), structure tree depth/types. Runs on the optimized document via `auditAccessibility()` in `accessibility-detect.js`.
@@ -291,20 +291,20 @@ A dedicated Accessibility floating palette surfaces accessibility information af
 |------|----------|-------------|
 | **Per-page accessibility drill-down** | P3 | Expand the Accessibility palette to show per-page structure tree and alt text coverage for large documents. |
 
-## Learnings & Documentation
+## Learnings and documentation
 
-Technical learnings, design decisions, and pitfalls encountered during development are captured in [`docs/learnings.md`](docs/learnings.md). This is a living document — update it whenever we discover something non-obvious about PDF internals, tooling trade-offs, or browser constraints.
+Technical learnings, design decisions, and pitfalls are in [`docs/learnings.md`](docs/learnings.md). Update it whenever we hit something non-obvious about PDF internals, tooling, or browser constraints.
 
-## Open Questions
+## Open questions
 
 1. ~~**pdf-lib vs custom parser?**~~ **Resolved:** pdf-lib works well. Direct access to its internal `context` and indirect object enumeration provides sufficient low-level control for all current optimization passes without needing a fork.
 2. **WASM Ghostscript licensing**: Ghostscript is AGPL. MuPDF is also AGPL. Best alternative: compile [QPDF](https://github.com/qpdf/qpdf) (Apache 2.0) to WASM for structural optimizations that pure JS can't handle.
 3. ~~**Standard font unembedding safety**~~ **Resolved:** Implemented for Type1/TrueType only, skipping Type0 composites and fonts with custom Differences encodings. Enabled by default (`unembedStandardFonts: true`) since all conforming PDF readers are required to provide the base-14 fonts.
 4. ~~**Configurability UX**~~ **Resolved:** Implemented preset buttons (Lossless/Web/Print), collapsible Advanced Settings panel with lossy/lossless toggle, image quality slider, and font unembedding checkbox. Presets set all controls; manual tweaks auto-detect matching preset or show "Custom". Options flow through to the worker and engine unchanged.
 
-## Easter Egg Ideas
+## Easter egg ideas
 
-Small, discoverable surprises that reinforce the retro aesthetic without interfering with the tool's core function. Each should be under a day to implement. All animated items must respect `prefers-reduced-motion`.
+Small, discoverable surprises that lean into the retro aesthetic without getting in the way. Each should take under a day. All animated items must respect `prefers-reduced-motion`.
 
 | Idea | Description | Trigger |
 |------|-------------|---------|
