@@ -1,10 +1,10 @@
-# UI Architecture & Information Architecture
+# UI architecture and information architecture
 
 Reference diagram for the PDF-A-go-slim interface. Documents the state model, screen layouts, component hierarchy, and data flow.
 
 **Visual style:** [Web Desktop](https://en.wikipedia.org/wiki/Web_desktop) — a browser-based application using the desktop metaphor with floating windows, icons, and drag-and-drop. Specifically, a Mac OS 8 Platinum-inspired desktop utility with window chrome, floating palettes, and status bar.
 
-### Design Thesis
+### Design thesis
 
 Late-90s desktop paradigms (persistent tool palettes, dense information display, always-visible controls) may be a better fit for single-purpose browser utilities than the modern convention of progressive disclosure and minimal surfaces. Browser tools are used in focused bursts, not browsed casually — the same use pattern that floating palettes were designed for.
 
@@ -14,7 +14,7 @@ Three principles guide visual decisions:
 2. **Utility, not decoration.** Every visual element — striped title bars, sunken panels, beveled borders — is borrowed because it communicates hierarchy or state, not because it looks retro.
 3. **Modern underneath.** System fonts, CSS custom properties, semantic HTML, responsive layout. The aesthetic is a styling layer; the app works without it.
 
-The patterns documented here (palette window manager, theme system, desktop patterns, control strip) are designed to be extractable — they have no dependency on the PDF optimization engine and could serve as the foundation for other web desktop projects, browser tools, or content sites.
+The patterns documented here (palette window manager, theme system, desktop patterns, control strip) have no dependency on the PDF optimization engine and could work in other web desktop projects or browser tools.
 
 **References:**
 - Apple Macintosh Human Interface Guidelines (1995)
@@ -27,7 +27,7 @@ See `PRD.md` for the full rationale and origin story.
 
 ---
 
-## State Model
+## State model
 
 The app uses a simplified two-phase model: **idle/results** vs **processing**. There is no `showState()` function — instead, the drop zone is always visible (dimmed during processing), and four floating palettes hold all content. Palettes show empty placeholders until optimization completes.
 
@@ -80,7 +80,7 @@ The app uses a simplified two-phase model: **idle/results** vs **processing**. T
 
 ---
 
-## Screen Layouts
+## Screen layouts
 
 ### IDLE
 
@@ -101,7 +101,7 @@ The app uses a simplified two-phase model: **idle/results** vs **processing**. T
 └──────────────────────────────────────────────┘
 
 ┌── Settings palette ──────────┐   (always on screen)
-│ [Lossless*][Web][Print]      │
+│ [Lossless*][Web][Print][Max] │
 │ No quality loss — recompress,│ ← preset hint (updates per tab)
 │ deduplicate, subset fonts    │
 │ ⚙ Advanced Settings          │ ← gear icon
@@ -188,7 +188,7 @@ After optimization, the main window shows "Start Over" and palettes are populate
 └──────────────────────────────────────────────┘
 
 ┌── Settings palette ───────────┐
-│ [Lossless*][Web][Print]       │
+│ [Lossless*][Web][Print][Max]  │
 │ No quality loss — recompress… │ ← preset hint
 │ ⚙ Advanced Settings           │
 │ ───────────────────────       │
@@ -226,7 +226,7 @@ After optimization, the main window shows "Start Over" and palettes are populate
 1. "Did it work?" — savings % + sizes in Results palette (always prominent)
 2. "Get my file" — Download button in Results palette
 3. "What happened?" — hint banner + Inspector palette (stats + object breakdown)
-4. "Deep dive" — Preview palette (PDF-A-go-go viewer), Debug panel (`?debug` only)
+4. "Deep dive" — Preview palette (PDF-A-go-go viewer), Debug Console (via Window menu)
 5. "What next?" — Re-optimize in Settings palette, Start Over in main window
 6. Status bar — persistent savings summary
 
@@ -266,7 +266,7 @@ Multi-file results use summary card + table rows in the Results palette:
 
 ---
 
-## Overlay: Drop Target
+## Overlay: drop target
 
 Shown over any state (except processing) when files are dragged onto the page.
 
@@ -289,7 +289,7 @@ Managed by `dragenter`/`dragleave` counter on `document`. Accepts both native `F
 
 ---
 
-## Component Hierarchy
+## Component hierarchy
 
 ```
 index.html
@@ -305,8 +305,6 @@ index.html
         │     │     ├── .title-bar__title ("PDF-A-go-slim")
         │     │     ├── .title-bar__ridges
         │     │     └── .title-bar__widgets > .title-bar__collapse-box
-        │     │
-        │     ├── .debug-banner (conditional, ?debug param)
         │     │
         │     ├── #app (main content area)
         │     │     │
@@ -334,7 +332,7 @@ index.html
         ├── #palette-settings (created by createPalette())
         │     └── .palette__body
         │           └── #options-panel (moved here from HTML on init)
-        │                 ├── .tab-control (Lossless / Web / Print, title tooltips)
+        │                 ├── .tab-control (Lossless / Web / Print / Max Compress, title tooltips)
         │                 ├── #preset-hint (.tab-control__hint, updates per preset)
         │                 ├── .advanced (<details open>)
         │                 │     └── .advanced__toggle (⚙ gear icon + "Advanced Settings")
@@ -368,7 +366,7 @@ index.html
         │                 │     │           ├── .inspect-annotation (what optimizer did)
         │                 │     │           └── .inspect-item × N (with Show more toggle)
         │                 │     └── .inspect-panel__total
-        │                 └── .debug-panel (<details>, ?debug only)
+        │                 └── (debug data shown in Debug Console palette)
         │
         ├── #palette-preview (created by createPalette())
         │     └── .palette__body
@@ -376,6 +374,30 @@ index.html
         │                 └── .compare-viewer-wrap
         │                       ├── .compare-side__label (size + Powered by link)
         │                       └── .compare-side__viewer (PDF-A-go-go container)
+        │
+        ├── #palette-accessibility (created by createPalette())
+        │     └── .palette__body
+        │           └── (populated by buildAccessibilityPaletteContent)
+        │                 ├── .a11y-traits (trait checklist rows)
+        │                 ├── .a11y-audits (ToUnicode, alt text, structure tree)
+        │                 └── .a11y-validators (external tool links)
+        │
+        ├── #palette-appearance (created by createPalette())
+        │     └── .palette__body
+        │           └── (populated by buildAppearanceContent)
+        │                 ├── .pattern-picker (9 pattern swatches)
+        │                 ├── .easter-egg-toggles (chime, Happy Mac, Sad Mac)
+        │                 └── sound picker (buildSoundContent)
+        │
+        ├── #palette-debug (created by createPalette(), hidden by default)
+        │     └── .palette__body
+        │           └── (populated by buildDebugPanel after optimization)
+        │
+        ├── .menu-bar (created by createMenuBar(), fixed top)
+        │     └── Window menu (palette show/hide toggles)
+        │
+        ├── .control-strip (created by createControlStrip(), fixed bottom-left)
+        │     └── .control-strip__modules (CRT, theme, B&W, Grayscale, links)
         │
         └── #desktop-icons
               ├── .desktop-icon #icon-readme (static, in HTML)
@@ -388,7 +410,7 @@ index.html
 
 ---
 
-## Options Panel Lifecycle
+## Options panel lifecycle
 
 The `#options-panel` is defined in HTML (so `options.js` module-level `querySelectorAll` finds elements on import), then physically moved into the Settings palette body on init:
 
@@ -402,7 +424,7 @@ Event listeners survive DOM relocation because they're attached to elements, not
 
 ---
 
-## Status Bar
+## Status bar
 
 The `.status-bar` sits at the bottom of `#main-window` with two sunken fields:
 
@@ -416,7 +438,7 @@ Updated by `setProcessing()` (idle/processing) and `renderResults()` (savings su
 
 ---
 
-## Module Map
+## Module map
 
 ```
 main.js
@@ -467,6 +489,32 @@ main.js
   │     ├── getCurrentPresetLabel()   "Lossless" / "Web" / "Print" / "Custom"
   │     └── initOptionsListeners()    Wire up event handlers + stale detection
   │
+  ├── ui/accessibility.js        Accessibility palette
+  │     ├── buildAccessibilityPaletteContent()  Trait checklist + audits + validators
+  │     └── buildAccessibilityEmptyContent()    Placeholder before optimization
+  │
+  ├── ui/appearance.js           Appearance palette (themes, patterns, easter eggs)
+  │     ├── initAppearance()         Initialize theme/pattern from localStorage
+  │     ├── buildAppearanceContent() Appearance palette body (patterns, themes, easter eggs)
+  │     ├── cycleTheme()             Cycle through 5 themes (Platinum, Dark, Amber, Ocean, Forest)
+  │     ├── toggleCRT()              Toggle CRT scanline overlay
+  │     ├── toggleFilter()           Toggle B&W or Grayscale filter
+  │     ├── getThemeLabel()          Current theme name for tooltips
+  │     ├── showMacAlert()           Platinum-style alert window (draggable, auto-dismiss)
+  │     ├── showHappyMac()           Pixel-art Happy Mac palette (savings >= 30%)
+  │     ├── showSadMac()             Pixel-art Sad Mac palette (savings <= 0%)
+  │     └── resetAppearance()        Clear all appearance localStorage
+  │
+  ├── ui/control-strip.js        Mac OS 8 Control Strip
+  │     └── createControlStrip()     Collapsible toolbar (CRT, theme, B&W, links)
+  │
+  ├── ui/menu-bar.js             Mac OS 8 menu bar
+  │     └── createMenuBar()          Press-and-drag menus (Window menu, palette list)
+  │
+  ├── ui/sound.js                Classic Mac sound system
+  │     ├── initSound()              Load sound pack, wire up alert sound triggers
+  │     └── buildSoundContent()      Sound picker UI for Appearance palette
+  │
   └── ui/helpers.js              Shared utilities
         ├── formatSize()             Bytes → human-readable string
         └── escapeHtml()             Sanitize for innerHTML
@@ -474,22 +522,22 @@ main.js
 
 ---
 
-## Micro-Interactions & Visual Feedback
+## Micro-interactions and visual feedback
 
 | Element | Trigger | Duration | Notes |
 |---------|---------|----------|-------|
 | `.toast` | Non-PDF files dropped | 4s + 300ms fade | Fixed bottom-center |
-| `.debug-banner` | `?debug` URL param | Persistent | Top of `#main-window` |
+| Debug Console palette | Window menu or `?debug` URL param | Persistent (closable) | Floating palette |
 | `.drop-overlay` | Files dragged over page | While dragging | Full-page, pointer-events: none |
 | `.btn--stale` animation | Settings changed after results | 1x 2s pulse | On Re-optimize button |
 | Count-up animation | Results displayed | 600ms ease-out | On savings percentage |
 | Bar fill animation | Results displayed | 400ms ease | CSS transition on width |
 
-### Stale Results Detection
+### Stale results detection
 
 After results render, the system watches for option changes. `renderResults()` stores `lastRunOptions = JSON.stringify(collectOptions())`. Every subsequent option change fires `checkStaleResults()`, which compares the current JSON against the stored snapshot. If different, the Re-optimize button gets a `.btn--stale` pulse animation. If the user reverts to the original settings, the indicator disappears. Simple JSON comparison — no diffing, no state management library.
 
-### Count-Up Animation
+### Count-up animation
 
 The savings percentage animates from 0 to the target using `requestAnimationFrame` + `performance.now()` with cubic ease-out (`1 - (1-t)^3`) over 600ms. The progress bar width animates simultaneously via CSS transition (400ms).
 
@@ -497,11 +545,11 @@ The savings percentage animates from 0 to the target using `requestAnimationFram
 
 ---
 
-## Reusable UI Patterns
+## Reusable UI patterns
 
-The following patterns have no dependency on the PDF optimization engine. They're designed as extractable components that could serve other browser tools or content sites using a similar retro desktop aesthetic.
+These patterns have no dependency on the PDF optimization engine and could work in other retro-styled browser tools.
 
-### Floating Palette Window Manager
+### Floating palette window manager
 
 **Why palettes?** The tool surfaces four categories of information simultaneously (settings, results, object breakdown, preview). Tabs force context switching. Stacked panels require scrolling. Floating palettes let users arrange by priority and keep everything visible — the same reason Photoshop, Illustrator, and classic Mac applications used this pattern.
 
@@ -524,7 +572,7 @@ No z-index stack to maintain. Called on mousedown/touchstart of any palette.
 
 **Touch support:** Both `mousedown` and `touchstart` handlers registered. `touchmove` uses `{ passive: false }` for `preventDefault()` (prevents scroll while dragging).
 
-### Desktop Pattern Generator
+### Desktop pattern generator
 
 Nine patterns generated entirely with CSS — no images, no canvas:
 
@@ -537,7 +585,7 @@ Nine patterns generated entirely with CSS — no images, no canvas:
 
 Each pattern adapts to light/dark themes via a single helper function `c(dark, a)` that generates RGBA values based on the current theme. Light themes use dark strokes on cream; dark themes use light strokes on dark surfaces. The patterns and themes are **orthogonal** — any of 9 patterns × 5 themes works. All state persists to `localStorage`.
 
-### Theme System
+### Theme system
 
 Five themes (Platinum, Dark, Amber, Ocean, Forest) applied by swapping CSS custom properties on the root element. B&W and Grayscale are CSS `filter` toggles on `<body>`, mutually exclusive. The theme switcher is a button in the Control Strip that cycles through themes, with the current theme name shown as a tooltip.
 
@@ -547,15 +595,15 @@ A Mac OS 8-style collapsible toolbar fixed at bottom-left. Contains toggle butto
 
 ---
 
-## PDF-A-go-go Integration
+## PDF-A-go-go integration
 
 [PDF-A-go-go](https://github.com/khawkins98/PDF-A-go-go) is the sibling project — a lightweight, embeddable PDF viewer built on PDF.js with tile-based rendering. PDF-A-go-slim was born from trying to optimize demo PDFs for PDF-A-go-go's showcase page (see `PRD.md` origin story). The two projects share a design philosophy: no server, no framework, pure browser.
 
-### Lazy Loading
+### Lazy loading
 
 PDF-A-go-go JS + CSS (~550 KB) are loaded from CDN only when the Preview palette is first populated. A shared `loadPromise` deduplicates concurrent load requests. This keeps PDF-A-go-slim's own bundle small — the heavy PDF.js rendering code is external and optional.
 
-### ResizeObserver Lifecycle
+### ResizeObserver lifecycle
 
 PDF-A-go-go doesn't support dynamic resizing — viewers must be destroyed and recreated at new dimensions. When a user drags the palette resize grip, this creates a lifecycle conflict with ResizeObserver:
 
@@ -569,11 +617,11 @@ The core insight: ResizeObserver + destroy/recreate is fundamentally at odds wit
 
 ---
 
-## Personality Layer
+## Personality layer
 
-Small, discoverable surprises that reinforce the retro aesthetic without interfering with core function. All animated items respect `prefers-reduced-motion`. State persists via `localStorage`.
+Small, discoverable surprises that lean into the retro aesthetic without getting in the way. All animated items respect `prefers-reduced-motion`. State persists via `localStorage`.
 
-### Startup Chime
+### Startup chime
 
 A 4-note C major chord synthesized with Web Audio API (`OscillatorNode` × 4 with harmonics). Plays once on the first file drop, never again in the same session. Togglable via Appearance palette.
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFRef, PDFRawStream } from 'pdf-lib';
 import { deflateSync } from 'fflate';
 import { deduplicateObjects } from '../../src/engine/optimize/dedup.js';
 import { createDuplicateObjectsPdf } from '../fixtures/create-test-pdfs.js';
@@ -47,5 +47,50 @@ describe('deduplicateObjects', () => {
     // Should be loadable
     const reloaded = await PDFDocument.load(bytes);
     expect(reloaded.getPageCount()).toBe(1);
+  });
+
+  it('skips page content streams', async () => {
+    // Create a PDF with two pages whose content streams are byte-identical
+    const doc = await PDFDocument.create();
+    const contentBytes = deflateSync(
+      new TextEncoder().encode('BT /F1 12 Tf (Hello) Tj ET'),
+      { level: 6 },
+    );
+
+    // Build two pages with identical content streams
+    for (let i = 0; i < 2; i++) {
+      const page = doc.addPage([200, 200]);
+      const dict = doc.context.obj({});
+      dict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+      dict.set(PDFName.of('Length'), doc.context.obj(contentBytes.length));
+      const stream = PDFRawStream.of(dict, new Uint8Array(contentBytes));
+      const ref = doc.context.register(stream);
+      page.node.set(PDFName.of('Contents'), ref);
+    }
+
+    // Collect content stream refs before dedup
+    const refsBefore = new Set();
+    for (const page of doc.getPages()) {
+      const c = page.node.get(PDFName.of('Contents'));
+      if (c instanceof PDFRef) refsBefore.add(c.tag);
+    }
+
+    const result = deduplicateObjects(doc);
+
+    // Content streams should be skipped, not merged
+    expect(result.contentStreamsSkipped).toBe(2);
+
+    // Both pages should still point to distinct content stream refs
+    const refsAfter = new Set();
+    for (const page of doc.getPages()) {
+      const c = page.node.get(PDFName.of('Contents'));
+      if (c instanceof PDFRef) refsAfter.add(c.tag);
+    }
+    expect(refsAfter.size).toBe(2);
+
+    // The original refs should be unchanged
+    for (const tag of refsBefore) {
+      expect(refsAfter.has(tag)).toBe(true);
+    }
   });
 });

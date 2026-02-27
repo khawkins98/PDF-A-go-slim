@@ -1,10 +1,10 @@
-# UI Design Decisions
+# UI design decisions
 
 Living document tracking the visual design direction for PDF-A-go-slim.
 
 ---
 
-## Architecture: Floating Palette Desktop
+## Architecture: floating palette desktop
 
 ### Layout
 
@@ -24,7 +24,7 @@ The UI is a **Mac OS 8 multi-window desktop** with a persistent drop zone in the
 └── palette#preview (Preview — before/after PDF viewer)
 ```
 
-### Window Manager (`src/ui/palette.js`)
+### Window manager (`src/ui/palette.js`)
 
 Core module (~200 lines) managing the floating palette system:
 
@@ -34,7 +34,7 @@ Core module (~200 lines) managing the floating palette system:
 - **`bringToFront(el)`** — Increments z-index counter and applies to element. Any mousedown on a palette calls this
 - **`isMobile()`** — Returns true if viewport < 768px
 
-### Drag System
+### Drag system
 
 - `mousedown` on title bar (excluding collapse box) starts drag
 - `mousemove` on document updates `style.left`/`style.top`
@@ -49,7 +49,7 @@ Mac OS classic behavior: double-click title bar or click collapse box to collaps
 - `.palette--shaded .palette__body { display: none }` — body collapses
 - No close box in current implementation — palettes are always present (can be hidden programmatically via `hide()`/`show()` API)
 
-### State Model
+### State model
 
 The old three-state machine (`idle → processing → results`) with `showState()` toggling hidden sections is replaced by a simpler model:
 
@@ -58,7 +58,7 @@ The old three-state machine (`idle → processing → results`) with `showState(
 - **Palettes** are always on screen. Results/Inspector/Preview show empty placeholder text until optimization completes, then populated via `setContent()`
 - **Settings palette** always contains the options panel (physically moved there from HTML on init)
 
-### Default Palette Positions
+### Default palette positions
 
 | Palette | Default Position |
 |---------|-----------------|
@@ -80,7 +80,7 @@ Palettes stack vertically. Still shadable, not draggable.
 
 ---
 
-## Visual Design: Classic Desktop Utility Aesthetic
+## Visual design
 
 ### Rationale
 
@@ -88,7 +88,7 @@ The original UI was clean but generic — centered cards, rounded corners, blue 
 
 The new direction borrows **structural patterns** from classic desktop applications: window chrome, status bars, dense panels, toolbar-style buttons. The goal is a utility that *feels* like a tool, not a marketing page.
 
-### Design Principles
+### Design principles
 
 1. **Structure over skin** — We borrow the *layout grammar* of classic desktop apps, specifically the Mac OS 8 Platinum appearance (title bars with ridges, folder tabs, beveled panels). No pixel fonts, no full OS recreation.
 2. **Utility not decoration** — Every pixel earns its place. Dense layouts, compact controls, information-first hierarchy.
@@ -97,9 +97,9 @@ The new direction borrows **structural patterns** from classic desktop applicati
 
 ---
 
-## Window Chrome
+## Window chrome
 
-### Main Document Window
+### Main document window
 
 The main `.app-window` is a draggable document window with:
 - **Title bar** — 19px height, Platinum-style gray bar with centered title, horizontal ridges extending from title to edges, collapse box (right). `cursor: grab`.
@@ -113,7 +113,7 @@ Floating palette windows with thinner title bars:
 - **Body** — 8px padding, scrollable, max-height 70vh
 - `.palette--shaded` collapses body, `.palette--dragging` adds enhanced shadow
 
-### Bevel System
+### Bevel system
 
 Simplified thin single-pixel borders replacing the original 4-layer depth system. Two CSS variables remain for the rare cases where inset effects are needed (button press states, fieldset grouping):
 - `--shadow-raised` / `--shadow-sunken` — 1px inset border pair using `var(--color-border)` and `#fff`.
@@ -130,11 +130,11 @@ Most UI elements now use simple `border: 1px solid var(--color-border)` instead 
 
 ---
 
-## HIG Interaction Patterns
+## HIG interaction patterns
 
 Beyond the visual reskin, the interaction patterns themselves follow mid-90s Human Interface Guidelines from Apple (1992/1995) and Microsoft (Win95 Interface Guidelines, Win32 Dialog Box Design).
 
-### Principles Applied
+### Principles applied
 
 | HIG Principle | What Changed | Guideline Source |
 |---------------|-------------|-----------------|
@@ -148,17 +148,17 @@ Beyond the visual reskin, the interaction patterns themselves follow mid-90s Hum
 | Table/list views | Multi-file results rendered as column-header table | Windows 95 Explorer "details view" pattern |
 | Persistent drop zone | Always visible, just dimmed during processing | Mac OS desktop: always accessible |
 
-### Progressive Disclosure
+### Progressive disclosure
 
 Not everything should be expanded. These remain controlled:
 
 - **Preview palette** — Loads PDF viewer on optimization complete (no lazy-load toggle)
-- **Debug info** — Opt-in diagnostic detail. Collapsed behind `?debug` URL flag
+- **Debug Console** — Diagnostic detail in a floating palette. Accessible via Window menu at any time, or auto-shown with `?debug` URL param
 - **"Show N more..." within inspector categories** — Categories open, but 50+ objects collapse to first 5
 
 ---
 
-## Reference Inspirations
+## Reference inspirations
 
 - **Apple Mac OS 8 Human Interface Guidelines ("Platinum")** — Primary visual design reference. [PDF source](http://interface.free.fr/Archives/Apple_HIGOS8_Guidelines.pdf). Specific chapters mapped to implementation:
 
@@ -173,18 +173,18 @@ Not everything should be expanded. These remain controlled:
   | Ch 2 (p46) Placards | Sunken info panel at window bottom | `.status-bar` with engraved top separator, idle tagline |
   | WindowShade | Double-click title bar collapses window to title bar | `.palette--shaded` class, dblclick handler |
 
-- **[Poolsuite.net](https://poolsuite.net/)** — Demonstrates that retro charm comes from thin borders, warm cream colors, generous spacing, and minimal chrome — not heavy 3D bevel recreation. Primary inspiration for the visual lightening pass.
+- **[Poolsuite.net](https://poolsuite.net/)** — Showed us that retro charm comes from thin borders, warm colors, and generous spacing, not heavy 3D bevel recreation. Main inspiration for our visual lightening pass.
 - **98.css** — The original bevel technique (raised/sunken box-shadows). We borrowed the idea but have since simplified to thin 1px borders.
 - **Classic property sheets** — Tabbed panels, fieldset grouping, dense control rows.
 - **List views / details views** — Column headers, compact row spacing, tabular data presentation.
 - **Status bars** — Sunken fields at the bottom with contextual information.
-- **[PostHog website redesign](https://posthog.com/)** — In 2025, PostHog (a developer analytics company) redesigned their marketing site as a full Windows-style desktop OS in the browser: draggable windows, start menu, screensaver, functional text editor, games, trash folder with joke files, sound effects. Built by [@ninepixelgrid](https://x.com/ninepixelgrid/status/1965618996990136539) over 6 months. Why it matters: a developer tools company independently chose the same retro desktop metaphor — validating the aesthetic for technical audiences. Key difference: they're a content-rich marketing site with dozens of pages; we're a single-purpose utility. Take selective cues, not their scope. [HN discussion](https://news.ycombinator.com/item?id=45217269).
+- **[PostHog website redesign](https://posthog.com/)** — In 2025, PostHog (developer analytics) redesigned their marketing site as a full Windows-style desktop OS in the browser: draggable windows, start menu, screensaver, text editor, games, trash folder with joke files, sound effects. Built by [@ninepixelgrid](https://x.com/ninepixelgrid/status/1965618996990136539) over 6 months. A developer tools company independently chose the same retro desktop metaphor. They're a content-rich marketing site with dozens of pages; we're a single-purpose utility. Take selective cues, not their scope. [HN discussion](https://news.ycombinator.com/item?id=45217269).
 
 ---
 
-## PostHog Lessons for PDF-A-go-slim
+## PostHog lessons
 
-PostHog proves the retro desktop metaphor works for developer tools. The difference is scope. They built an operating system to present a portfolio of products. We build a utility window to do one job. Take the personality and polish, leave the complexity.
+PostHog showed that the retro desktop metaphor works for developer tools. The difference is scope. They built an operating system to present a portfolio of products. We build a utility window to do one job. Take the personality and polish, leave the complexity.
 
 ### What to adopt
 
@@ -210,5 +210,5 @@ Lessons from [HN criticism](https://news.ycombinator.com/item?id=45217269) of Po
 
 ### Scope boundary
 
-- **Yes**: Copy personality, themed transient UI, small easter eggs, transparency, metaphor consistency
-- **No**: Start menu, file system navigation, screensaver, games, editable content, sound effects by default
+- **Do**: Copy personality, themed transient UI, small easter eggs, transparency, metaphor consistency
+- **Don't**: Start menu, file system navigation, screensaver, games, editable content, sound effects by default

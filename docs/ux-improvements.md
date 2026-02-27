@@ -1,8 +1,8 @@
-# UX/UI Improvements
+# UX/UI improvements
 
 Prioritized backlog of visual polish, usability, and accessibility improvements. Benchmarked against Squoosh, TinyPNG, iLovePDF, and Smallpdf.
 
-## Quick wins (low effort)
+## Quick wins
 
 - [x] **Full-page drop overlay** — Listen for drag on `document.body`, show a full-viewport overlay with "Drop to optimize" message. Currently drops outside the drop zone are silently ignored. Filter with `e.dataTransfer.types.includes('Files')`.
 
@@ -20,7 +20,7 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 
 - [x] **Preset discoverability** — Bump `.preset-btn__desc` from `0.65rem` to `0.72rem`. Add a gear icon to the "Advanced Settings" toggle. Consider a counter badge ("2 options customized").
 
-## Medium effort
+## Medium
 
 - [ ] **Mobile responsiveness** — Results table (5 columns) and inspect panel (5-column grid) overflow on small screens. At `max-width: 640px`: convert results to card layout, collapse inspect grid to 2-3 columns, add `flex-wrap: wrap` to preset buttons, ensure 44px minimum tap targets.
 
@@ -48,12 +48,7 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 
 - [x] **Read Me palette (Stickies)** — Yellow Mac Stickies-style floating palette displaying the project README.md content, rendered via a minimal markdown-to-HTML function. Scrollable, draggable, shadable.
 
-## Bugs
-
-- [x] **calrgb.pdf loses all background colors and text after optimization** — **Fixed.** Root cause: fflate's `deflateSync` produces raw DEFLATE without the 2-byte zlib header (RFC 1950), but PDF's FlateDecode spec expects zlib-wrapped data. macOS Preview and other PDF viewers silently fail on headerless deflate, rendering blank pages. This affected all stream recompression and font subsetting output. Fix: replaced `deflateSync` with `zlibSync` in `streams.js` and `font-subset.js`. Also hardened the BFS traversal (`PDFRawStream` → `PDFStream` base class) and added a `checkContentIntegrity()` post-pipeline guard.
-
 ## Lower priority
-
 - [ ] **Drop zone micro-interactions** — Brief scale animation (`transform: scale(1.02)`) on successful file selection. Subtle box-shadow glow pulse on drag-over. Animate the SVG upload icon during drag.
 
 - [ ] **Single-file results consolidation** — For the most common case (one file), hide the table entirely and consolidate everything into the hero card: move "Show details" and "Object breakdown" toggles into the hero section.
@@ -62,11 +57,11 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 
 - [ ] **Sound effects for key moments** — Optional audio cues for optimization complete, error, drag-over (off by default, respect `prefers-reduced-motion`). PostHog uses sound effects throughout; we'd keep it minimal and opt-in.
 
-- [ ] **Keyboard shortcuts overlay** — `?shortcuts` URL param showing available shortcuts in a Platinum-styled window. Builds on the `?debug` pattern we already have.
+- [ ] **Keyboard shortcuts overlay** — `?shortcuts` URL param showing available shortcuts in a Platinum-styled window. Could also be a closable palette toggleable from the Window menu (like Debug Console).
 
 ## Easter eggs
 
-Small, discoverable surprises that reinforce the retro aesthetic. Each should be under a day to implement. All animated items must respect `prefers-reduced-motion`. State (unlocked themes, dismissed alerts) persists via `localStorage`.
+Small, discoverable surprises that lean into the retro aesthetic. Each should take under a day. All animated items must respect `prefers-reduced-motion`. State (unlocked themes, dismissed alerts) persists via `localStorage`.
 
 ### Audio
 
@@ -83,6 +78,8 @@ Small, discoverable surprises that reinforce the retro aesthetic. Each should be
 - [x] **Happy Mac on big savings** — Easter egg toggle stub in Appearance palette. Triggered when savings >= 30%. Full pixel-art SVG implementation deferred.
 
 - [x] **Sad Mac on zero savings** — Easter egg toggle stub in Appearance palette. Triggered when savings <= 0%. Full pixel-art SVG implementation deferred.
+
+- [x] **Pac-Man on long jobs** — Monochrome Pac-Man + Blinky ghost animation in the menu bar during long-running optimizations (>10s). Loops until processing completes or is cancelled. Toggle in Appearance > Visual Effects. `?pacman` URL param for instant activation. Respects `prefers-reduced-motion`.
 
 - [ ] **Finder zoom-rect open** — Classic Mac "zoom rectangle" animation when opening/restoring palettes. Four concentric rectangles scaling from source to destination over ~200ms using CSS `@keyframes`. Respect `prefers-reduced-motion`.
 
@@ -110,4 +107,4 @@ Small, discoverable surprises that reinforce the retro aesthetic. Each should be
 
 - [ ] **"Rebuild Desktop" progress bar** — Accessible via `?rebuild` URL param or a hidden button in the About dialog. Shows a mock "Rebuilding Desktop..." progress bar that fills over 5 seconds, then dismisses with "Desktop rebuilt successfully." Pure CSS animation, no actual operation.
 
-- [ ] **Keyboard shortcuts overlay** (from Lower priority above) — `?shortcuts` URL param showing available shortcuts in a Platinum-styled window. Builds on the `?debug` and `?balloons` pattern.
+- [ ] **Keyboard shortcuts overlay** (from Lower priority above) — `?shortcuts` URL param showing available shortcuts in a Platinum-styled window. Could also be a closable palette toggleable from the Window menu (like Debug Console).

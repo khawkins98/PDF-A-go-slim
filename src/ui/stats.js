@@ -60,6 +60,38 @@ export function buildDebugPanel(stats) {
     </tbody>
   </table>`;
 
+  // Resource integrity warnings (per-pass dangling refs)
+  const danglingPasses = stats.passes.filter((p) => p._danglingAfterPass?.length > 0);
+  if (danglingPasses.length > 0) {
+    html += `<h4 style="margin-top:0.75rem;color:var(--color-error)">Resource integrity warnings</h4>`;
+    for (const p of danglingPasses) {
+      const rows = p._danglingAfterPass.map((w) =>
+        `<tr><td>${escapeHtml(w)}</td></tr>`
+      ).join('');
+      html += `<p style="margin:0.25rem 0;font-weight:600">${escapeHtml(p.name)}</p>
+        <table class="debug-table"><tbody>${rows}</tbody></table>`;
+    }
+  }
+
+  // Generic debug entries from any pass (streams, images, etc.)
+  // Show entries with ref + message in a simple table, grouped by pass name
+  for (const p of stats.passes) {
+    if (!p._debug?.length) continue;
+    const generic = p._debug.filter((e) => e.message && !e.beforeSize);
+    if (generic.length > 0) {
+      const rows = generic.map((e) => `<tr>
+        <td>${escapeHtml(e.ref || '')}</td>
+        <td>${escapeHtml(e.reason || e.action || '')}</td>
+        <td>${escapeHtml(e.message)}</td>
+      </tr>`).join('');
+      html += `<h4 style="margin-top:0.75rem">${escapeHtml(p.name)} details</h4>
+        <table class="debug-table">
+          <thead><tr><th>Ref</th><th>Action</th><th>Detail</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+  }
+
   const imagesPass = stats.passes.find((p) => p._debug);
   if (imagesPass) {
     const { skipReasons, _debug } = imagesPass;

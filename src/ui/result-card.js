@@ -1,6 +1,6 @@
 import { formatSize, escapeHtml, buildDownloadName } from './helpers.js';
 import { buildStatsDetail } from './stats.js';
-import { buildInspectPanel, initInspectorInteractions } from './inspector.js';
+import { buildInspectPanel, initInspectorInteractions, generateHtmlReport } from './inspector.js';
 import { applyPreset } from './options.js';
 
 /**
@@ -329,6 +329,30 @@ export function buildInspectorPaletteContent(result, options) {
   const inspectHtml = buildInspectPanel(result.stats);
 
   if (!statsHtml && !inspectHtml && !metaHtml) return null;
+
+  // Download Report button
+  const reportHtml = generateHtmlReport(result.stats, result.name);
+  if (reportHtml) {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'inspector-toolbar';
+    const reportBtn = document.createElement('button');
+    reportBtn.className = 'btn btn--small inspector-toolbar__report';
+    reportBtn.textContent = 'Download Report';
+    reportBtn.addEventListener('click', () => {
+      const blob = new Blob([reportHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const base = result.name.replace(/\.pdf$/i, '');
+      const now = new Date();
+      const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+      a.href = url;
+      a.download = `${base}_report_${date}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+    toolbar.appendChild(reportBtn);
+    container.appendChild(toolbar);
+  }
 
   const content = document.createElement('div');
   content.innerHTML = (metaHtml || '') + (statsHtml || '') + (inspectHtml || '');

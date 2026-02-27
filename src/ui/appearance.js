@@ -83,7 +83,7 @@ function applyFont(id) {
 }
 
 // --- localStorage helpers ---
-function getLS(key) {
+export function getLS(key) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 function setLS(key, val) {
@@ -306,6 +306,7 @@ export function buildAppearanceContent() {
   const effectsSec = buildSection('Visual Effects');
   effectsSec.appendChild(buildCheckbox('Happy Mac on big savings', 'pdfa-easter-happy-mac'));
   effectsSec.appendChild(buildCheckbox('Sad Mac on zero savings', 'pdfa-easter-sad-mac'));
+  effectsSec.appendChild(buildCheckbox('Pac-Man on long jobs', 'pdfa-easter-pacman'));
   wrap.appendChild(effectsSec);
 
   // --- Reset to Defaults ---
@@ -332,7 +333,7 @@ export function buildAppearanceContent() {
 export function resetAppearance() {
   const keys = [
     'pdfa-theme', 'pdfa-pattern', 'pdfa-crt', 'pdfa-filter',
-    'pdfa-font', 'pdfa-easter-happy-mac', 'pdfa-easter-sad-mac',
+    'pdfa-font', 'pdfa-easter-happy-mac', 'pdfa-easter-sad-mac', 'pdfa-easter-pacman',
     'pdfa-sound-enabled', 'pdfa-sound-volume',
     'pdfa-sound-startup', 'pdfa-sound-drop', 'pdfa-sound-success', 'pdfa-sound-error', 'pdfa-sound-ui',
   ];
@@ -361,7 +362,7 @@ export function initAppearance() {
 }
 
 // --- Easter eggs ---
-function prefersReducedMotion() {
+export function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
@@ -424,6 +425,46 @@ const SAD_MAC_SVG = `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.o
 <rect x="10" y="8" width="1" height="1" fill="#c0c0c0"/>
 <rect x="6" y="12" width="4" height="1" rx="0.5" fill="#666"/>
 </svg>`;
+
+/**
+ * Show a Platinum-style alert (no icon strip, auto-dismiss after duration).
+ * Reuses the mac-face-toast chrome: draggable title bar, close box, shade.
+ */
+export function showMacAlert(title, bodyHtml, duration = 8000) {
+  // Remove any existing alert with the same title to avoid stacking
+  for (const existing of document.querySelectorAll('.mac-face-toast')) {
+    const t = existing.querySelector('.mac-face-toast__title');
+    if (t && t.textContent === title) existing.remove();
+  }
+
+  const toast = document.createElement('div');
+  toast.className = 'mac-face-toast';
+  toast.style.top = '30px';
+  toast.style.right = '80px';
+  toast.innerHTML = `
+    <div class="mac-face-toast__title-bar">
+      <div class="mac-face-toast__close-box" data-action="close"></div>
+      <div class="mac-face-toast__stripes"></div>
+      <span class="mac-face-toast__title">${title}</span>
+      <div class="mac-face-toast__stripes"></div>
+    </div>
+    <div class="mac-face-toast__content">
+      <div class="mac-face-toast__text">${bodyHtml}</div>
+    </div>`;
+  function dismiss() {
+    toast.classList.add('mac-face-toast--closing');
+    toast.addEventListener('transitionend', () => toast.remove());
+  }
+  toast.querySelector('[data-action="close"]').addEventListener('click', dismiss);
+  const titleBar = toast.querySelector('.mac-face-toast__title-bar');
+  titleBar.addEventListener('dblclick', () => toast.classList.toggle('mac-face-toast--shaded'));
+  document.body.appendChild(toast);
+  initDrag(toast, titleBar);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => toast.classList.add('mac-face-toast--visible'));
+  });
+  if (duration > 0) setTimeout(dismiss, duration);
+}
 
 export function showHappyMac({ pct, original, optimized, saved, savedBytes } = {}) {
   if (getLS('pdfa-easter-happy-mac') !== 'true') return;

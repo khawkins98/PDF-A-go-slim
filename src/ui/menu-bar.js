@@ -11,10 +11,10 @@ import { playSound } from './sound.js';
  *     click an item or click outside to dismiss
  *   - dragging from one trigger to another switches menus seamlessly
  *
- * @param {{ onAbout: () => void, onAppearance: () => void }} callbacks
+ * @param {{ onAbout: () => void, onAppearance: () => void, onCleanUpDesktop: () => void, onEmptyTrash: () => void, onRestart: () => void, onShutDown: () => void }} callbacks
  * @returns {{ element: HTMLElement }}
  */
-export function createMenuBar({ onAbout, onAppearance } = {}) {
+export function createMenuBar({ onAbout, onAppearance, onCleanUpDesktop, onEmptyTrash, onRestart, onShutDown } = {}) {
   const el = document.createElement('div');
   el.className = 'menu-bar';
   el.setAttribute('role', 'menubar');
@@ -303,7 +303,36 @@ export function createMenuBar({ onAbout, onAppearance } = {}) {
   );
 
   // =====================
-  // 2. Window menu
+  // 2. Special menu (classic Mac Finder)
+  // =====================
+  const { menuEl: specialMenuEl } = createMenu(
+    'Special',
+    '',
+    (dropdown) => {
+      dropdown.innerHTML = '';
+
+      dropdown.appendChild(makeItem('Clean Up Desktop', () => {
+        if (onCleanUpDesktop) onCleanUpDesktop();
+      }));
+
+      dropdown.appendChild(makeItem('Empty Trash', () => {
+        if (onEmptyTrash) onEmptyTrash();
+      }));
+
+      dropdown.appendChild(makeSeparator());
+
+      dropdown.appendChild(makeItem('Restart', () => {
+        if (onRestart) onRestart();
+      }));
+
+      dropdown.appendChild(makeItem('Shut Down', () => {
+        if (onShutDown) onShutDown();
+      }));
+    },
+  );
+
+  // =====================
+  // 3. Window menu
   // =====================
   const { menuEl: windowMenuEl } = createMenu(
     'Window',
@@ -335,6 +364,7 @@ export function createMenuBar({ onAbout, onAppearance } = {}) {
   );
 
   el.appendChild(appMenuEl);
+  el.appendChild(specialMenuEl);
   el.appendChild(windowMenuEl);
 
   document.body.appendChild(el);

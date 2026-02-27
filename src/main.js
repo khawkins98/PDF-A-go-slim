@@ -8,8 +8,9 @@ import { buildAccessibilityPaletteContent, buildAccessibilityEmptyContent } from
 import { initWindowManager, createPalette, initDrag, bringToFront, registerWindow } from './ui/palette.js';
 import { createControlStrip } from './ui/control-strip.js';
 import { createMenuBar } from './ui/menu-bar.js';
-import { buildAppearanceContent, initAppearance, showHappyMac, showSadMac } from './ui/appearance.js';
-import { playSound, initSound } from './ui/sound.js';
+import { buildAppearanceContent, initAppearance, showHappyMac, showSadMac, showMacAlert } from './ui/appearance.js';
+import { startPacman, stopPacman, forcePacman } from './ui/pacman.js';
+import { playSound, previewSound, initSound } from './ui/sound.js';
 import readmeText from '../README.md?raw';
 
 // --- Sample PDFs (pdf.js test suite — CORS-accessible via GitHub raw) ---
@@ -67,6 +68,19 @@ function showToast(message, duration = 4000) {
   }, duration);
 }
 
+// --- Trash "poof" visual feedback (classic Mac OS) ---
+function showTrashPoof() {
+  const poof = document.createElement('div');
+  poof.className = 'trash-poof';
+  for (let i = 0; i < 5; i++) {
+    const star = document.createElement('div');
+    star.className = 'trash-poof__star';
+    poof.appendChild(star);
+  }
+  document.body.appendChild(poof);
+  poof.addEventListener('animationend', () => poof.remove());
+}
+
 // --- Count-up animation ---
 function animateCountUp(el, target, duration = 600) {
   const start = performance.now();
@@ -86,6 +100,7 @@ let lastRunOptions = null;
 let activeWorker = null;
 let cancelled = false;
 let hasPlayedChime = false;
+let pacmanTimer = null;
 
 // --- DOM refs ---
 const dropZone = document.getElementById('drop-zone');
@@ -193,9 +208,13 @@ initDrag(mainWindow, mainTitleBar, { onDragMove: clearMainZoomState });
 registerWindow('main', 'PDF-A-go-slim', mainWindow, 'main');
 
 // Create menu bar
-createMenuBar({
+const menuBar = createMenuBar({
   onAbout: showAboutDialog,
   onAppearance: toggleAppearancePalette,
+  onCleanUpDesktop: cleanUpDesktop,
+  onEmptyTrash: () => { playSound('trash'); showTrashPoof(); startOver(); },
+  onRestart: doRestart,
+  onShutDown: doShutDown,
 });
 
 // --- Create palettes ---
@@ -252,7 +271,7 @@ previewPalette.showEmpty('No document loaded');
 const readmePalette = createPalette({
   id: 'readme',
   title: 'Read Me',
-  defaultPosition: { top: 400, left: 20 },
+  defaultPosition: { top: 340, left: 20 },
   width: 340,
   closable: true,
 });
@@ -262,6 +281,7 @@ const readmeContent = document.createElement('div');
 readmeContent.className = 'readme-content';
 readmeContent.innerHTML = renderMarkdown(readmeText);
 readmePalette.setContent(readmeContent);
+readmePalette.clampToViewport();
 
 // --- Appearance palette (hidden by default, closable) ---
 const appearancePalette = createPalette({
@@ -274,19 +294,23 @@ const appearancePalette = createPalette({
 appearancePalette.setContent(buildAppearanceContent());
 appearancePalette.hide();
 
-// --- Debug Console palette (only when ?debug) ---
-const isDebug = new URLSearchParams(window.location.search).has('debug');
-let debugPalette;
-if (isDebug) {
-  debugPalette = createPalette({
-    id: 'debug',
-    title: 'Debug Console',
-    defaultPosition: { top: 440, left: 520 },
-    width: 480,
-    closable: true,
-  });
-  debugPalette.showEmpty('Run optimization to see diagnostics');
+// --- URL param flags (?debug, ?pacman) ---
+const urlParams = new URLSearchParams(window.location.search);
+const isDebug = urlParams.has('debug');
+if (urlParams.has('pacman')) {
+  forcePacman();
+  // Start immediately for visual testing — no need to drop a file
+  requestAnimationFrame(() => startPacman(menuBar.element));
 }
+const debugPalette = createPalette({
+  id: 'debug',
+  title: 'Debug Console',
+  defaultPosition: { top: 440, left: 520 },
+  width: 480,
+  closable: true,
+});
+debugPalette.showEmpty('Run optimization to see diagnostics');
+if (!isDebug) debugPalette.hide();
 
 // Establish initial z-order: Read Me behind work palettes
 bringToFront(readmePalette.element);
@@ -295,6 +319,55 @@ bringToFront(resultsPalette.element);
 bringToFront(previewPalette.element);
 bringToFront(inspectorPalette.element);
 bringToFront(accessibilityPalette.element);
+
+// --- Special menu callbacks ---
+
+/** Reset all palettes to their default positions. */
+function cleanUpDesktop() {
+  [settingsPalette, resultsPalette, inspectorPalette, previewPalette,
+   accessibilityPalette, readmePalette, appearancePalette, debugPalette]
+    .forEach((p) => p.resetPosition());
+}
+
+/** Dismiss overlay, reset app state, and play startup bong. */
+function bootUp(overlay) {
+  overlay.remove();
+  startOver();
+  cleanUpDesktop();
+  previewSound('synthesized');
+}
+
+/** Show a restart overlay then "reboot" the app in-place. */
+function doRestart() {
+  const overlay = document.createElement('div');
+  overlay.className = 'shutdown-overlay';
+  const msg = document.createElement('div');
+  msg.className = 'shutdown-message';
+  msg.textContent = 'Restarting\u2026';
+  overlay.appendChild(msg);
+  document.body.appendChild(overlay);
+  setTimeout(() => bootUp(overlay), 1200);
+}
+
+/** Classic Mac shutdown: fade to black, screen stays off. Click to restart. */
+function doShutDown() {
+  const overlay = document.createElement('div');
+  overlay.className = 'shutdown-overlay';
+  document.body.appendChild(overlay);
+
+  // Fade to black
+  requestAnimationFrame(() => overlay.classList.add('shutdown-overlay--off'));
+
+  // After a few seconds of darkness, show a subtle hint
+  setTimeout(() => {
+    const hint = document.createElement('div');
+    hint.className = 'shutdown-hint';
+    hint.textContent = 'Click to restart';
+    overlay.appendChild(hint);
+  }, 3000);
+
+  overlay.addEventListener('click', () => bootUp(overlay));
+}
 
 function toggleAppearancePalette() {
   if (appearancePalette.element.hidden) {
@@ -455,14 +528,12 @@ function renderResults(results, options) {
     inspectorPalette.showEmpty('No optimization data available');
   }
 
-  // Debug Console palette
-  if (debugPalette) {
-    const debugHtml = buildDebugPanel(firstResult.stats);
-    if (debugHtml) {
-      const body = document.createElement('div');
-      body.innerHTML = debugHtml;
-      debugPalette.setContent(body);
-    }
+  // Debug Console palette (always populated — visible via Window menu)
+  const debugHtml = buildDebugPanel(firstResult.stats);
+  if (debugHtml) {
+    const body = document.createElement('div');
+    body.innerHTML = debugHtml;
+    debugPalette.setContent(body);
   }
 
   // Accessibility palette (batch: shows first file only, matching Inspector/Preview)
@@ -501,7 +572,7 @@ function startOver() {
   resultsPalette.showEmpty('Nothing to report yet');
   inspectorPalette.showEmpty('Waiting for a PDF to dissect');
   previewPalette.showEmpty('No document loaded');
-  if (debugPalette) debugPalette.showEmpty('Run optimization to see diagnostics');
+  debugPalette.showEmpty('Run optimization to see diagnostics');
   accessibilityPalette.setContent(buildAccessibilityEmptyContent());
 
   mainActions.hidden = true;
@@ -526,6 +597,14 @@ async function handleFiles(files) {
   }
   if (pdfFiles.length === 0) return;
 
+  // Large file alert (tiered at 20/50 MB) — Platinum-style window, top-right
+  const totalMB = pdfFiles.reduce((s, f) => s + f.size, 0) / (1024 * 1024);
+  if (totalMB >= 50) {
+    showMacAlert('Large File', `<p>${Math.round(totalMB)} MB is a lot of PDF to chew on.</p><p>This could take a while \u2014 hang tight!</p>`);
+  } else if (totalMB >= 20) {
+    showMacAlert('Large File', `<p>That\u2019s a big file! Sit tight \u2014</p><p>${Math.round(totalMB)} MB may take a moment to crunch.</p>`);
+  }
+
   lastFiles = pdfFiles;
   cancelled = false;
 
@@ -540,6 +619,12 @@ async function handleFiles(files) {
   lastRunOptions = JSON.stringify(options);
 
   setProcessing(true);
+  clearTimeout(pacmanTimer);
+  if (urlParams.has('pacman')) {
+    startPacman(menuBar.element);
+  } else {
+    pacmanTimer = setTimeout(() => startPacman(menuBar.element), 10000);
+  }
   const processingStart = Date.now();
   fileList.innerHTML = '';
 
@@ -600,6 +685,8 @@ async function handleFiles(files) {
   }
 
   if (cancelled) {
+    clearTimeout(pacmanTimer);
+    stopPacman();
     setProcessing(false);
     return;
   }
@@ -611,6 +698,8 @@ async function handleFiles(files) {
   }
 
   // Show results
+  clearTimeout(pacmanTimer);
+  stopPacman();
   setProcessing(false);
   revokeBlobUrls();
   destroyAllComparisons();
@@ -689,6 +778,7 @@ document.addEventListener('dragenter', (e) => {
   dragCounter++;
   if (dragCounter === 1) {
     dropOverlay.hidden = false;
+    bringToFront(mainWindow);
   }
 });
 
@@ -726,6 +816,8 @@ document.addEventListener('drop', async (e) => {
 // --- Cancel button ---
 btnCancel.addEventListener('click', () => {
   cancelled = true;
+  clearTimeout(pacmanTimer);
+  stopPacman();
   if (activeWorker) {
     activeWorker.terminate();
     activeWorker = null;
@@ -746,12 +838,13 @@ function showAboutDialog() {
         <div class="about-dialog__stripes"></div>
       </div>
       <div class="about-dialog__body">
+        <img src="${new URL('/favicon.svg', import.meta.url).href}" alt="" width="48" height="48" style="display:block;margin:0 auto 0.5rem" />
         <div class="about-dialog__name">PDF-A-go-slim</div>
         <p>Reduce PDF file size entirely in your browser. No uploads, no server.</p>
         <p>Built with pdf-lib, fflate, harfbuzzjs, and jpeg-js.</p>
         <p>Classic Mac sounds curated by Steven Jay Cohen, Karl Laurent, and Ginger Lindsey.</p>
         <p><a href="https://github.com/khawkins98/PDF-A-go-slim" target="_blank" rel="noopener">github.com/khawkins98/PDF-A-go-slim</a></p>
-        <p style="margin-top:0.4rem;font-size:0.7rem;opacity:0.6">Last updated: ${__BUILD_DATE__}</p>
+        <p style="margin-top:0.4rem;font-size:0.7rem;opacity:0.6"><a href="https://github.com/khawkins98/PDF-A-go-slim/blob/main/CHANGELOG.md" target="_blank" rel="noopener" style="color:inherit">v${__APP_VERSION__}</a> &middot; ${__BUILD_DATE__}</p>
       </div>
       <div class="about-dialog__footer">
         <button class="btn btn--default" data-action="close">OK</button>
@@ -770,14 +863,18 @@ function showAboutDialog() {
 
 document.getElementById('btn-about').addEventListener('click', showAboutDialog);
 
-// --- Debug mode indicator ---
-if (new URLSearchParams(window.location.search).has('debug')) {
-  const banner = document.createElement('div');
-  banner.className = 'debug-banner';
-  banner.innerHTML = 'Debug mode active \u2014 extra diagnostics will appear in results';
-  const appWindow = document.querySelector('.app-window');
-  appWindow.insertBefore(banner, appWindow.firstChild);
-}
+// --- Debug Console link (status bar button) ---
+document.getElementById('btn-debug').addEventListener('click', () => {
+  if (debugPalette.element.hidden) debugPalette.show();
+  bringToFront(debugPalette.element);
+});
+
+// --- Warn before navigating away if results exist ---
+window.addEventListener('beforeunload', (e) => {
+  if (lastFiles && lastFiles.length > 0) {
+    e.preventDefault();
+  }
+});
 
 // --- Startup warning dialog ---
 const WARNING_DISMISSED_KEY = 'pdfagoslim-warning-dismissed';
@@ -802,7 +899,7 @@ function showWarningDialog() {
           <p>However, the optimized copy may have rendering differences or missing content. If you overwrite your original with the optimized version, that data may be unrecoverable.</p>
           <p><strong>Font subsetting</strong> is off by default. A rendering issue with certain fonts has been fixed, but we continue to monitor for edge cases. You can enable it in Advanced Settings.</p>
           <p>This tool is provided "as is", without warranty of any kind.</p>
-          <p style="margin-top:0.6rem;font-size:0.7rem;opacity:0.6">Last updated: ${__BUILD_DATE__}</p>
+          <p style="margin-top:0.6rem;font-size:0.7rem;opacity:0.6"><a href="https://github.com/khawkins98/PDF-A-go-slim/blob/main/CHANGELOG.md" target="_blank" rel="noopener" style="color:inherit">v${__APP_VERSION__}</a> &middot; ${__BUILD_DATE__}</p>
         </div>
       </div>
       <div class="warning-dialog__footer">
@@ -843,3 +940,4 @@ showWarningDialog();
 
 // --- Initial state ---
 statusLeft.textContent = 'Ready \u2014 files never leave your device';
+
