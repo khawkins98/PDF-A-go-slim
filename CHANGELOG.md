@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 - **Favicon** — SVG favicon inspired by the classic StuffIt compressed-document icon: a PDF page pinched at the waist with clamp lines on each side. Also displayed in the About dialog.
 - **Version number in About and startup dialogs** — Shows `v1.1.0` (read from `package.json` at build time) as a clickable link to the changelog on GitHub, alongside the build date.
 - **Changelog linked from README** — Documentation section now links to `CHANGELOG.md`.
-- **Large file toast** — Tiered toast notifications when dropping large PDFs: friendly nudge at 20 MB, emphatic warning at 50 MB. Helps set expectations for processing time.
+- **Large file alert** — Platinum-style alert window (top-right, draggable, auto-dismiss) when dropping large PDFs: friendly nudge at 20 MB, emphatic warning at 50 MB.
 - **Inspector HTML report download** — "Download Report" button in the Inspector palette generates a self-contained HTML report with document info, category breakdown, optimization passes, and accessibility traits.
 - **Debug Console palette** — The Debug Console is now always available via the Window menu or the status bar Debug button — no page refresh or `?debug` URL param required. Adding `?debug` to the URL still auto-shows it on load. Debug data is always collected.
 - **Navigation guard** — Browser warns before navigating away when optimization results exist, preventing accidental loss of work.
@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - **Semver versioning** — Project now uses semantic versioning (`package.json` version is the source of truth, injected at build time via `__APP_VERSION__`).
 - **"Removed" label clarity** — Inspector items in the "Page Content" category now show "stream merged" instead of "removed", with a tooltip explaining the object was deduplicated rather than deleted.
 - **Read Me palette viewport fix** — The Read Me palette no longer overflows below the viewport on smaller screens. Default position lowered; palettes now auto-clamp to viewport bounds after content is set.
+- **Main window focus on drag** — Dragging files onto the page brings the main window to the front, ensuring the drop zone is visible above any palettes.
 
 ## [1.0.0] - 2026-02-19
 

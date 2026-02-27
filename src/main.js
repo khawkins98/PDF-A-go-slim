@@ -8,7 +8,7 @@ import { buildAccessibilityPaletteContent, buildAccessibilityEmptyContent } from
 import { initWindowManager, createPalette, initDrag, bringToFront, registerWindow } from './ui/palette.js';
 import { createControlStrip } from './ui/control-strip.js';
 import { createMenuBar } from './ui/menu-bar.js';
-import { buildAppearanceContent, initAppearance, showHappyMac, showSadMac } from './ui/appearance.js';
+import { buildAppearanceContent, initAppearance, showHappyMac, showSadMac, showMacAlert } from './ui/appearance.js';
 import { playSound, initSound } from './ui/sound.js';
 import readmeText from '../README.md?raw';
 
@@ -523,12 +523,12 @@ async function handleFiles(files) {
   }
   if (pdfFiles.length === 0) return;
 
-  // Large file toast (tiered at 20/50 MB)
+  // Large file alert (tiered at 20/50 MB) — Platinum-style window, top-right
   const totalMB = pdfFiles.reduce((s, f) => s + f.size, 0) / (1024 * 1024);
   if (totalMB >= 50) {
-    showToast(`${Math.round(totalMB)} MB is a lot of PDF to chew on. This could take a while \u2014 hang tight!`, 8000);
+    showMacAlert('Large File', `<p>${Math.round(totalMB)} MB is a lot of PDF to chew on.</p><p>This could take a while \u2014 hang tight!</p>`);
   } else if (totalMB >= 20) {
-    showToast(`That\u2019s a big file! Sit tight \u2014 ${Math.round(totalMB)} MB may take a moment to crunch.`, 8000);
+    showMacAlert('Large File', `<p>That\u2019s a big file! Sit tight \u2014</p><p>${Math.round(totalMB)} MB may take a moment to crunch.</p>`);
   }
 
   lastFiles = pdfFiles;
@@ -694,6 +694,7 @@ document.addEventListener('dragenter', (e) => {
   dragCounter++;
   if (dragCounter === 1) {
     dropOverlay.hidden = false;
+    bringToFront(mainWindow);
   }
 });
 
