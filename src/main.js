@@ -9,6 +9,7 @@ import { initWindowManager, createPalette, initDrag, bringToFront, registerWindo
 import { createControlStrip } from './ui/control-strip.js';
 import { createMenuBar } from './ui/menu-bar.js';
 import { buildAppearanceContent, initAppearance, showHappyMac, showSadMac, showMacAlert } from './ui/appearance.js';
+import { startPacman, stopPacman, forcePacman } from './ui/pacman.js';
 import { playSound, initSound } from './ui/sound.js';
 import readmeText from '../README.md?raw';
 
@@ -86,6 +87,7 @@ let lastRunOptions = null;
 let activeWorker = null;
 let cancelled = false;
 let hasPlayedChime = false;
+let pacmanTimer = null;
 
 // --- DOM refs ---
 const dropZone = document.getElementById('drop-zone');
@@ -193,7 +195,7 @@ initDrag(mainWindow, mainTitleBar, { onDragMove: clearMainZoomState });
 registerWindow('main', 'PDF-A-go-slim', mainWindow, 'main');
 
 // Create menu bar
-createMenuBar({
+const menuBar = createMenuBar({
   onAbout: showAboutDialog,
   onAppearance: toggleAppearancePalette,
 });
@@ -275,8 +277,14 @@ const appearancePalette = createPalette({
 appearancePalette.setContent(buildAppearanceContent());
 appearancePalette.hide();
 
-// --- Debug Console palette (always created, hidden unless ?debug) ---
-const isDebug = new URLSearchParams(window.location.search).has('debug');
+// --- URL param flags (?debug, ?pacman) ---
+const urlParams = new URLSearchParams(window.location.search);
+const isDebug = urlParams.has('debug');
+if (urlParams.has('pacman')) {
+  forcePacman();
+  // Start immediately for visual testing — no need to drop a file
+  requestAnimationFrame(() => startPacman(menuBar.element));
+}
 const debugPalette = createPalette({
   id: 'debug',
   title: 'Debug Console',
@@ -545,6 +553,12 @@ async function handleFiles(files) {
   lastRunOptions = JSON.stringify(options);
 
   setProcessing(true);
+  clearTimeout(pacmanTimer);
+  if (urlParams.has('pacman')) {
+    startPacman(menuBar.element);
+  } else {
+    pacmanTimer = setTimeout(() => startPacman(menuBar.element), 10000);
+  }
   const processingStart = Date.now();
   fileList.innerHTML = '';
 
@@ -605,6 +619,8 @@ async function handleFiles(files) {
   }
 
   if (cancelled) {
+    clearTimeout(pacmanTimer);
+    stopPacman();
     setProcessing(false);
     return;
   }
@@ -616,6 +632,8 @@ async function handleFiles(files) {
   }
 
   // Show results
+  clearTimeout(pacmanTimer);
+  stopPacman();
   setProcessing(false);
   revokeBlobUrls();
   destroyAllComparisons();
@@ -732,6 +750,8 @@ document.addEventListener('drop', async (e) => {
 // --- Cancel button ---
 btnCancel.addEventListener('click', () => {
   cancelled = true;
+  clearTimeout(pacmanTimer);
+  stopPacman();
   if (activeWorker) {
     activeWorker.terminate();
     activeWorker = null;

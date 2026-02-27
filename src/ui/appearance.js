@@ -83,7 +83,7 @@ function applyFont(id) {
 }
 
 // --- localStorage helpers ---
-function getLS(key) {
+export function getLS(key) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 function setLS(key, val) {
@@ -306,6 +306,7 @@ export function buildAppearanceContent() {
   const effectsSec = buildSection('Visual Effects');
   effectsSec.appendChild(buildCheckbox('Happy Mac on big savings', 'pdfa-easter-happy-mac'));
   effectsSec.appendChild(buildCheckbox('Sad Mac on zero savings', 'pdfa-easter-sad-mac'));
+  effectsSec.appendChild(buildCheckbox('Pac-Man on long jobs', 'pdfa-easter-pacman'));
   wrap.appendChild(effectsSec);
 
   // --- Reset to Defaults ---
@@ -332,7 +333,7 @@ export function buildAppearanceContent() {
 export function resetAppearance() {
   const keys = [
     'pdfa-theme', 'pdfa-pattern', 'pdfa-crt', 'pdfa-filter',
-    'pdfa-font', 'pdfa-easter-happy-mac', 'pdfa-easter-sad-mac',
+    'pdfa-font', 'pdfa-easter-happy-mac', 'pdfa-easter-sad-mac', 'pdfa-easter-pacman',
     'pdfa-sound-enabled', 'pdfa-sound-volume',
     'pdfa-sound-startup', 'pdfa-sound-drop', 'pdfa-sound-success', 'pdfa-sound-error', 'pdfa-sound-ui',
   ];
@@ -361,7 +362,7 @@ export function initAppearance() {
 }
 
 // --- Easter eggs ---
-function prefersReducedMotion() {
+export function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 

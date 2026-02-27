@@ -2769,6 +2769,146 @@ body[data-theme="forest"] .readme-content hr {
   border-top-color: #9a8a20;
 }
 
+/* --- Pac-Man menu bar easter egg --- */
+.pacman-strip {
+  position: absolute;
+  right: 8px;
+  top: 0;
+  height: 21px;
+  width: 120px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.pacman-strip--visible {
+  opacity: 1;
+}
+
+.pacman-strip--leaving {
+  opacity: 0;
+}
+
+/* Pac-Man character */
+.pacman-char {
+  position: absolute;
+  top: 5px;
+  animation: pacman-walk 4s linear infinite;
+}
+
+.pacman-icon {
+  display: block;
+  animation: pacman-chomp 0.2s steps(2) infinite;
+}
+
+/* Mouth animation via clip-path — mouth opens LEFT (direction of travel) */
+@keyframes pacman-chomp {
+  0% { clip-path: polygon(0% 0%, 50% 50%, 0% 100%, 100% 100%, 100% 0%); }
+  50% { clip-path: polygon(0% 20%, 50% 50%, 0% 80%, 100% 100%, 100% 0%); }
+}
+
+/* Walk from right to left */
+@keyframes pacman-walk {
+  0%   { transform: translateX(110px); }
+  100% { transform: translateX(-20px); }
+}
+
+/* Dots */
+.pacman-dot {
+  position: absolute;
+  top: 9px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--color-text);
+  opacity: 0.5;
+  animation: pacman-dot-hide 4s linear infinite;
+}
+
+/* Each dot disappears when Pac-Man reaches it.
+   Dots at 20%/35%/50%/65%/80% of 120px = 24/42/60/78/96px from left.
+   Pac-Man travels 130px in 4s (from 110px to -20px).
+   Time to reach dot = (110 - dotX) / 130 * 4s */
+.pacman-dot:nth-child(1) { animation-delay: 0s; }     /* x=24, t=(110-24)/130*4 = 2.65s */
+.pacman-dot:nth-child(2) { animation-delay: 0s; }     /* x=42, t=2.09s */
+.pacman-dot:nth-child(3) { animation-delay: 0s; }     /* x=60, t=1.54s */
+.pacman-dot:nth-child(4) { animation-delay: 0s; }     /* x=78, t=0.98s */
+.pacman-dot:nth-child(5) { animation-delay: 0s; }     /* x=96, t=0.43s */
+
+@keyframes pacman-dot-hide {
+  /* Dot 1 (24px): hidden at 66.2% */
+  /* Dot 2 (42px): hidden at 52.3% */
+  /* Dot 3 (60px): hidden at 38.5% */
+  /* Dot 4 (78px): hidden at 24.6% */
+  /* Dot 5 (96px): hidden at 10.8% */
+  0%   { visibility: visible; }
+  100% { visibility: visible; }
+}
+
+/* Per-dot hide timing: use individual keyframes */
+.pacman-dot:nth-child(5) { animation: pacman-dot5 4s linear infinite; }
+.pacman-dot:nth-child(4) { animation: pacman-dot4 4s linear infinite; }
+.pacman-dot:nth-child(3) { animation: pacman-dot3 4s linear infinite; }
+.pacman-dot:nth-child(2) { animation: pacman-dot2 4s linear infinite; }
+.pacman-dot:nth-child(1) { animation: pacman-dot1 4s linear infinite; }
+
+@keyframes pacman-dot5 {
+  0%, 10%  { opacity: 0.5; }
+  10.8%    { opacity: 0; }
+  99.9%    { opacity: 0; }
+  100%     { opacity: 0.5; }
+}
+
+@keyframes pacman-dot4 {
+  0%, 24%  { opacity: 0.5; }
+  24.6%    { opacity: 0; }
+  99.9%    { opacity: 0; }
+  100%     { opacity: 0.5; }
+}
+
+@keyframes pacman-dot3 {
+  0%, 38%  { opacity: 0.5; }
+  38.5%    { opacity: 0; }
+  99.9%    { opacity: 0; }
+  100%     { opacity: 0.5; }
+}
+
+@keyframes pacman-dot2 {
+  0%, 52%  { opacity: 0.5; }
+  52.3%    { opacity: 0; }
+  99.9%    { opacity: 0; }
+  100%     { opacity: 0.5; }
+}
+
+@keyframes pacman-dot1 {
+  0%, 66%  { opacity: 0.5; }
+  66.2%    { opacity: 0; }
+  99.9%    { opacity: 0; }
+  100%     { opacity: 0.5; }
+}
+
+/* Blinky ghost — trails 20px behind Pac-Man */
+.pacman-ghost-wrap {
+  position: absolute;
+  top: 5px;
+  animation: pacman-ghost-walk 4s linear infinite;
+}
+
+@keyframes pacman-ghost-walk {
+  0%   { transform: translateX(130px); }
+  100% { transform: translateX(0px); }
+}
+
+.pacman-ghost {
+  display: block;
+}
+
+/* Reduced motion: disable all pacman animations */
+@media (prefers-reduced-motion: reduce) {
+  .pacman-strip { display: none; }
+}
+
 /* --- Mac face easter egg alert (classic Mac OS dialog) --- */
 .mac-face-toast {
   position: absolute;

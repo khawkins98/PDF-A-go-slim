@@ -79,6 +79,8 @@ Small, discoverable surprises that lean into the retro aesthetic. Each should ta
 
 - [x] **Sad Mac on zero savings** — Easter egg toggle stub in Appearance palette. Triggered when savings <= 0%. Full pixel-art SVG implementation deferred.
 
+- [x] **Pac-Man on long jobs** — Monochrome Pac-Man + Blinky ghost animation in the menu bar during long-running optimizations (>10s). Loops until processing completes or is cancelled. Toggle in Appearance > Visual Effects. `?pacman` URL param for instant activation. Respects `prefers-reduced-motion`.
+
 - [ ] **Finder zoom-rect open** — Classic Mac "zoom rectangle" animation when opening/restoring palettes. Four concentric rectangles scaling from source to destination over ~200ms using CSS `@keyframes`. Respect `prefers-reduced-motion`.
 
 - [ ] **Trash can for rejected files** — When a non-PDF file is dragged over the drop zone, show an animated trash can icon (CSS lid-open transform on dragenter, lid-close on dragleave). Reinforces the "PDFs only" constraint with personality.

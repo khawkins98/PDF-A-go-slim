@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - **Inspector HTML report download** — "Download Report" button in the Inspector palette generates a self-contained HTML report with document info, category breakdown, optimization passes, and accessibility traits.
 - **Debug Console palette** — The Debug Console is now always available via the Window menu or the status bar Debug button — no page refresh or `?debug` URL param required. Adding `?debug` to the URL still auto-shows it on load. Debug data is always collected.
 - **Navigation guard** — Browser warns before navigating away when optimization results exist, preventing accidental loss of work.
+- **Pac-Man easter egg** — A monochrome Pac-Man + Blinky ghost animation appears in the menu bar during long-running optimizations (>10 seconds). Enabled by default; toggle in Appearance > Visual Effects. Respects `prefers-reduced-motion`. Add `?pacman` to the URL to activate immediately for testing.
 
 ### Fixed
 
