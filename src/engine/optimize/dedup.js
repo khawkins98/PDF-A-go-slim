@@ -1,9 +1,16 @@
 /**
  * Object deduplication pass.
  *
- * Hashes each PDFRawStream (contents + serialized dict) using SHA-256.
- * Builds a hash → canonical ref map, then walks all dicts/arrays replacing
- * duplicate refs with canonical refs, and deletes duplicates.
+ * Hashes each PDFRawStream (contents + serialized dict) using a fast
+ * non-cryptographic hash. Builds a hash → canonical ref map, then walks
+ * all dicts/arrays replacing duplicate refs with canonical refs, and
+ * deletes duplicates.
+ *
+ * Page content streams are intentionally excluded — a hash collision
+ * would silently replace one page's drawing commands with another's,
+ * producing blank or wrong pages. The content integrity guard can't
+ * catch this because dedup relinks refs before deleting, so the refs
+ * remain valid even when pointing to the wrong stream.
  */
 import { PDFRawStream, PDFDict, PDFArray, PDFRef, PDFName } from 'pdf-lib';
 import { hashBytes } from '../utils/hash.js';
@@ -24,19 +31,49 @@ function serializeDict(dict) {
 }
 
 /**
+ * Collect ref tags of all page content streams.
+ * These are excluded from dedup to prevent hash-collision-induced blank pages.
+ */
+function collectContentStreamRefs(pdfDoc) {
+  const refs = new Set();
+  for (const page of pdfDoc.getPages()) {
+    const contents = page.node.get(PDFName.of('Contents'));
+    if (!contents) continue;
+    if (contents instanceof PDFRef) {
+      refs.add(contents.tag);
+    } else if (contents instanceof PDFArray) {
+      for (let i = 0; i < contents.size(); i++) {
+        const item = contents.get(i);
+        if (item instanceof PDFRef) refs.add(item.tag);
+      }
+    }
+  }
+  return refs;
+}
+
+/**
  * Deduplicate identical objects.
  * @param {PDFDocument} pdfDoc
- * @returns {{ deduplicated: number }}
+ * @returns {{ deduplicated: number, contentStreamsSkipped: number }}
  */
 export function deduplicateObjects(pdfDoc) {
   const context = pdfDoc.context;
+  const contentRefs = collectContentStreamRefs(pdfDoc);
 
-  // Phase 1: Hash all stream objects
+  // Phase 1: Hash all stream objects (excluding page content streams)
   const hashToCanonical = new Map(); // hash → PDFRef (first seen)
   const duplicateToCanonical = new Map(); // duplicate PDFRef tag → canonical PDFRef
+  let contentStreamsSkipped = 0;
 
   for (const [ref, obj] of context.enumerateIndirectObjects()) {
     if (!(obj instanceof PDFRawStream)) continue;
+
+    // Never dedup page content streams — a hash collision would silently
+    // blank a page, and the content integrity guard can't catch it.
+    if (contentRefs.has(ref.tag)) {
+      contentStreamsSkipped++;
+      continue;
+    }
 
     const dictSer = serializeDict(obj.dict);
     const combined = new Uint8Array(dictSer.length + obj.contents.length);
@@ -52,7 +89,7 @@ export function deduplicateObjects(pdfDoc) {
     }
   }
 
-  if (duplicateToCanonical.size === 0) return { deduplicated: 0 };
+  if (duplicateToCanonical.size === 0) return { deduplicated: 0, contentStreamsSkipped };
 
   // Phase 2: Rewrite refs throughout the document
   rewriteRefs(context, duplicateToCanonical);
@@ -65,7 +102,7 @@ export function deduplicateObjects(pdfDoc) {
     context.delete(ref);
   }
 
-  return { deduplicated: duplicateToCanonical.size };
+  return { deduplicated: duplicateToCanonical.size, contentStreamsSkipped };
 }
 
 /**

@@ -14,6 +14,10 @@ All notable changes to this project will be documented in this file.
 - **Debug Console palette** — The Debug Console is now always available via the Window menu or the status bar Debug button — no page refresh or `?debug` URL param required. Adding `?debug` to the URL still auto-shows it on load. Debug data is always collected.
 - **Navigation guard** — Browser warns before navigating away when optimization results exist, preventing accidental loss of work.
 
+### Fixed
+
+- **Page content streams excluded from deduplication** — Object dedup no longer merges page content streams. The non-cryptographic hash used for dedup has a small but non-zero collision risk; a collision on a content stream would silently blank a page, and the content integrity guard cannot catch it because dedup relinks refs before deleting (so the dangling-ref check passes). Images, fonts, and other supporting objects are still deduplicated normally.
+
 ### Changed
 
 - **Semver versioning** — Project now uses semantic versioning (`package.json` version is the source of truth, injected at build time via `__APP_VERSION__`).

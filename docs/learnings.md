@@ -104,7 +104,13 @@ Many PDF producers (especially Illustrator, older tools) use Flate level 1–6 o
 
 ### Object Deduplication
 
-Hash-based dedup using djb2. Surprisingly common in real PDFs — fonts and images are often embedded multiple times (e.g., TrueType + Type1 copies of the same font). Our implementation hashes the raw stream bytes and replaces all duplicate refs with a single canonical copy.
+Hash-based dedup using a fast non-cryptographic hash (53-bit djb2 variant). Surprisingly common in real PDFs — fonts and images are often embedded multiple times (e.g., TrueType + Type1 copies of the same font). Our implementation hashes the raw stream bytes + serialized dict entries and replaces all duplicate refs with a single canonical copy.
+
+**Page content streams are excluded from dedup.** This is a deliberate safety decision, not a limitation:
+
+- **High risk, low reward.** A hash collision on a content stream silently replaces one page's drawing commands with another's, producing blank or wrong pages. Truly identical content streams across pages are rare in real-world PDFs, so the savings are minimal.
+- **The content integrity guard can't catch it.** The guard in `pipeline.js` checks for dangling `/Contents` refs after all passes. But dedup relinks refs *before* deleting — the page's `/Contents` now validly points to the canonical (wrong) stream, so the dangling-ref check passes.
+- **Non-cryptographic hash.** The 53-bit hash space makes collisions unlikely (~10^-7 for a large PDF) but not impossible. For images and fonts, a collision merely causes a display glitch in one element; for content streams, it blanks an entire page.
 
 ### Standard Font Unembedding
 
@@ -227,7 +233,7 @@ PDF optimization can silently break accessibility. Key risks and mitigations:
 - **OutputIntent** (required by PDF/A) is stored as `/OutputIntents` on the catalog dict, so BFS always reaches it. Never removed as unreferenced.
 
 **Safe by design (no fix needed):**
-- **Object deduplication** only processes `PDFRawStream` objects. Structure tree elements (`/StructElem`) are plain `PDFDict` objects and are never merged.
+- **Object deduplication** only processes `PDFRawStream` objects (excluding page content streams). Structure tree elements (`/StructElem`) are plain `PDFDict` objects and are never merged.
 - **Font subsetting** reduces font size but keeps the font embedded. Safe for both PDF/A and PDF/UA.
 
 ### Accessibility Auditing (Lightweight)
