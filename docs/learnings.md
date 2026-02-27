@@ -87,8 +87,8 @@ Pure JS zlib, faster and smaller than pako. Used for `zlibSync`/`inflateSync`/`d
 
 **The three fflate functions and when to use each:**
 - `zlibSync(data, { level })` — **compression**. Always use this for PDF FlateDecode streams. Produces zlib-wrapped DEFLATE (RFC 1950, 2-byte header starting `0x78`, 4-byte Adler-32 checksum). 6 bytes overhead vs raw DEFLATE, but macOS Preview and other viewers silently render blank pages without the zlib wrapper.
-- `inflateSync(data)` — **decompression of raw DEFLATE only** (RFC 1951, no wrapper). Fast path for most streams. Correctly rejects zlib-wrapped data — this is by design, not a bug.
-- `decompressSync(data)` — **decompression with auto-format detection** (GZIP, Zlib, or raw DEFLATE). Used as fallback when `inflateSync` fails on pako-produced zlib streams (pdf-lib uses pako internally).
+- `decompressSync(data)` — **decompression with auto-format detection** (GZIP, Zlib, or raw DEFLATE). **Always use this as the primary decompressor.** Handles all stream variants correctly.
+- `inflateSync(data)` — **decompression of raw DEFLATE only** (RFC 1951, no wrapper). Used only as a fallback if `decompressSync` fails. **Danger:** `inflateSync` does NOT always reject zlib-wrapped data — with certain zlib headers (e.g., `0x48 0x89`, a valid zlib header with 4KB window size used by ReportLab), it silently returns truncated garbage data instead of throwing. This caused black bars in recompressed images from ReportLab-produced PDFs.
 
 **`mem` option for `zlibSync`:** fflate supports `mem: 0-12` (memory level) — higher values increase speed and compression ratio at exponential memory cost (level 4 = 64 KB, level 8 = 1 MB, level 12 = 16 MB). Default is auto-sized per input. Values above 8 rarely help. Not worth tuning for our use case, but good to know for future profiling.
 

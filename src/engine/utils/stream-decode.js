@@ -194,10 +194,13 @@ function paethPredictor(a, b, c) {
 
 function decodeFlateDecode(data) {
   try {
-    return inflateSync(data);
-  } catch {
-    // Some zlib streams (e.g. from pako) need the full zlib wrapper handling
+    // decompressSync auto-detects zlib/gzip/raw DEFLATE and handles all correctly.
+    // inflateSync (raw DEFLATE only) can silently return truncated data when given
+    // zlib-wrapped streams instead of throwing, so we must not try it first.
     return decompressSync(data);
+  } catch {
+    // Fallback for edge-case streams that decompressSync rejects
+    return inflateSync(data);
   }
 }
 

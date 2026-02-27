@@ -15,7 +15,7 @@ PDF-A-go-slim is a browser-based PDF optimization tool (Vite + pdf-lib + fflate 
 
 - **harfbuzzjs CJS/ESM interop:** Don't `import('harfbuzzjs')` — its `module.exports = Promise` causes ESM thenable breakage in Vitest. Load the WASM binary directly via `WebAssembly.instantiate()`.
 - **fflate: use `zlibSync`, NOT `deflateSync`:** `deflateSync` produces raw DEFLATE without zlib header. PDF's FlateDecode expects zlib-wrapped data (0x78... header). macOS Preview silently renders blank pages with raw DEFLATE.
-- **fflate vs pako:** pdf-lib uses pako internally. fflate's `inflateSync` can fail on some pako-produced streams; use `decompressSync` as fallback.
+- **fflate decompression: use `decompressSync` first, NOT `inflateSync`:** `inflateSync` is raw DEFLATE only. With certain zlib headers (e.g., `0x48 0x89` from ReportLab), it silently returns truncated data instead of throwing. Always use `decompressSync` (auto-detects zlib/gzip/raw) as the primary decompressor, with `inflateSync` as fallback.
 - **`PDFStream` does NOT extend `PDFDict`:** `PDFStream` has a `.dict` property; use `obj.dict.get()` for streams. Only `PDFDict` subclasses have `.get()` directly. BFS traversal should use `instanceof PDFStream` (base class), not `PDFRawStream`.
 - **PDF number extraction:** Use `Number(val.toString())` for reliable numeric reads from pdf-lib dicts. The `.numberValue()` / `.value()` accessors are inconsistent depending on how the number was created.
 
