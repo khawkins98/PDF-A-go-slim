@@ -91,8 +91,10 @@ Nothing open-source and browser-based does all of this.
 src/
   main.js                     # UI, drag-and-drop, worker orchestration
   worker.js                   # Web Worker — off-main-thread processing
+  style.css                   # All styles (Platinum theme, palettes, responsive)
   engine/
     pipeline.js               # Sequential optimization passes with progress + options
+    inspect.js                # Object inspector — classifies PDF objects by type and size
     optimize/
       streams.js              # Recompress streams with fflate level 9
       images.js               # FlateDecode → JPEG recompression (lossy, opt-in)
@@ -111,6 +113,19 @@ src/
       unicode-mapper.js       # Map char codes → Unicode codepoints
       glyph-list.js           # Adobe Glyph List + standard encoding tables
       harfbuzz-subsetter.js   # harfbuzzjs WASM wrapper for font subsetting
+  ui/
+    palette.js                # Window manager — floating palettes, drag, z-index
+    result-card.js            # Result card builders (single + multi-file)
+    inspector.js              # Object breakdown grid
+    compare.js                # PDF preview viewers (PDF-A-go-go integration)
+    stats.js                  # Pass-level statistics + debug panel
+    options.js                # Options panel logic, preset management
+    helpers.js                # Shared utilities (formatSize, escapeHtml)
+    accessibility.js          # Accessibility palette (traits, audits, validator links)
+    appearance.js             # Appearance palette (themes, patterns, CRT, Happy/Sad Mac)
+    control-strip.js          # Mac OS 8 Control Strip toolbar
+    menu-bar.js               # Mac OS 8 menu bar (Window menu, press-and-drag)
+    sound.js                  # Classic Mac sound system (sound pack, alerts)
 ```
 
 ### Options schema
@@ -297,31 +312,5 @@ Technical learnings, design decisions, and pitfalls are in [`docs/learnings.md`]
 
 ## Open questions
 
-1. ~~**pdf-lib vs custom parser?**~~ **Resolved:** pdf-lib works well. Direct access to its internal `context` and indirect object enumeration provides sufficient low-level control for all current optimization passes without needing a fork.
-2. **WASM Ghostscript licensing**: Ghostscript is AGPL. MuPDF is also AGPL. Best alternative: compile [QPDF](https://github.com/qpdf/qpdf) (Apache 2.0) to WASM for structural optimizations that pure JS can't handle.
-3. ~~**Standard font unembedding safety**~~ **Resolved:** Implemented for Type1/TrueType only, skipping Type0 composites and fonts with custom Differences encodings. Enabled by default (`unembedStandardFonts: true`) since all conforming PDF readers are required to provide the base-14 fonts.
-4. ~~**Configurability UX**~~ **Resolved:** Implemented preset buttons (Lossless/Web/Print), collapsible Advanced Settings panel with lossy/lossless toggle, image quality slider, and font unembedding checkbox. Presets set all controls; manual tweaks auto-detect matching preset or show "Custom". Options flow through to the worker and engine unchanged.
+1. **WASM Ghostscript licensing**: Ghostscript is AGPL. MuPDF is also AGPL. Best alternative: compile [QPDF](https://github.com/qpdf/qpdf) (Apache 2.0) to WASM for structural optimizations that pure JS can't handle.
 
-## Easter egg ideas
-
-Small, discoverable surprises that lean into the retro aesthetic without getting in the way. Each should take under a day. All animated items must respect `prefers-reduced-motion`.
-
-| Idea | Description | Trigger |
-|------|-------------|---------|
-| Startup chime | Retro Mac boot sound via Web Audio synthesis | First file drop or page load, opt-in via `?sound` |
-| "About This Mac" system info | Expand About dialog — browser, OS, memory, pdf-lib version, WASM status, session stats | "More Info..." button in About |
-| Classic bomb error dialog | Mac bomb icon, "Sorry, a system error occurred", error code, "Restart" button | Unexpected processing error |
-| Screensaver idle mode | CSS-only flying toasters, starfield, or bouncing logo | 5 min idle timeout |
-| Konami code theme | Hidden theme unlock — CRT scanlines, amber terminal, or hot-dog-stand | `up up down down left right left right b a` |
-| "Get Info" on results | Classic Mac Get Info window with detailed PDF metadata | Right-click / long-press result card |
-| Trash can for rejected files | Animated trash icon for non-PDF drops | Non-PDF file drag |
-| Spinning beach ball | Rainbow beach ball for first 300ms of processing | Processing start |
-| Happy Mac on big savings | Flash pixel-art Happy Mac in status bar | Savings > 30% |
-| System version tooltip | "PDF-A-go-slim v1.0 / Built date / pdf-lib X.X" | Click app name in title bar |
-| Sad Mac on zero savings | Brief Sad Mac when file can't be reduced | Zero improvement result |
-| "Rebuild Desktop" | Mock "rebuilding desktop" progress bar in About or as `?rebuild` param | Easter egg URL param |
-| Finder zoom-rect open | Classic Mac "zoom rectangle" animation when opening palettes | Palette show/restore |
-| Desktop pattern chooser | Let user pick a classic desktop pattern (tartan, bricks, etc.) for the background | Hidden setting or `?pattern` |
-| Extension conflict alert | Joke "extension conflict" alert on first visit: "PDF-A-go-slim would like to optimize your PDFs" with "OK" only | First visit |
-| "Not Enough Memory" | Classic Mac low-memory dialog appearance when processing files > 50MB | Large file warning |
-| Balloon Help tooltips | Classic Mac question-mark cursor + yellow balloon help on hover | `?balloons` URL param |

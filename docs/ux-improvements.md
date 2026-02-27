@@ -1,8 +1,8 @@
-# UX/UI Improvements
+# UX/UI improvements
 
 Prioritized backlog of visual polish, usability, and accessibility improvements. Benchmarked against Squoosh, TinyPNG, iLovePDF, and Smallpdf.
 
-## Quick wins (low effort)
+## Quick wins
 
 - [x] **Full-page drop overlay** — Listen for drag on `document.body`, show a full-viewport overlay with "Drop to optimize" message. Currently drops outside the drop zone are silently ignored. Filter with `e.dataTransfer.types.includes('Files')`.
 
@@ -20,7 +20,7 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 
 - [x] **Preset discoverability** — Bump `.preset-btn__desc` from `0.65rem` to `0.72rem`. Add a gear icon to the "Advanced Settings" toggle. Consider a counter badge ("2 options customized").
 
-## Medium effort
+## Medium
 
 - [ ] **Mobile responsiveness** — Results table (5 columns) and inspect panel (5-column grid) overflow on small screens. At `max-width: 640px`: convert results to card layout, collapse inspect grid to 2-3 columns, add `flex-wrap: wrap` to preset buttons, ensure 44px minimum tap targets.
 
@@ -48,12 +48,7 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 
 - [x] **Read Me palette (Stickies)** — Yellow Mac Stickies-style floating palette displaying the project README.md content, rendered via a minimal markdown-to-HTML function. Scrollable, draggable, shadable.
 
-## Bugs
-
-- [x] **calrgb.pdf loses all background colors and text after optimization** — **Fixed.** Root cause: fflate's `deflateSync` produces raw DEFLATE without the 2-byte zlib header (RFC 1950), but PDF's FlateDecode spec expects zlib-wrapped data. macOS Preview and other PDF viewers silently fail on headerless deflate, rendering blank pages. This affected all stream recompression and font subsetting output. Fix: replaced `deflateSync` with `zlibSync` in `streams.js` and `font-subset.js`. Also hardened the BFS traversal (`PDFRawStream` → `PDFStream` base class) and added a `checkContentIntegrity()` post-pipeline guard.
-
 ## Lower priority
-
 - [ ] **Drop zone micro-interactions** — Brief scale animation (`transform: scale(1.02)`) on successful file selection. Subtle box-shadow glow pulse on drag-over. Animate the SVG upload icon during drag.
 
 - [ ] **Single-file results consolidation** — For the most common case (one file), hide the table entirely and consolidate everything into the hero card: move "Show details" and "Object breakdown" toggles into the hero section.
@@ -66,7 +61,7 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 
 ## Easter eggs
 
-Small, discoverable surprises that reinforce the retro aesthetic. Each should be under a day to implement. All animated items must respect `prefers-reduced-motion`. State (unlocked themes, dismissed alerts) persists via `localStorage`.
+Small, discoverable surprises that lean into the retro aesthetic. Each should take under a day. All animated items must respect `prefers-reduced-motion`. State (unlocked themes, dismissed alerts) persists via `localStorage`.
 
 ### Audio
 

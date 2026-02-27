@@ -101,7 +101,7 @@ The app uses a simplified two-phase model: **idle/results** vs **processing**. T
 └──────────────────────────────────────────────┘
 
 ┌── Settings palette ──────────┐   (always on screen)
-│ [Lossless*][Web][Print]      │
+│ [Lossless*][Web][Print][Max] │
 │ No quality loss — recompress,│ ← preset hint (updates per tab)
 │ deduplicate, subset fonts    │
 │ ⚙ Advanced Settings          │ ← gear icon
@@ -188,7 +188,7 @@ After optimization, the main window shows "Start Over" and palettes are populate
 └──────────────────────────────────────────────┘
 
 ┌── Settings palette ───────────┐
-│ [Lossless*][Web][Print]       │
+│ [Lossless*][Web][Print][Max]  │
 │ No quality loss — recompress… │ ← preset hint
 │ ⚙ Advanced Settings           │
 │ ───────────────────────       │
@@ -332,7 +332,7 @@ index.html
         ├── #palette-settings (created by createPalette())
         │     └── .palette__body
         │           └── #options-panel (moved here from HTML on init)
-        │                 ├── .tab-control (Lossless / Web / Print, title tooltips)
+        │                 ├── .tab-control (Lossless / Web / Print / Max Compress, title tooltips)
         │                 ├── #preset-hint (.tab-control__hint, updates per preset)
         │                 ├── .advanced (<details open>)
         │                 │     └── .advanced__toggle (⚙ gear icon + "Advanced Settings")
@@ -374,6 +374,30 @@ index.html
         │                 └── .compare-viewer-wrap
         │                       ├── .compare-side__label (size + Powered by link)
         │                       └── .compare-side__viewer (PDF-A-go-go container)
+        │
+        ├── #palette-accessibility (created by createPalette())
+        │     └── .palette__body
+        │           └── (populated by buildAccessibilityPaletteContent)
+        │                 ├── .a11y-traits (trait checklist rows)
+        │                 ├── .a11y-audits (ToUnicode, alt text, structure tree)
+        │                 └── .a11y-validators (external tool links)
+        │
+        ├── #palette-appearance (created by createPalette())
+        │     └── .palette__body
+        │           └── (populated by buildAppearanceContent)
+        │                 ├── .pattern-picker (9 pattern swatches)
+        │                 ├── .easter-egg-toggles (chime, Happy Mac, Sad Mac)
+        │                 └── sound picker (buildSoundContent)
+        │
+        ├── #palette-debug (created by createPalette(), hidden by default)
+        │     └── .palette__body
+        │           └── (populated by buildDebugPanel after optimization)
+        │
+        ├── .menu-bar (created by createMenuBar(), fixed top)
+        │     └── Window menu (palette show/hide toggles)
+        │
+        ├── .control-strip (created by createControlStrip(), fixed bottom-left)
+        │     └── .control-strip__modules (CRT, theme, B&W, Grayscale, links)
         │
         └── #desktop-icons
               ├── .desktop-icon #icon-readme (static, in HTML)
@@ -464,6 +488,32 @@ main.js
   │     ├── syncPresetIndicator()     Highlight matching preset button
   │     ├── getCurrentPresetLabel()   "Lossless" / "Web" / "Print" / "Custom"
   │     └── initOptionsListeners()    Wire up event handlers + stale detection
+  │
+  ├── ui/accessibility.js        Accessibility palette
+  │     ├── buildAccessibilityPaletteContent()  Trait checklist + audits + validators
+  │     └── buildAccessibilityEmptyContent()    Placeholder before optimization
+  │
+  ├── ui/appearance.js           Appearance palette (themes, patterns, easter eggs)
+  │     ├── initAppearance()         Initialize theme/pattern from localStorage
+  │     ├── buildAppearanceContent() Appearance palette body (patterns, themes, easter eggs)
+  │     ├── cycleTheme()             Cycle through 5 themes (Platinum, Dark, Amber, Ocean, Forest)
+  │     ├── toggleCRT()              Toggle CRT scanline overlay
+  │     ├── toggleFilter()           Toggle B&W or Grayscale filter
+  │     ├── getThemeLabel()          Current theme name for tooltips
+  │     ├── showMacAlert()           Platinum-style alert window (draggable, auto-dismiss)
+  │     ├── showHappyMac()           Pixel-art Happy Mac palette (savings >= 30%)
+  │     ├── showSadMac()             Pixel-art Sad Mac palette (savings <= 0%)
+  │     └── resetAppearance()        Clear all appearance localStorage
+  │
+  ├── ui/control-strip.js        Mac OS 8 Control Strip
+  │     └── createControlStrip()     Collapsible toolbar (CRT, theme, B&W, links)
+  │
+  ├── ui/menu-bar.js             Mac OS 8 menu bar
+  │     └── createMenuBar()          Press-and-drag menus (Window menu, palette list)
+  │
+  ├── ui/sound.js                Classic Mac sound system
+  │     ├── initSound()              Load sound pack, wire up alert sound triggers
+  │     └── buildSoundContent()      Sound picker UI for Appearance palette
   │
   └── ui/helpers.js              Shared utilities
         ├── formatSize()             Bytes → human-readable string
