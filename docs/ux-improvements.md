@@ -62,7 +62,7 @@ Prioritized backlog of visual polish, usability, and accessibility improvements.
 
 - [ ] **Sound effects for key moments** — Optional audio cues for optimization complete, error, drag-over (off by default, respect `prefers-reduced-motion`). PostHog uses sound effects throughout; we'd keep it minimal and opt-in.
 
-- [ ] **Keyboard shortcuts overlay** — `?shortcuts` URL param showing available shortcuts in a Platinum-styled window. Builds on the `?debug` pattern we already have.
+- [ ] **Keyboard shortcuts overlay** — `?shortcuts` URL param showing available shortcuts in a Platinum-styled window. Could also be a closable palette toggleable from the Window menu (like Debug Console).
 
 ## Easter eggs
 
@@ -110,4 +110,4 @@ Small, discoverable surprises that reinforce the retro aesthetic. Each should be
 
 - [ ] **"Rebuild Desktop" progress bar** — Accessible via `?rebuild` URL param or a hidden button in the About dialog. Shows a mock "Rebuilding Desktop..." progress bar that fills over 5 seconds, then dismisses with "Desktop rebuilt successfully." Pure CSS animation, no actual operation.
 
-- [ ] **Keyboard shortcuts overlay** (from Lower priority above) — `?shortcuts` URL param showing available shortcuts in a Platinum-styled window. Builds on the `?debug` and `?balloons` pattern.
+- [ ] **Keyboard shortcuts overlay** (from Lower priority above) — `?shortcuts` URL param showing available shortcuts in a Platinum-styled window. Could also be a closable palette toggleable from the Window menu (like Debug Console).

@@ -153,7 +153,7 @@ Beyond the visual reskin, the interaction patterns themselves follow mid-90s Hum
 Not everything should be expanded. These remain controlled:
 
 - **Preview palette** — Loads PDF viewer on optimization complete (no lazy-load toggle)
-- **Debug info** — Opt-in diagnostic detail. Collapsed behind `?debug` URL flag
+- **Debug Console** — Diagnostic detail in a floating palette. Accessible via Window menu at any time, or auto-shown with `?debug` URL param
 - **"Show N more..." within inspector categories** — Categories open, but 50+ objects collapse to first 5
 
 ---

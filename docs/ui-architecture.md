@@ -226,7 +226,7 @@ After optimization, the main window shows "Start Over" and palettes are populate
 1. "Did it work?" — savings % + sizes in Results palette (always prominent)
 2. "Get my file" — Download button in Results palette
 3. "What happened?" — hint banner + Inspector palette (stats + object breakdown)
-4. "Deep dive" — Preview palette (PDF-A-go-go viewer), Debug panel (`?debug` only)
+4. "Deep dive" — Preview palette (PDF-A-go-go viewer), Debug Console (via Window menu)
 5. "What next?" — Re-optimize in Settings palette, Start Over in main window
 6. Status bar — persistent savings summary
 
@@ -306,8 +306,6 @@ index.html
         │     │     ├── .title-bar__ridges
         │     │     └── .title-bar__widgets > .title-bar__collapse-box
         │     │
-        │     ├── .debug-banner (conditional, ?debug param)
-        │     │
         │     ├── #app (main content area)
         │     │     │
         │     │     ├── #drop-zone (ALWAYS visible, dimmed during processing)
@@ -368,7 +366,7 @@ index.html
         │                 │     │           ├── .inspect-annotation (what optimizer did)
         │                 │     │           └── .inspect-item × N (with Show more toggle)
         │                 │     └── .inspect-panel__total
-        │                 └── .debug-panel (<details>, ?debug only)
+        │                 └── (debug data shown in Debug Console palette)
         │
         ├── #palette-preview (created by createPalette())
         │     └── .palette__body
@@ -479,7 +477,7 @@ main.js
 | Element | Trigger | Duration | Notes |
 |---------|---------|----------|-------|
 | `.toast` | Non-PDF files dropped | 4s + 300ms fade | Fixed bottom-center |
-| `.debug-banner` | `?debug` URL param | Persistent | Top of `#main-window` |
+| Debug Console palette | Window menu or `?debug` URL param | Persistent (closable) | Floating palette |
 | `.drop-overlay` | Files dragged over page | While dragging | Full-page, pointer-events: none |
 | `.btn--stale` animation | Settings changed after results | 1x 2s pulse | On Re-optimize button |
 | Count-up animation | Results displayed | 600ms ease-out | On savings percentage |

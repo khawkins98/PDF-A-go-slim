@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Squeezed PDF document — StuffIt-inspired "on a diet" icon -->
+
+  <!-- Document body: pinched at the waist -->
+  <path d="
+    M7 2 h12 l6 6 v4
+    Q25 16 21 16
+    Q25 16 25 20
+    v8 H7 v-8
+    Q7 16 11 16
+    Q7 16 7 12
+    Z
+  " fill="#F5F0E6" stroke="#333" stroke-width="1" stroke-linejoin="round"/>
+
+  <!-- Folded corner -->
+  <path d="M19 2v6h6" fill="#E8E0D0" stroke="#333" stroke-width="1" stroke-linejoin="round"/>
+
+  <!-- Clamp lines at the waist -->
+  <line x1="3" y1="14.5" x2="8" y2="14.5" stroke="#333" stroke-width="1" stroke-linecap="round"/>
+  <line x1="3" y1="16" x2="9" y2="16" stroke="#333" stroke-width="1.25" stroke-linecap="round"/>
+  <line x1="3" y1="17.5" x2="8" y2="17.5" stroke="#333" stroke-width="1" stroke-linecap="round"/>
+
+  <line x1="29" y1="14.5" x2="24" y2="14.5" stroke="#333" stroke-width="1" stroke-linecap="round"/>
+  <line x1="29" y1="16" x2="23" y2="16" stroke="#333" stroke-width="1.25" stroke-linecap="round"/>
+  <line x1="29" y1="17.5" x2="24" y2="17.5" stroke="#333" stroke-width="1" stroke-linecap="round"/>
+
+  <!-- "PDF" text in lower half -->
+  <text x="16" y="25" text-anchor="middle" font-family="Geneva,Chicago,system-ui,sans-serif" font-size="7" font-weight="700" fill="#333">PDF</text>
+</svg>

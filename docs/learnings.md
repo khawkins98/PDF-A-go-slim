@@ -2,6 +2,8 @@
 
 Technical knowledge accumulated during development. Updated as we go.
 
+This project shares foundational PDF knowledge with its sibling [PDF-A-go-actionable](https://github.com/khawkins98/PDF-A-go-actionable), a client-side PDF accessibility checker. Accessibility-specific learnings (structure tree walking, heading/table/list validation, WCAG/PDF/UA audit patterns) live in [PDF-A-go-actionable's learnings file](https://github.com/khawkins98/PDF-A-go-actionable/blob/main/docs/learnings.md). This file covers optimization-focused knowledge.
+
 This project grew out of [PDF-A-go-go](https://github.com/khawkins98/PDF-A-go-go), a lightweight embeddable PDF viewer built on PDF.js. While creating a demo PDF for that project's showcase page, a clean 32 KB file ballooned to 198 KB after a minor Illustrator edit — redundant font embeddings, metadata bloat, duplicate objects. The existing tools (Ghostscript, qpdf, online services) each solved part of the problem but none solved all of it in the browser. PDF-A-go-slim applies every optimization technique we could find, entirely client-side. The two projects share a philosophy: no server, no framework, pure browser.
 
 ---
@@ -324,15 +326,15 @@ PDF font names often carry a 6-letter subset prefix (e.g., `ABCDEF+Helvetica`). 
 
 ## Code Architecture
 
-### Debug Mode (`?debug` URL Parameter)
+### Debug Console
 
-Debug mode is activated by adding `?debug` to the URL (e.g., `localhost:5173/?debug`). It provides structured diagnostic information without cluttering the UI for normal users.
+The Debug Console is a floating palette (always created, hidden by default) that displays per-pass timing, image skip reasons, and per-image conversion details. It can be shown at any time via the **Window menu** — no page refresh required. Adding `?debug` to the URL auto-shows it on load, so shareable debug links still work.
 
 **How it works:**
-- `collectOptions()` in `main.js` reads the `?debug` URL param and sets `options.debug: true`
+- `options.debug` is always `true` — debug data is always collected (the overhead is minimal: just array pushes during the image pass)
 - `pipeline.js` wraps each pass with `Date.now()` timing, adding `_ms` to every pass's stats object
-- Individual passes can return a `_debug` array of structured log entries and a `skipReasons` counter object when `options.debug` is true — this replaces ad-hoc `console.log` debugging
-- `main.js` renders a collapsible `<details>` debug panel below each file's results when debug mode is active
+- Individual passes can return a `_debug` array of structured log entries and a `skipReasons` counter object — this replaces ad-hoc `console.log` debugging
+- `main.js` always populates the Debug Console palette after optimization completes
 
 **Adding debug output to a new pass:**
 ```js

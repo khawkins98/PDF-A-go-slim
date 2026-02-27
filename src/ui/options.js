@@ -109,7 +109,7 @@ export function collectOptions() {
     maxImageDpi: lossy && dpiVal > 0 ? dpiVal : undefined,
     unembedStandardFonts: unembedCheckbox.checked,
     subsetFonts: subsetCheckbox.checked,
-    debug: new URLSearchParams(window.location.search).has('debug'),
+    debug: true,
   };
 }
 

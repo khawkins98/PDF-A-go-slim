@@ -28,7 +28,7 @@ Every optimization technique here is well-documented individually, but no tool p
 - **PDF/A and accessibility aware** — auto-detects PDF/A conformance and tagged PDFs; preserves embedded fonts, XMP metadata, and structure trees that conformance requires
 - **Privacy-first** — files never leave your browser; all processing runs in a Web Worker
 - **Batch capable** — optimize multiple PDFs at once with individual or bulk download
-- **Debug mode** — add `?debug` to the URL for per-pass timing and image conversion details
+- **Debug Console** — per-pass timing and image conversion details, accessible from the Window menu (or auto-shown with `?debug` URL param)
 - **Benchmark tested** — 57 tests verify compression, asset stripping, and accessibility preservation ([results](docs/benchmark-results.md))
 
 ## A note on font subsetting
@@ -129,6 +129,7 @@ For detailed technical notes on PDF internals, font handling, and stream decodin
 
 ## Documentation
 
+- [Changelog](CHANGELOG.md) — notable changes per release
 - [Benchmark results](docs/benchmark-results.md) — auto-generated compression and accessibility test report
 - [UI architecture](docs/UI.md) — design decisions, layout, and window manager details
 - [Technical learnings](docs/learnings.md) — PDF internals, font subsetting, stream decoding notes

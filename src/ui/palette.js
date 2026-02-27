@@ -328,11 +328,40 @@ export function createPalette({ id, title, defaultPosition, width, closable = fa
     bodyEl.appendChild(empty);
   }
 
+  /** Clamp palette position so it fits within the visible viewport. */
+  function clampToViewport() {
+    if (isMobile()) return;
+    requestAnimationFrame(() => {
+      const rect = el.getBoundingClientRect();
+      const vpHeight = window.innerHeight;
+      const menuBar = 21;
+      const controlStrip = 28;
+      const margin = 8;
+      const maxBottom = vpHeight - controlStrip - margin;
+
+      if (rect.bottom > maxBottom) {
+        let newTop = maxBottom - rect.height;
+        newTop = Math.max(menuBar + margin, newTop);
+        el.style.top = `${newTop}px`;
+        el.style.bottom = 'auto';
+
+        // If still overflowing after moving up, cap body height
+        const updatedRect = el.getBoundingClientRect();
+        if (updatedRect.bottom > maxBottom) {
+          const titleBarHeight = titleBar.offsetHeight;
+          const available = maxBottom - updatedRect.top - titleBarHeight - 2;
+          if (available > 60) bodyEl.style.maxHeight = `${available}px`;
+        }
+      }
+    });
+  }
+
   return {
     element: el,
     bodyEl,
     setContent,
     showEmpty,
+    clampToViewport,
     shade: () => el.classList.add('palette--shaded'),
     unshade: () => el.classList.remove('palette--shaded'),
     isShaded: () => el.classList.contains('palette--shaded'),

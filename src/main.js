@@ -252,7 +252,7 @@ previewPalette.showEmpty('No document loaded');
 const readmePalette = createPalette({
   id: 'readme',
   title: 'Read Me',
-  defaultPosition: { top: 400, left: 20 },
+  defaultPosition: { top: 340, left: 20 },
   width: 340,
   closable: true,
 });
@@ -262,6 +262,7 @@ const readmeContent = document.createElement('div');
 readmeContent.className = 'readme-content';
 readmeContent.innerHTML = renderMarkdown(readmeText);
 readmePalette.setContent(readmeContent);
+readmePalette.clampToViewport();
 
 // --- Appearance palette (hidden by default, closable) ---
 const appearancePalette = createPalette({
@@ -274,19 +275,17 @@ const appearancePalette = createPalette({
 appearancePalette.setContent(buildAppearanceContent());
 appearancePalette.hide();
 
-// --- Debug Console palette (only when ?debug) ---
+// --- Debug Console palette (always created, hidden unless ?debug) ---
 const isDebug = new URLSearchParams(window.location.search).has('debug');
-let debugPalette;
-if (isDebug) {
-  debugPalette = createPalette({
-    id: 'debug',
-    title: 'Debug Console',
-    defaultPosition: { top: 440, left: 520 },
-    width: 480,
-    closable: true,
-  });
-  debugPalette.showEmpty('Run optimization to see diagnostics');
-}
+const debugPalette = createPalette({
+  id: 'debug',
+  title: 'Debug Console',
+  defaultPosition: { top: 440, left: 520 },
+  width: 480,
+  closable: true,
+});
+debugPalette.showEmpty('Run optimization to see diagnostics');
+if (!isDebug) debugPalette.hide();
 
 // Establish initial z-order: Read Me behind work palettes
 bringToFront(readmePalette.element);
@@ -455,14 +454,12 @@ function renderResults(results, options) {
     inspectorPalette.showEmpty('No optimization data available');
   }
 
-  // Debug Console palette
-  if (debugPalette) {
-    const debugHtml = buildDebugPanel(firstResult.stats);
-    if (debugHtml) {
-      const body = document.createElement('div');
-      body.innerHTML = debugHtml;
-      debugPalette.setContent(body);
-    }
+  // Debug Console palette (always populated — visible via Window menu)
+  const debugHtml = buildDebugPanel(firstResult.stats);
+  if (debugHtml) {
+    const body = document.createElement('div');
+    body.innerHTML = debugHtml;
+    debugPalette.setContent(body);
   }
 
   // Accessibility palette (batch: shows first file only, matching Inspector/Preview)
@@ -501,7 +498,7 @@ function startOver() {
   resultsPalette.showEmpty('Nothing to report yet');
   inspectorPalette.showEmpty('Waiting for a PDF to dissect');
   previewPalette.showEmpty('No document loaded');
-  if (debugPalette) debugPalette.showEmpty('Run optimization to see diagnostics');
+  debugPalette.showEmpty('Run optimization to see diagnostics');
   accessibilityPalette.setContent(buildAccessibilityEmptyContent());
 
   mainActions.hidden = true;
@@ -525,6 +522,14 @@ async function handleFiles(files) {
     playSound('error');
   }
   if (pdfFiles.length === 0) return;
+
+  // Large file toast (tiered at 20/50 MB)
+  const totalMB = pdfFiles.reduce((s, f) => s + f.size, 0) / (1024 * 1024);
+  if (totalMB >= 50) {
+    showToast(`${Math.round(totalMB)} MB is a lot of PDF to chew on. This could take a while \u2014 hang tight!`, 8000);
+  } else if (totalMB >= 20) {
+    showToast(`That\u2019s a big file! Sit tight \u2014 ${Math.round(totalMB)} MB may take a moment to crunch.`, 8000);
+  }
 
   lastFiles = pdfFiles;
   cancelled = false;
@@ -746,12 +751,13 @@ function showAboutDialog() {
         <div class="about-dialog__stripes"></div>
       </div>
       <div class="about-dialog__body">
+        <img src="${new URL('/favicon.svg', import.meta.url).href}" alt="" width="48" height="48" style="display:block;margin:0 auto 0.5rem" />
         <div class="about-dialog__name">PDF-A-go-slim</div>
         <p>Reduce PDF file size entirely in your browser. No uploads, no server.</p>
         <p>Built with pdf-lib, fflate, harfbuzzjs, and jpeg-js.</p>
         <p>Classic Mac sounds curated by Steven Jay Cohen, Karl Laurent, and Ginger Lindsey.</p>
         <p><a href="https://github.com/khawkins98/PDF-A-go-slim" target="_blank" rel="noopener">github.com/khawkins98/PDF-A-go-slim</a></p>
-        <p style="margin-top:0.4rem;font-size:0.7rem;opacity:0.6">Last updated: ${__BUILD_DATE__}</p>
+        <p style="margin-top:0.4rem;font-size:0.7rem;opacity:0.6"><a href="https://github.com/khawkins98/PDF-A-go-slim/blob/main/CHANGELOG.md" target="_blank" rel="noopener" style="color:inherit">v${__APP_VERSION__}</a> &middot; ${__BUILD_DATE__}</p>
       </div>
       <div class="about-dialog__footer">
         <button class="btn btn--default" data-action="close">OK</button>
@@ -770,14 +776,18 @@ function showAboutDialog() {
 
 document.getElementById('btn-about').addEventListener('click', showAboutDialog);
 
-// --- Debug mode indicator ---
-if (new URLSearchParams(window.location.search).has('debug')) {
-  const banner = document.createElement('div');
-  banner.className = 'debug-banner';
-  banner.innerHTML = 'Debug mode active \u2014 extra diagnostics will appear in results';
-  const appWindow = document.querySelector('.app-window');
-  appWindow.insertBefore(banner, appWindow.firstChild);
-}
+// --- Debug Console link (status bar button) ---
+document.getElementById('btn-debug').addEventListener('click', () => {
+  if (debugPalette.element.hidden) debugPalette.show();
+  bringToFront(debugPalette.element);
+});
+
+// --- Warn before navigating away if results exist ---
+window.addEventListener('beforeunload', (e) => {
+  if (lastFiles && lastFiles.length > 0) {
+    e.preventDefault();
+  }
+});
 
 // --- Startup warning dialog ---
 const WARNING_DISMISSED_KEY = 'pdfagoslim-warning-dismissed';
@@ -802,7 +812,7 @@ function showWarningDialog() {
           <p>However, the optimized copy may have rendering differences or missing content. If you overwrite your original with the optimized version, that data may be unrecoverable.</p>
           <p><strong>Font subsetting</strong> is off by default. A rendering issue with certain fonts has been fixed, but we continue to monitor for edge cases. You can enable it in Advanced Settings.</p>
           <p>This tool is provided "as is", without warranty of any kind.</p>
-          <p style="margin-top:0.6rem;font-size:0.7rem;opacity:0.6">Last updated: ${__BUILD_DATE__}</p>
+          <p style="margin-top:0.6rem;font-size:0.7rem;opacity:0.6"><a href="https://github.com/khawkins98/PDF-A-go-slim/blob/main/CHANGELOG.md" target="_blank" rel="noopener" style="color:inherit">v${__APP_VERSION__}</a> &middot; ${__BUILD_DATE__}</p>
         </div>
       </div>
       <div class="warning-dialog__footer">
