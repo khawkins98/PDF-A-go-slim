@@ -3293,6 +3293,41 @@ body.crt-overlay::after {
   text-decoration: underline;
 }
 
+/* --- Shutdown / Restart overlay --- */
+.shutdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  transition: background 0.5s ease;
+}
+
+.shutdown-overlay--off {
+  background: #000;
+}
+
+.shutdown-message {
+  color: #fff;
+  font-size: 1.2rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.shutdown-hint {
+  color: #fff;
+  font-size: 0.75rem;
+  opacity: 0;
+  animation: shutdown-hint-fade 0.8s ease forwards;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+@keyframes shutdown-hint-fade {
+  to { opacity: 0.35; }
+}
+
 /* --- Mobile: stack palettes vertically --- */
 @media (max-width: 768px) {
   .desktop {

@@ -356,12 +356,29 @@ export function createPalette({ id, title, defaultPosition, width, closable = fa
     });
   }
 
+  /** Reset palette to its original default position, size, and state. */
+  function resetPosition() {
+    clearZoomState();
+    el.classList.remove('palette--shaded');
+    savedHeight = null;
+    bodyEl.style.maxHeight = '';
+    el.style.height = '';
+    el.style.width = `${width}px`;
+
+    // Reset position — handle all four anchor variants
+    el.style.top = defaultPosition.top != null ? `${defaultPosition.top}px` : '';
+    el.style.bottom = defaultPosition.bottom != null ? `${defaultPosition.bottom}px` : '';
+    el.style.left = defaultPosition.left != null ? `${defaultPosition.left}px` : '';
+    el.style.right = defaultPosition.right != null ? `${defaultPosition.right}px` : '';
+  }
+
   return {
     element: el,
     bodyEl,
     setContent,
     showEmpty,
     clampToViewport,
+    resetPosition,
     shade: () => el.classList.add('palette--shaded'),
     unshade: () => el.classList.remove('palette--shaded'),
     isShaded: () => el.classList.contains('palette--shaded'),

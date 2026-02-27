@@ -10,7 +10,7 @@ import { createControlStrip } from './ui/control-strip.js';
 import { createMenuBar } from './ui/menu-bar.js';
 import { buildAppearanceContent, initAppearance, showHappyMac, showSadMac, showMacAlert } from './ui/appearance.js';
 import { startPacman, stopPacman, forcePacman } from './ui/pacman.js';
-import { playSound, initSound } from './ui/sound.js';
+import { playSound, previewSound, initSound } from './ui/sound.js';
 import readmeText from '../README.md?raw';
 
 // --- Sample PDFs (pdf.js test suite — CORS-accessible via GitHub raw) ---
@@ -198,6 +198,10 @@ registerWindow('main', 'PDF-A-go-slim', mainWindow, 'main');
 const menuBar = createMenuBar({
   onAbout: showAboutDialog,
   onAppearance: toggleAppearancePalette,
+  onCleanUpDesktop: cleanUpDesktop,
+  onEmptyTrash: () => startOver(),
+  onRestart: doRestart,
+  onShutDown: doShutDown,
 });
 
 // --- Create palettes ---
@@ -302,6 +306,55 @@ bringToFront(resultsPalette.element);
 bringToFront(previewPalette.element);
 bringToFront(inspectorPalette.element);
 bringToFront(accessibilityPalette.element);
+
+// --- Special menu callbacks ---
+
+/** Reset all palettes to their default positions. */
+function cleanUpDesktop() {
+  [settingsPalette, resultsPalette, inspectorPalette, previewPalette,
+   accessibilityPalette, readmePalette, appearancePalette, debugPalette]
+    .forEach((p) => p.resetPosition());
+}
+
+/** Dismiss overlay, reset app state, and play startup bong. */
+function bootUp(overlay) {
+  overlay.remove();
+  startOver();
+  cleanUpDesktop();
+  previewSound('synthesized');
+}
+
+/** Show a restart overlay then "reboot" the app in-place. */
+function doRestart() {
+  const overlay = document.createElement('div');
+  overlay.className = 'shutdown-overlay';
+  const msg = document.createElement('div');
+  msg.className = 'shutdown-message';
+  msg.textContent = 'Restarting\u2026';
+  overlay.appendChild(msg);
+  document.body.appendChild(overlay);
+  setTimeout(() => bootUp(overlay), 1200);
+}
+
+/** Classic Mac shutdown: fade to black, screen stays off. Click to restart. */
+function doShutDown() {
+  const overlay = document.createElement('div');
+  overlay.className = 'shutdown-overlay';
+  document.body.appendChild(overlay);
+
+  // Fade to black
+  requestAnimationFrame(() => overlay.classList.add('shutdown-overlay--off'));
+
+  // After a few seconds of darkness, show a subtle hint
+  setTimeout(() => {
+    const hint = document.createElement('div');
+    hint.className = 'shutdown-hint';
+    hint.textContent = 'Click to restart';
+    overlay.appendChild(hint);
+  }, 3000);
+
+  overlay.addEventListener('click', () => bootUp(overlay));
+}
 
 function toggleAppearancePalette() {
   if (appearancePalette.element.hidden) {
@@ -874,3 +927,4 @@ showWarningDialog();
 
 // --- Initial state ---
 statusLeft.textContent = 'Ready \u2014 files never leave your device';
+
