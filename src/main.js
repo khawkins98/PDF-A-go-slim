@@ -68,6 +68,19 @@ function showToast(message, duration = 4000) {
   }, duration);
 }
 
+// --- Trash "poof" visual feedback (classic Mac OS) ---
+function showTrashPoof() {
+  const poof = document.createElement('div');
+  poof.className = 'trash-poof';
+  for (let i = 0; i < 5; i++) {
+    const star = document.createElement('div');
+    star.className = 'trash-poof__star';
+    poof.appendChild(star);
+  }
+  document.body.appendChild(poof);
+  poof.addEventListener('animationend', () => poof.remove());
+}
+
 // --- Count-up animation ---
 function animateCountUp(el, target, duration = 600) {
   const start = performance.now();
@@ -199,7 +212,7 @@ const menuBar = createMenuBar({
   onAbout: showAboutDialog,
   onAppearance: toggleAppearancePalette,
   onCleanUpDesktop: cleanUpDesktop,
-  onEmptyTrash: () => startOver(),
+  onEmptyTrash: () => { playSound('trash'); showTrashPoof(); startOver(); },
   onRestart: doRestart,
   onShutDown: doShutDown,
 });

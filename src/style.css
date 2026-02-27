@@ -3328,6 +3328,63 @@ body.crt-overlay::after {
   to { opacity: 0.35; }
 }
 
+/* --- Empty Trash "poof" animation (classic Mac OS) --- */
+.trash-poof {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 160px;
+  height: 160px;
+  margin: -80px 0 0 -80px;
+  pointer-events: none;
+  z-index: 99999;
+  animation: trash-poof 0.6s ease-out forwards;
+}
+
+.trash-poof__star {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: var(--color-text, #333);
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  opacity: 0.85;
+}
+
+.trash-poof__star:nth-child(1) { animation: poof-particle-1 0.55s ease-out forwards; }
+.trash-poof__star:nth-child(2) { animation: poof-particle-2 0.55s ease-out forwards; }
+.trash-poof__star:nth-child(3) { animation: poof-particle-3 0.55s ease-out forwards; }
+.trash-poof__star:nth-child(4) { animation: poof-particle-4 0.55s ease-out forwards; }
+.trash-poof__star:nth-child(5) { animation: poof-particle-5 0.55s ease-out forwards; }
+
+@keyframes trash-poof {
+  0%   { opacity: 1; transform: scale(0.4); }
+  40%  { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+@keyframes poof-particle-1 {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.9; }
+  100% { transform: translate(-50px, -60px) scale(0.3); opacity: 0; }
+}
+@keyframes poof-particle-2 {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.9; }
+  100% { transform: translate(55px, -45px) scale(0.3); opacity: 0; }
+}
+@keyframes poof-particle-3 {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.9; }
+  100% { transform: translate(60px, 40px) scale(0.3); opacity: 0; }
+}
+@keyframes poof-particle-4 {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.9; }
+  100% { transform: translate(-55px, 50px) scale(0.3); opacity: 0; }
+}
+@keyframes poof-particle-5 {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.9; }
+  100% { transform: translate(0, -70px) scale(0.3); opacity: 0; }
+}
+
 /* --- Mobile: stack palettes vertically --- */
 @media (max-width: 768px) {
   .desktop {
