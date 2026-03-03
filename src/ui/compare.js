@@ -87,7 +87,7 @@ function observeResize(viewer, blobUrl) {
       wrap.appendChild(newViewer);
 
       try {
-        const pdfagogo = window.flipbook?.default || window.flipbook;
+        const pdfagogo = window.pdfagogo?.default || window.pdfagogo;
         await pdfagogo.initializeContainer(newViewer, { pdfUrl: blobUrl, ...VIEWER_CONFIG });
         activeContainers.push(newViewer);
         currentViewer = newViewer;
@@ -119,7 +119,7 @@ function loadPdfAGoGo() {
     }
 
     // Load JS
-    if (window.flipbook) {
+    if (window.pdfagogo) {
       resolve();
       return;
     }
@@ -207,7 +207,7 @@ export function buildCompareSection(originalFile, optimizedBlob, { autoOpen = fa
 
     // Initialize viewer
     try {
-      const pdfagogo = window.flipbook?.default || window.flipbook;
+      const pdfagogo = window.pdfagogo?.default || window.pdfagogo;
       await pdfagogo.initializeContainer(viewer, { pdfUrl: blobUrl, ...VIEWER_CONFIG });
       activeContainers.push(viewer);
       observeResize(viewer, blobUrl);
@@ -258,7 +258,7 @@ export function buildPreviewContent(originalFile, optimizedBlob) {
     viewerContainer.appendChild(viewer);
 
     try {
-      const pdfagogo = window.flipbook?.default || window.flipbook;
+      const pdfagogo = window.pdfagogo?.default || window.pdfagogo;
       await pdfagogo.initializeContainer(viewer, { pdfUrl: blobUrl, ...VIEWER_CONFIG });
       activeContainers.push(viewer);
       observeResize(viewer, blobUrl);
