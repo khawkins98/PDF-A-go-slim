@@ -12,6 +12,7 @@ import { buildAppearanceContent, initAppearance, showHappyMac, showSadMac, showM
 import { startPacman, stopPacman, forcePacman } from './ui/pacman.js';
 import { playSound, previewSound, initSound } from './ui/sound.js';
 import readmeText from '../README.md?raw';
+import faviconUrl from '/favicon.svg?url';
 
 // --- Sample PDFs (pdf.js test suite — CORS-accessible via GitHub raw) ---
 const SAMPLE_PDF_BASE = 'https://raw.githubusercontent.com/mozilla/pdf.js/master/test/pdfs/';
@@ -279,7 +280,7 @@ readmePalette.element.classList.add('palette--sticky');
 
 const readmeContent = document.createElement('div');
 readmeContent.className = 'readme-content';
-readmeContent.innerHTML = renderMarkdown(readmeText);
+readmeContent.innerHTML = renderMarkdown(readmeText.replace('public/favicon.svg', faviconUrl));
 readmePalette.setContent(readmeContent);
 readmePalette.clampToViewport();
 
@@ -838,7 +839,7 @@ function showAboutDialog() {
         <div class="about-dialog__stripes"></div>
       </div>
       <div class="about-dialog__body">
-        <img src="${new URL('/favicon.svg', import.meta.url).href}" alt="" width="48" height="48" style="display:block;margin:0 auto 0.5rem" />
+        <img src="${faviconUrl}" alt="" width="48" height="48" style="display:block;margin:0 auto 0.5rem" />
         <div class="about-dialog__name">PDF-A-go-slim</div>
         <p>Reduce PDF file size entirely in your browser. No uploads, no server.</p>
         <p>Built with pdf-lib, fflate, harfbuzzjs, and jpeg-js.</p>
