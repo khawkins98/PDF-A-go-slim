@@ -471,3 +471,29 @@ The guards are ordered intentionally: integrity check catches corruption, size g
 ### Node.js fetch() detection
 
 Node.js 18+ has a global `fetch()`, so `typeof fetch === 'function'` is true in both browser and Node. For environment detection, use `typeof process !== 'undefined' && process.versions?.node` to identify Node.js before checking for `fetch`.
+
+---
+
+## Progressive Web App (PWA)
+
+### Service worker strategy: generateSW + autoUpdate
+
+`vite-plugin-pwa` with Workbox's `generateSW` strategy is the right fit for a fully client-side app like this. The entire app shell is static build output — no API routes, no dynamic content — so precaching everything is straightforward.
+
+`registerType: 'autoUpdate'` means the new service worker activates immediately without prompting. Combined with `skipWaiting` and `clientsClaim`, users always get the latest version on the next page load. For a utility tool (vs a long-running SPA), this is better than "prompt to refresh" — users visit, optimize a PDF, and leave. There's no session state to protect.
+
+### Precache budget and sound files
+
+The default `generateSW` precaches everything in the build output. With ~20 MP3 sound files in `public/sounds/` (~1 MB total), this would bloat the initial service worker install. Since sounds are optional (decorative UI feedback), they're excluded from precache via `globIgnores: ['**/sounds/**']` and instead runtime-cached with a `CacheFirst` strategy on first play. This keeps the precache at ~1.3 MB (JS + CSS + HTML + WASM).
+
+### WASM in the precache
+
+The harfbuzzjs `hb-subset.wasm` binary (~596 KB, ~237 KB gzipped) is included in the precache automatically because the glob pattern includes `*.wasm`. This is intentional — without it, font subsetting wouldn't work offline. Vite fingerprints the WASM file (e.g., `hb-subset-BZvn1wMA.wasm`), so cache invalidation on updates is automatic.
+
+### SVG-only manifest icons
+
+The manifest uses `favicon.svg` with `sizes: "any"` and `type: "image/svg+xml"`. Chrome, Edge, and Firefox all support SVG manifest icons. iOS Safari added support in 16.4 (March 2023). Older iOS versions fall back to a page screenshot for the home screen icon, which is acceptable for a basic PWA. If broader icon support is needed later, generate 192x192 and 512x512 PNGs from the SVG and add them to the `manifest.icons` array in `vite.config.js`.
+
+### Dev vs production behavior
+
+The service worker is only generated during `npm run build`. During `npm run dev`, no service worker is registered, so the dev experience is unchanged — no stale cache issues during development. To test PWA behavior locally, run `npm run build && npm run preview`.

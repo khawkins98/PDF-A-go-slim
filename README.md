@@ -28,6 +28,7 @@ Every optimization technique here is well-documented individually, but no tool p
 - **Object inspector** — before/after breakdown of PDF objects by category with proportional size bars and per-item diffs
 - **Accessibility palette** — dedicated floating palette with pass/fail trait checklist (tagged, structure tree, document title, display title, language, PDF/A, PDF/UA), lightweight audits (ToUnicode coverage, image alt text, structure tree depth), and links to external validators
 - **PDF/A and accessibility aware** — auto-detects PDF/A conformance and tagged PDFs; preserves embedded fonts, XMP metadata, and structure trees that conformance requires
+- **Installable (PWA)** — install to your home screen on mobile or desktop; works offline once cached
 - **Private** — files never leave your browser; all processing runs in a Web Worker
 - **Batch capable** — optimize multiple PDFs at once with individual or bulk download
 - **Debug Console** — per-pass timing and image conversion details, accessible from the Window menu (or auto-shown with `?debug` URL param)
@@ -98,6 +99,7 @@ For detailed technical notes on PDF internals, font handling, and stream decodin
 - [harfbuzzjs](https://github.com/nicbou/harfbuzzjs) — WASM font subsetting (MIT / Apache 2.0)
 - [Vite](https://vitejs.dev/) — build tooling
 - [Vitest](https://vitest.dev/) — test runner
+- [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) — PWA service worker and manifest generation
 
 ## Inspirations
 
@@ -124,6 +126,20 @@ For detailed technical notes on PDF internals, font handling, and stream decodin
 
 **Accessibility checks inspired by:**
 - [PDFcheck](https://github.com/jsnmrs/pdfcheck) by Jason Morris ([blog post](https://jasonmorris.com/code/pdfcheck/)) — client-side PDF accessibility checker (MIT); our document title, display title, and marked-status checks were inspired by its approach
+
+## Progressive Web App (PWA)
+
+The app is installable as a PWA and works fully offline. The service worker is generated at build time by `vite-plugin-pwa` using Workbox's `generateSW` strategy.
+
+**What gets precached:** All JS, CSS, HTML, SVG, and WASM assets (~1.3 MB). This includes the harfbuzzjs WASM binary needed for font subsetting, so the full optimization pipeline works offline.
+
+**What gets runtime-cached:** Sound effects (~1 MB total) are cached on first play via a `CacheFirst` strategy, so they don't inflate the initial install size.
+
+**Update strategy:** `autoUpdate` — new versions activate immediately without prompting. The service worker calls `skipWaiting()` and `clientsClaim()` so the next page load uses the updated assets.
+
+**Icons:** The manifest uses the SVG favicon (`favicon.svg`) which works in Chrome, Edge, and Firefox. iOS Safari 16.4+ also supports SVG icons; on older iOS the home screen icon will fall back to a page screenshot. If broader icon support is needed, generate 192x192 and 512x512 PNGs from the SVG and add them to the manifest in `vite.config.js`.
+
+**Dev vs production:** The service worker is only generated during `npm run build`. It won't interfere with `npm run dev`.
 
 ## Related projects
 

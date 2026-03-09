@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-03-09
+
+### Added
+
+- **Progressive Web App (PWA)** — The app is now installable on mobile and desktop home screens and works fully offline. Uses `vite-plugin-pwa` with Workbox's `generateSW` strategy. App shell assets (~1.3 MB including harfbuzzjs WASM) are precached on first visit; sound effects are runtime-cached on first play to keep the install lightweight. Updates activate automatically on the next page load.
+
 ## [1.1.1] - 2026-03-03
 
 ### Fixed
