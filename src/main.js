@@ -37,7 +37,7 @@ window.addEventListener('error', (e) => {
 
 // --- Friendly pass name labels (pipeline names stay unchanged for test compat) ---
 const PASS_LABELS = {
-  'Recompressing streams': 'Compressing data\u2026',
+  'Recompressing streams': 'Recompressing streams\u2026',
   'Recompressing images': 'Optimizing images\u2026',
   'Unembedding standard fonts': 'Cleaning up fonts\u2026',
   'Subsetting fonts': 'Optimizing fonts\u2026',
