@@ -4,6 +4,8 @@
 
 A browser-based PDF optimization tool that reduces file size entirely client-side. No uploads, no accounts, no file size limits beyond available RAM.
 
+**[Try it live →](https://www.allaboutken.com/PDF-A-go-slim/)**
+
 ## Why I built this
 
 This project grew out of [PDF-A-go-go](https://github.com/khawkins98/PDF-A-go-go), an embeddable PDF viewer for the web. While building a small showcase PDF for its demo page, I hit a problem that turns out to be universal.
